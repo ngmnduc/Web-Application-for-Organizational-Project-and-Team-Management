@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: Team Task API
+  version: 1.0.0
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties: { code: {type: string}, message: {type: string}, details: {type: object} }
+    PageMeta:
+      type: object
+      properties: { page: {type: integer}, limit: {type: integer}, total: {type: integer} }
+security:
+  - bearerAuth: []
+paths:
+  /auth/signup:
+    post:
+      tags: [auth]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name,email,password], properties: { name:{type:string}, email:{type:string}, password:{type:string} } } } } }
+      responses:
+        "201": { description: created }
+        "400": { description: bad, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /auth/login:
+    post:
+      tags: [auth]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email,password], properties: { email:{type:string}, password:{type:string} } } } } }
+      responses:
+        "200": { description: ok }
+        "401": { description: invalid credentials, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /projects:
+    get:
+      tags: [projects]
+      responses: { "200": { description: list with pagination } }
+    post:
+      tags: [projects]
+      responses: { "201": { description: created } }
+  /projects/{id}/members:
+    post:
+      tags: [projects]
+      responses: { "201": { description: added } }
+  /projects/{id}/summary:
+    get:
+      tags: [reports]
+      responses: { "200": { description: summary } }
+  /projects/{id}/labels:
+    get: { tags: [labels], responses: { "200": { description: ok } } }
+    post: { tags: [labels], responses: { "201": { description: created } } }
+  /tasks:
+    post: { tags: [tasks], responses: { "201": { description: created } } }
+  /projects/{id}/tasks:
+    get: { tags: [tasks], responses: { "200": { description: list } } }
+  /tasks/{taskId}:
+    patch: { tags: [tasks], responses: { "200": { description: updated } } }
+    delete: { tags: [tasks], responses: { "204": { description: deleted } } }
+  /tasks/{taskId}/comments:
+    get: { tags: [comments], responses: { "200": { } } }
+    post: { tags: [comments], responses: { "201": { } } }
+  /notifications:
+    get: { tags: [notifications], responses: { "200": { } } }
+  /notifications/{id}/read:
+    patch: { tags: [notifications], responses: { "200": { } } }
+  /projects/{pid}/meetings:
+    get: { tags: [meetings], parameters: [ {in: query, name: month, schema: {type:string}}, {in: query, name: date, schema: {type:string}} ], responses: { "200": { } } }
+    post: { tags: [meetings], responses: { "201": { } } }
+  /meetings/{id}:
+    patch: { tags: [meetings], responses: { "200": { } } }
+    delete: { tags: [meetings], responses: { "204": { } } }
+  /attendance/checkin:
+    post: { tags: [attendance], responses: { "200": { } } }
+  /attendance/me:
+    get: { tags: [attendance], parameters: [ {in: query, name: date, schema: {type:string}} ], responses: { "200": { } } }

@@ -1,12 +1,13 @@
-import app from "./app.js";
-import mongoose from "mongoose";
+import { Router } from "express";
 
-const PORT = process.env.PORT || 4000;
-const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/projectdb";
+const router = Router();
 
-mongoose.connect(MONGO_URI)
-  .then(() => {
-    console.log("✅ MongoDB connected");
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-  })
-  .catch((err) => console.error("❌ MongoDB error:", err));
+// ví dụ
+router.get("/healthz", (req, res) => res.json({ ok: true }));
+
+// mount các module khác:
+// router.use("/v1/auth", authRoutes);
+// router.use("/v1/projects", projectRoutes);
+// ...
+
+export default router;  
