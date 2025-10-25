@@ -1,0 +1,41 @@
+# ===== Node & JavaScript =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+
+# ===== Environment =====
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ===== Build outputs =====
+dist/
+build/
+coverage/
+.temp/
+.cache/
+.vscode/
+.DS_Store
+
+# ===== Backend specific =====
+backend/logs/
+backend/uploads/
+backend/tmp/
+backend/.env
+
+# ===== Frontend specific =====
+frontend/.next/
+frontend/out/
+frontend/.env
+frontend/.env.local
+frontend/node_modules/
+frontend/build/
+
+# ===== OS generated =====
+Thumbs.db
+desktop.ini
