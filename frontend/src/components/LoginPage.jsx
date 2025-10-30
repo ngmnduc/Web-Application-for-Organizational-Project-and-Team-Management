@@ -1,5 +1,5 @@
 import React from 'react'
-import { FaGoogle,FaApple} from 'react-icons/fa';
+import { FaGoogle,FaApple, FaFacebook } from 'react-icons/fa';
 const LoginPage = () => {
   return (
     <>
@@ -46,7 +46,7 @@ const LoginPage = () => {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
+            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition transform hover:scale-110"
           >
             Sign In
           </button>
@@ -54,16 +54,19 @@ const LoginPage = () => {
 
         
         <div className="my-4 flex items-center justify-center">
-          <span className="text-gray-400 text-sm">OR</span>
+          <span className="text-gray-400 text-sm">OR Continue With</span>
         </div>
 
         
-        <div className="space-y-2 w-full max-w-sm">
-          <button className="w-full border py-2 rounded-md flex items-center justify-center gap-2 hover:bg-gray-100 transition">
-            <FaGoogle /> Continue with Google
+        <div className="flex space-x-6 ">
+          <button className="w-12 h-12 border py-2 rounded-full flex items-center justify-center gap-2 hover:bg-red-500 transition transform hover:scale-150">
+            <FaGoogle className='text-xl' /> 
           </button>
-          <button className="w-full border py-2 rounded-md flex items-center justify-center gap-2 hover:bg-gray-100 transition">
-            <FaApple /> Continue with Apple
+          <button className="w-12 h-12 border py-2 rounded-full flex items-center justify-center gap-2 hover:bg-gray-100 transition transform hover:scale-150">
+            <FaApple className='text-2xl'/> 
+          </button>
+          <button className="w-12 h-12 border py-2 rounded-full flex items-center justify-center gap-2 hover:bg-blue-500 transition transform hover:scale-150">
+            <FaFacebook className='text-xl'/> 
           </button>
         </div>
 
@@ -77,16 +80,16 @@ const LoginPage = () => {
       </div>
 
       {/* Right Section */}
-      <div className="md:w-1/2 w-full bg-gradient-to-br from-blue-500 to-indigo-600 flex flex-col justify-center items-center text-white px-10 text-center py-12">
-        <h1 className="text-xl font-bold mb-4">
+      <div className="md:w-1/2 w-full bg-gradient-to-br rounded-lg border-spacing-4 outline-none mb-5 mt-5 mr-6 from-orange-200 to-indigo-600 flex flex-col justify-center items-center text-white px-10 text-center py-12">
+        <h1 className="text-6xl font-bold mb-4">
           Revolutionize Your Workflow with Smarter Automation
         </h1>
         <p className="italic mb-6">
           “Whether you think you can or you think you can't — you're right.”
         </p>
         <div className="flex justify-center gap-10 text-sm">
-          <div> Secure</div>
-          <div>Fast</div>
+          <div>  Secure</div>
+          <div> Fast</div>
           <div> Collaborative</div>
         </div>
       </div>
