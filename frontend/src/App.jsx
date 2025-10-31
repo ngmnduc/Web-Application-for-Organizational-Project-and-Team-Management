@@ -1,20 +1,20 @@
-import { useState } from 'react'
-import React from 'react'
-import { Route, createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom'
-import LoginPage from './components/LoginPage'
-import MainLayout from './layouts/MainLayout'
-const router = createBrowserRouter(
-  createRoutesFromElements(
-  <Route path='/login' element={<LoginPage />}/>
-  
-  )
-);
-const App = () => {
+import { Routes, Route, Navigate } from "react-router-dom";
+import LoginPage from "./components/LoginPage.jsx";
+// sau này thêm Dashboard, NotFound,...
+
+function App() {
   return (
-    <>
-     <RouterProvider router={router} />
-    </>
-  )
+    <Routes>
+      {/* trang mặc định */}
+      <Route path="/" element={<Navigate to="/login" />} />
+
+      {/* login */}
+      <Route path="/login" element={<LoginPage />} />
+
+      {/* fallback 404 */}
+      <Route path="*" element={<div>404 - Page not found</div>} />
+    </Routes>
+  );
 }
 
-export default App
+export default App;
