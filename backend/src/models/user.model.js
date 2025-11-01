@@ -3,6 +3,13 @@ import bcrypt from "bcryptjs";
 
 export const USER_ROLES = ["Admin", "Manager", "Member"];
 
+// export ROLES as an object for imports like `ROLES.ADMIN` used in routes/middlewares
+export const ROLES = {
+  ADMIN: "Admin",
+  MANAGER: "Manager",
+  MEMBER: "Member",
+};
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },

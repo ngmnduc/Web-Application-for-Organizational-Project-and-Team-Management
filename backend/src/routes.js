@@ -1,27 +1,30 @@
 import { Router } from "express";
+import { signup, login, me } from "./controllers/auth.controller.js";
+import { verifyToken, checkRole } from "./middlewares/auth.js";
+import { ROLES } from "./models/user.model.js";
 
 const router = Router();
 
-// ví dụ
 router.get("/healthz", (req, res) => res.json({ ok: true }));
 
-// Auth
-router.use("/auth", authRoutes);
+router.post("/auth/signup", signup);
+router.post("/auth/login", login);
+router.get("/auth/me", verifyToken, me);
 
-// Protected sample routes (test phân quyền)
 router.get("/protected/me", verifyToken, (req, res) => {
-  res.json({ message: "Authenticated", userId: req.userId, role: req.userRole });
-});
-router.get("/protected/admin", verifyToken, checkRole("Admin"), (req, res) => {
-  res.json({ message: "Admin only content" });
-});
-router.get("/protected/manager", verifyToken, checkRole("Admin", "Manager"), (req, res) => {
-  res.json({ message: "Manager or Admin content" });
+  res.json({ message: "Authenticated", user: req.user });
 });
 
-// mount các module khác:
-// router.use("/v1/auth", authRoutes);
-// router.use("/v1/projects", projectRoutes);
-// ...
+router.get("/protected/admin",
+  verifyToken,
+  checkRole(ROLES.ADMIN),
+  (req, res) => res.json({ message: "Admin only content" })
+);
 
-export default router;  
+router.get("/protected/manager",
+  verifyToken,
+  checkRole(ROLES.ADMIN, ROLES.MANAGER),
+  (req, res) => res.json({ message: "Manager or Admin content" })
+);
+
+export default router;

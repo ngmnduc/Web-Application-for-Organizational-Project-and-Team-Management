@@ -1,4 +1,4 @@
-import User from "../models/User.js";
+import User from "../models/user.model.js";
 import { signToken } from "../utils/jwt.js";
 
 function toPublicUser(u) {
@@ -63,6 +63,21 @@ export async function login(req, res, next) {
       tokenType: "Bearer",
       user: toPublicUser(user),
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /auth/me
+export async function me(req, res, next) {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: { message: "Unauthorized" } });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: { message: "User not found" } });
+
+    return res.json({ user: toPublicUser(user) });
   } catch (err) {
     next(err);
   }
