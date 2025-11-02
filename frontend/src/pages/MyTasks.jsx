@@ -34,7 +34,6 @@ const TaskSummaryCard = ({ icon, number, label, iconColor, bgColor, textColor })
       
       {/* Text Content */}
       <div>
-          {/* Định dạng số lượng: text-xl font-semibold và áp dụng màu sắc */}
           <div className={`text-xl font-semibold ${textColor}`}>{number}</div>
           <div className="text-sm text-gray-500 flex items-center">
               {label}
@@ -72,34 +71,9 @@ const MyTasks = () => {
 
   return (
     <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
-      {/* Header Section */}
-      <header className="flex justify-between items-start mb-6">
-        <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
-            <p className="text-gray-500">Manage and track your assigned tasks across all projects</p>
-        </div>
-        <div className="flex space-x-4 items-center">
-            {/* Notification Bell Icon */}
-            <div className="relative cursor-pointer p-1.5 rounded-full hover:bg-gray-100 transition"> 
-                <BellIcon className="w-6 h-6 text-gray-700" />
-                <div 
-                    className="absolute top-0 right-0 w-3 h-3 text-xs rounded-full border-2 border-white bg-red-500" 
-                >
-                </div>
-            </div>
-
-            {/* Avatar/User Icon */}
-            <div className="relative cursor-pointer w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
-                JD
-            </div>
-            
-            {/* Dropdown Icon */}
-            <EllipsisVerticalIcon className="w-6 h-6 text-gray-700 cursor-pointer" /> 
-        </div>
-      </header>
 
       {/* Filters Section */}
-      <div className="flex flex-wrap gap-3 mb-8">
+      <div className="flex flex-wrap gap-3 mb-6">
         {filterOptions.map((option, index) => (
           <button 
             key={index}
@@ -114,6 +88,7 @@ const MyTasks = () => {
           </button>
         ))}
       </div>
+      <div className="border-t border-gray-200 mb-8"></div>
 
       {/* Task Summary Section (Cards) */}
       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg mb-8">

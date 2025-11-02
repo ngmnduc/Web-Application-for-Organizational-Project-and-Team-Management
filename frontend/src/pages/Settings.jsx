@@ -16,33 +16,6 @@ const PRIMARY_COLOR = '#f35640';
 const RED_ORANGE_BG = { backgroundColor: PRIMARY_COLOR };
 const RED_ORANGE_TEXT = { color: PRIMARY_COLOR };
 
-// ---Header Icons---
-const HeaderIcons = () => {
-    return (
-        <div className="flex space-x-4 items-center">
-            {/* Notification Bell Icon */}
-            <div className="relative cursor-pointer p-1.5 rounded-full hover:bg-gray-100 transition">
-                <BellIcon className="w-6 h-6 text-gray-700" />
-                {/* Notification Badge */}
-                <div 
-                    className="absolute top-0 right-0 w-3 h-3 text-xs rounded-full border-2 border-white" 
-                    style={RED_ORANGE_BG}
-                >
-                </div>
-            </div>
-
-            {/* Avatar/User Info */}
-            <div className="flex items-center space-x-2 cursor-pointer">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
-                    JD
-                </div>
-                {/* Dropdown Icon */}
-                <ChevronDownIcon className="w-4 h-4 text-gray-700 cursor-pointer" />
-            </div>
-        </div>
-    );
-};
-
 // ---Sub-Component: Profile Info---
 const ProfileInfo = () => {
     return (
@@ -167,28 +140,7 @@ const AccountSettings = () => {
                     Update Password
                 </button>
             </div>
-
-            {/* Two-Factor Authentication Section */}
-            <div className="mb-8 pb-6 border-b border-gray-100 flex justify-between items-start">
-                <div>
-                    <h3 className="text-lg font-medium text-gray-800">Two-Factor Authentication</h3>
-                    <p className="text-sm text-gray-500 mt-1">Enable 2FA via email code for enhanced security.</p>
-                </div>
-                {/* Toggle Switch */}
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        value="" 
-                        className="sr-only peer" 
-                        checked={is2FAEnabled}
-                        onChange={() => setIs2FAEnabled(!is2FAEnabled)}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-red-300 dark:peer-focus:ring-red-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600"
-                        style={is2FAEnabled ? RED_ORANGE_BG : {}}
-                    ></div>
-                </label>
-            </div>
-
+            
             {/* Danger Zone Section */}
             <div>
                 <h3 className="text-lg font-medium text-gray-800 mb-4">Danger Zone</h3>
@@ -347,7 +299,7 @@ const Preferences = () => {
 };
 
 // ---Main Settings Page Component---
-const SettingsPage = () => {
+const Settings = () => {
     const [activeTab, setActiveTab] = useState('Profile Info'); // 'Profile Info', 'Account Settings', 'Preferences'
 
     const renderContent = () => {
@@ -380,14 +332,6 @@ const SettingsPage = () => {
 
     return (
         <div className="flex-1 p-6 md:p-8 lg:p-10 bg-gray-50 min-h-screen">
-            {/* Header Title and Icons */}
-            <div className="flex justify-between items-start mb-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
-                    <p className="text-gray-500">Manage your account information and preferences</p>
-                </div>
-                <HeaderIcons /> 
-            </div>
 
             {/* Main Content Container */}
             <div className="max-w-4xl mx-auto"> 

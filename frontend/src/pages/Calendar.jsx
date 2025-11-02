@@ -18,38 +18,6 @@ import {
 
 const PRIMARY_COLOR = '#f35640'; 
 
-// ---Header Icons---
-const HeaderIcons = () => {
-    return (
-        <div className="flex space-x-4 items-center">
-            {/* Notification Bell Icon */}
-            <div className="relative cursor-pointer p-1.5 rounded-full hover:bg-gray-100 transition">
-                <BellIcon className="w-6 h-6 text-gray-700" />
-                {/* Notification Badge */}
-                <div 
-                    className="absolute top-0 right-0 w-3 h-3 text-xs rounded-full border-2 border-white" 
-                    style={{ backgroundColor: PRIMARY_COLOR }}
-                >
-                </div>
-            </div>
-
-            {/* Avatar/User Icon */}
-            <div className="relative cursor-pointer w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
-                JD
-                <div 
-                    className="absolute -top-1 -right-1 w-4 h-4 text-xs rounded-full flex items-center justify-center text-white font-semibold" 
-                    style={{ backgroundColor: PRIMARY_COLOR }}
-                >
-                    30
-                </div>
-            </div>
-            
-            {/* Dropdown Icon */}
-            <ChevronDownIcon className="w-6 h-6 text-gray-700 cursor-pointer" />
-        </div>
-    );
-};
-
 // ---Task Summary Card Component---
 const TaskSummary = () => {
     const tasks = [
@@ -209,10 +177,10 @@ const EventPanel = () => {
     return (
         <div className="space-y-6 flex flex-col flex-grow">
             {/* Attendance Today Card */}
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col flex-grow">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Attendance Today</h2>
                 <button 
-                    className="w-full py-3 text-white font-medium rounded-xl hover:opacity-90 transition duration-150 disabled:opacity-70 disabled:cursor-not-allowed mt-auto shadow-md" 
+                    className="w-auto self-start mt-0.2 px-4 py-1.5 text-sm text-white font-medium rounded-lg hover:opacity-90 transition duration-150 disabled:opacity-70 disabled:cursor-not-allowed"
                     onClick={handleMockCheckIn}
                     disabled={isCheckedIn || isCheckingIn}
                     style={buttonStyle}
@@ -241,16 +209,7 @@ const EventPanel = () => {
 const Calendar = () => {
     return (
         <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
-            <div className="flex justify-between items-start mb-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
-                    <p className="text-gray-500">View meetings and events by day</p>
-                </div>
-                <HeaderIcons />
-            </div>
-            
             <TaskSummary />
-
             {/* Main Content: Calendar and Events  */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch min-h-[550px]">
                 {/* Cột Trái: Calendar Panel */}
