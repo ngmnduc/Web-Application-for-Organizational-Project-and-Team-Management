@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { signup, login, me } from "./controllers/auth.controller.js";
+import { signup, login, me, promoteRole } from "./controllers/auth.controller.js";
 import { verifyToken, checkRole } from "./middlewares/auth.js";
 import { ROLES } from "./models/user.model.js";
 
@@ -10,6 +10,8 @@ router.get("/healthz", (req, res) => res.json({ ok: true }));
 router.post("/auth/signup", signup);
 router.post("/auth/login", login);
 router.get("/auth/me", verifyToken, me);
+// Admin-only: promote a user to a role (default: Manager)
+router.put("/auth/:id/role", verifyToken, checkRole(ROLES.ADMIN), promoteRole);
 
 router.get("/protected/me", verifyToken, (req, res) => {
   res.json({ message: "Authenticated", user: req.user });

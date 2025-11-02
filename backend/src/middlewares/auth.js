@@ -1,6 +1,8 @@
 import { verifyJwt } from "../utils/jwt.js";
+import User from "../models/user.model.js";
 
-export function verifyToken(req, res, next) {
+// verify token and attach user to req.user
+export async function verifyToken(req, res, next) {
   try {
     const header = req.headers.authorization || "";
     const [scheme, token] = header.split(" ");
@@ -11,6 +13,14 @@ export function verifyToken(req, res, next) {
     req.auth = decoded;
     req.userId = decoded.sub;
     req.userRole = decoded.role;
+
+    // load user from DB and ensure still exists
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(401).json({ error: { message: "User not found or removed" } });
+    }
+    req.user = user;
+
     next();
   } catch (err) {
     return res.status(401).json({ error: { message: "Invalid or expired token" } });
@@ -20,8 +30,9 @@ export function verifyToken(req, res, next) {
 // checkRole("Admin") hoặc checkRole("Admin","Manager")
 export function checkRole(...allowed) {
   return (req, res, next) => {
-    if (!req.userRole) return res.status(401).json({ error: { message: "Unauthorized" } });
-    if (!allowed.includes(req.userRole)) {
+    const role = req.userRole || (req.user && req.user.role);
+    if (!role) return res.status(401).json({ error: { message: "Unauthorized" } });
+    if (!allowed.includes(role)) {
       return res.status(403).json({ error: { message: "Forbidden: insufficient role" } });
     }
     next();

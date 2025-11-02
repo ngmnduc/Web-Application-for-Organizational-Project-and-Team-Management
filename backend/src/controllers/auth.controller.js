@@ -19,6 +19,10 @@ export async function signup(req, res, next) {
     if (!name || !email || !password) {
       return res.status(400).json({ error: { message: "name, email, password are required" } });
     }
+    // password minimum length
+    if (typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({ error: { message: "Password must be at least 6 characters" } });
+    }
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ error: { message: "Email already registered" } });
@@ -71,13 +75,36 @@ export async function login(req, res, next) {
 // GET /auth/me
 export async function me(req, res, next) {
   try {
-    const userId = req.userId;
-    if (!userId) return res.status(401).json({ error: { message: "Unauthorized" } });
+    // verifyToken middleware attaches req.user
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: { message: "Unauthorized" } });
+    return res.json({ user: toPublicUser(user) });
+  } catch (err) {
+    next(err);
+  }
+}
 
-    const user = await User.findById(userId);
+// PUT /auth/:id/role  (Admin only)
+export async function promoteRole(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { role } = req.body || {};
+    const newRole = role || "Manager";
+
+    // validate role
+    if (!Array.isArray(User.schema.path("role").enumValues) || !User.schema.path("role").enumValues.includes(newRole)) {
+      // fallback: check common roles
+      const allowed = ["Admin", "Manager", "Member"];
+      if (!allowed.includes(newRole)) return res.status(400).json({ error: { message: "Invalid role" } });
+    }
+
+    const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: { message: "User not found" } });
 
-    return res.json({ user: toPublicUser(user) });
+    user.role = newRole;
+    await user.save();
+
+    return res.json({ message: "User role updated", user: toPublicUser(user) });
   } catch (err) {
     next(err);
   }
