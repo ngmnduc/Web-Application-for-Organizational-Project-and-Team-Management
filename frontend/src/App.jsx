@@ -1,16 +1,12 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./components/LoginPage.jsx";
-import HomePage from "./pages/HomePage.jsx";
-import MainLayout from "./layouts/MainLayout.jsx";
-import MyTasks from './pages/MyTasks';
-import Calendar from './pages/Calendar';
-import Notification from './pages/Notification';
-import Settings from './pages/Settings';
 // sau này thêm Dashboard, NotFound,...
 
 function App() {
   return (
     <Routes>
+      {/* trang task board */}
+      <Route path="/tasks" element={<TaskBoard />} />
       {/* trang mặc định */}
       <Route path="/" element={<Navigate to="/login" />} />
 
