@@ -4,6 +4,7 @@ import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import router from "./routes.js";   // import default OK
+import taskRoutes from "./routes/task.routes.js"; 
 
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
@@ -18,6 +19,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.use("/api", router);
+app.use("/api", taskRoutes);
 
 // Swagger
 const __filename = fileURLToPath(import.meta.url);
