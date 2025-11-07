@@ -82,10 +82,10 @@ const SideBar = () => {
     <>
     <div className='w-64 bg-white border-r h-screen flex flex-col' >
         {/* Logo */}
-      <div className="flex items-center gap-2 px-6 py-7 border-b">
+      <div className="flex items-center gap-2 px-6 py-7 ">
         <a className='flex items-center' href='/index.html'>
         <img
-        className="h-10 w-auto"
+        className="h-auto w-40 "
         src={ logo }
         />
         </a>

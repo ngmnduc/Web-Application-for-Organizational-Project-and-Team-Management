@@ -1,12 +1,16 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./components/LoginPage.jsx";
 import MainLayout from "./layouts/MainLayout.jsx";
+<<<<<<< HEAD
 import HomePage from "./pages/HomePage.jsx";
 import MyTasks from "./pages/MyTasks.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Notification from "./pages/Notification.jsx";
 import Settings from "./pages/Settings.jsx";
 import TaskCard from "./components/TaskCard.jsx";
+=======
+import SignUpPage from "./pages/SignUpPage.jsx";
+>>>>>>> 89b9830 (temp de pull code moi)
 // sau này thêm Dashboard, NotFound,...
 
 function App() {
@@ -18,6 +22,9 @@ function App() {
 
       {/* login */}
       <Route path="/login" element={<LoginPage />} />
+
+      {/*signup*/}
+      <Route path="/signup" element={<SignUpPage />} />
 
       {/* home */}
       <Route path="/" element={<MainLayout />}>
