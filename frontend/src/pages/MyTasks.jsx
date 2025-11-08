@@ -1,4 +1,5 @@
-import React from 'react';
+// (giữ nguyên import cũ, chỉ chỉnh React để dùng useState)
+import React, { useState } from 'react';
 import { 
   ClipboardDocumentListIcon, 
   ClockIcon, 
@@ -17,6 +18,10 @@ import {
     CheckCircleIcon as DoneSolid,
     ExclamationTriangleIcon as WarningSolid, 
 } from '@heroicons/react/24/solid';
+
+// ===== Kanban drag & drop =====
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+// ===== end =====
 
 
 // --- Task Summary Card Component ---
@@ -43,6 +48,63 @@ const TaskSummaryCard = ({ icon, number, label, iconColor, bgColor, textColor })
   );
 };
 
+// ======= Kanban Card (UI giống ảnh mẫu) =======
+const PriorityBadge = ({ level }) => {
+  const map = {
+    High:   { bg: 'bg-red-100', text: 'text-red-600' },
+    Medium: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+    Low:    { bg: 'bg-green-100', text: 'text-green-700' },
+  };
+  const c = map[level] ?? map.Medium;
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${c.bg} ${c.text}`}>
+      {level}
+    </span>
+  );
+};
+
+const KanbanCard = ({ task }) => {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition">
+      {/* dòng badge */}
+      <div className="flex items-center gap-2 mb-2">
+        <PriorityBadge level={task.priority} />
+        {task.dueSoon && (
+          <span className="text-xs px-2 py-0.5 rounded-md bg-orange-100 text-orange-700">
+            1 day left
+          </span>
+        )}
+      </div>
+      {/* title */}
+      <h4 className="font-semibold text-gray-800 leading-snug">
+        {task.title}
+      </h4>
+
+      {/* meta */}
+      <div className="mt-3 flex items-center justify-between text-sm">
+        <div className="flex items-center gap-3 text-gray-500">
+          <div className="flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>{task.due}</span>
+          </div>
+          <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-md ${
+            task.projectColor ?? 'bg-blue-50 text-blue-700'
+          }`}>
+            <span className="w-2 h-2 rounded-full bg-current opacity-60" />
+            {task.project}
+          </span>
+        </div>
+        <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs font-semibold">
+          {task.assignee}
+        </div>
+      </div>
+    </div>
+  );
+};
+// ======= end Kanban Card =======
+
 
 // --- MyTasks Component ---
 const MyTasks = () => {
@@ -68,6 +130,61 @@ const MyTasks = () => {
     { label: 'In Progress', count: 4 },
     { label: 'Done', count: 12 },
   ];
+
+  // ===== Kanban data & handlers (local state) =====
+  const [tasks, setTasks] = useState([
+    // Backlog
+    { id: 't1', title: 'Design new landing page wireframes for mobile responsive layout', status: 'Backlog', priority: 'High', due: 'Dec 15', project: 'Website Redesign', assignee: 'SC' },
+    { id: 't2', title: 'Research competitor pricing models', status: 'Backlog', priority: 'Medium', due: 'Dec 18', project: 'Marketing Campaign', assignee: 'MJ' },
+    { id: 't3', title: 'Set up analytics tracking', status: 'Backlog', priority: 'Low', due: 'Dec 20', project: 'Website Redesign', assignee: 'AR' },
+
+    // Todo
+    { id: 't4', title: 'Implement user authentication flow', status: 'Todo', priority: 'High', due: 'Dec 14', project: 'Mobile App', assignee: 'DK' },
+    { id: 't5', title: 'Write comprehensive API documentation', status: 'Todo', priority: 'Medium', due: 'Dec 16', project: 'API Integration', assignee: 'LW', dueSoon: true },
+    { id: 't6', title: 'Design mobile app icons', status: 'Todo', priority: 'Low', due: 'Dec 19', project: 'Mobile App', assignee: 'SC' },
+
+    // In Progress
+    { id: 't7', title: 'Build responsive navigation component', status: 'In Progress', priority: 'High', due: 'Dec 13', project: 'Website Redesign', assignee: 'AR' },
+    { id: 't8', title: 'Conduct user interviews', status: 'In Progress', priority: 'Medium', due: 'Dec 17', project: 'User Research', assignee: 'ED' },
+
+    // Done
+    { id: 't9',  title: 'Set up project repository', status: 'Done', priority: 'Medium', due: 'Dec 8',  project: 'API Integration', assignee: 'AR' },
+    { id: 't10', title: 'Create brand guidelines', status: 'Done', priority: 'Low',    due: 'Dec 10', project: 'Marketing Campaign', assignee: 'MJ' },
+    { id: 't11', title: 'Design system color tokens', status: 'Done', priority: 'Medium', due: 'Dec 11', project: 'Website Redesign', assignee: 'SC' },
+  ]);
+
+  const columns = [
+    { id: 'Backlog', label: 'Backlog' },
+    { id: 'Todo', label: 'Todo' },
+    { id: 'In Progress', label: 'In Progress' },
+    { id: 'Done', label: 'Done' },
+  ];
+
+  const handleDragEnd = ({ source, destination, draggableId }) => {
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    setTasks(prev => {
+      const item = prev.find(t => t.id === draggableId);
+      if (!item) return prev;
+      const updated = prev.map(t => (t.id === draggableId ? { ...t, status: destination.droppableId } : t));
+      return updated;
+    });
+  };
+
+  const addTask = (status) => {
+    const newTask = {
+      id: Date.now().toString(),
+      title: 'New task',
+      status,
+      priority: 'Low',
+      due: 'Dec 20',
+      project: 'Website Redesign',
+      assignee: 'SC',
+    };
+    setTasks(prev => [...prev, newTask]);
+  };
+  // ===== end Kanban =====
 
   return (
     <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
@@ -99,21 +216,59 @@ const MyTasks = () => {
         </div>
       </div>
 
-      {/* Task List Section Headers (Bottom part of the image) */}
-      <div className="flex justify-between items-center text-sm font-bold text-gray-700 pt-4 px-2">
-          {statusCounts.map((status, index) => (
-              <div 
-                  key={index} 
-                  className={`py-2 px-3 rounded-t-lg transition-all duration-300 
-                      text-gray-500`} 
-              >
-                  {status.label} ({status.count})
+      {/* =================== KANBAN (giống ảnh mẫu) =================== */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {columns.map((col) => {
+            const list = tasks.filter(t => t.status === col.id);
+            return (
+              <div key={col.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                {/* Header cột */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-700">{col.label}</h3>
+                    <span className="text-xs text-gray-500">({list.length})</span>
+                  </div>
+                  <button
+                    onClick={() => addTask(col.id)}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    + Add
+                  </button>
+                </div>
+
+                {/* Danh sách thẻ kéo thả */}
+                <Droppable droppableId={col.id}>
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="flex flex-col gap-3 min-h-[220px]"
+                    >
+                      {list.map((task, index) => (
+                        <Draggable draggableId={task.id} index={index} key={task.id}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                            >
+                              <KanbanCard task={task} />
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
-          ))}
-      </div>
-      
-      {/* Placeholder for Task List - Added a line to complete the UI context */}
-      <div className="border-t border-gray-200 mt-[-1px]"></div>
+            );
+          })}
+        </div>
+      </DragDropContext>
+      {/* ================= end KANBAN ================= */}
+
     </div>
   );
 }
