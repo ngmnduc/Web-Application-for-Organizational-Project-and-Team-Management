@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../assets/images/syncora.png'; 
@@ -74,23 +73,6 @@ const SideBar = () => {
                     />
                 </a>
             </div>
-=======
-import React from 'react'
-import logo from '../assets/images/syncora.png'
-const SideBar = () => {
-  return (
-    <>
-    <div className='w-64 bg-white border-r h-screen flex flex-col' >
-        {/* Logo */}
-      <div className="flex items-center gap-2 px-6 py-7 ">
-        <a className='flex items-center' href='/index.html'>
-        <img
-        className="h-auto w-40 "
-        src={ logo }
-        />
-        </a>
-      </div>
->>>>>>> 4fb98f8 (add logo syncora)
 
             {/* Menu chính */}
             <nav className="space-y-2 px-3 pb-4 flex-grow">

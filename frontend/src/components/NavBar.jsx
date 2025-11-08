@@ -27,7 +27,6 @@ const HeaderIcons = () => {
 // Component Navbar chính, nhận props
 const Navbar = ({ title, subtitle }) => {
   return (
-<<<<<<< HEAD
     <header className="flex justify-between items-start p-5 border-b bg-white">
         {/* Phần Title (được truyền từ MainLayout) */}
         <div>
@@ -39,12 +38,6 @@ const Navbar = ({ title, subtitle }) => {
         <HeaderIcons />
     </header>
   );
-=======
-    <>
-    <div className="flex justify-end items-center h-24 px-6 py-8 border-b bg-white">ádasdas</div>
-    </>
-  )
->>>>>>> 4fb98f8 (add logo syncora)
 }
 
 export default Navbar;

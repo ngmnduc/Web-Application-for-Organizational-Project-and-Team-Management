@@ -46,7 +46,6 @@ const MainLayout = () => {
 
   return (
     <>
-<<<<<<< HEAD
       <div className='flex h-screen'>
         <SideBar />
         <div className="flex-1 flex flex-col bg-gray-50 overflow-y-auto">
@@ -61,15 +60,6 @@ const MainLayout = () => {
           <main className='flex-1'>
             <Outlet />
           </main>
-=======
-    <div className='flex h-screen'>
-        <SideBar/>
-        <div className="flex-1  flex flex-col  bg-gray-50">
-            <Navbar/>
-            <main className='flex p-6'>
-                <Outlet/>
-            </main>
->>>>>>> 4fb98f8 (add logo syncora)
         </div>
       </div>
     </>
