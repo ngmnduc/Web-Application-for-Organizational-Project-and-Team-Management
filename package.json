@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "tailwindcss": "^4.1.16"
+    "tailwindcss": "^4.1.16",
+    "@hello-pangea/dnd": "^16.5.1"
   }
 }
