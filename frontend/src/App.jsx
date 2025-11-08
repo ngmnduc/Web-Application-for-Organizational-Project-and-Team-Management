@@ -1,12 +1,18 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./components/LoginPage.jsx";
-import HomePage from "./pages/HomePage.jsx";
 import MainLayout from "./layouts/MainLayout.jsx";
+import HomePage from "./pages/HomePage.jsx";
+import MyTasks from "./pages/MyTasks.jsx";
+import Calendar from "./pages/Calendar.jsx";
+import Notification from "./pages/Notification.jsx";
+import Settings from "./pages/Settings.jsx";
+import TaskCard from "./components/TaskCard.jsx";
 // sau này thêm Dashboard, NotFound,...
 
 function App() {
   return (
     <Routes>
+      
       {/* trang mặc định */}
       <Route path="/" element={<Navigate to="/login" />} />
 
@@ -16,6 +22,10 @@ function App() {
       {/* home */}
       <Route path="/" element={<MainLayout />}>
       <Route path="/home" element={<HomePage />} />
+      <Route path="/tasks" element={<MyTasks />} />
+      <Route path="/calendar" element={<Calendar />} />
+      <Route path="/notifications" element={<Notification />} />
+      <Route path="/settings" element={<Settings />} />
       </Route>
 
       {/* fallback 404 */}
