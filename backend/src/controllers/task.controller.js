@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Task from "../models/task.model.js";
+import Project from "../models/project.model.js";
 
 /**
  * @desc    Lấy tất cả task trong 1 project (chưa bị xóa)
@@ -9,7 +10,18 @@ import Task from "../models/task.model.js";
 export const getTasksByProject = async (req, res) => {
   try {
     const projectId = req.params.id;
+
+    // Kiểm tra project tồn tại
+    const projectExists = await Project.findById(projectId);
+    if (!projectExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
     const tasks = await Task.find({ projectId, deletedAt: null });
+
     res.status(200).json({
       success: true,
       count: tasks.length,
@@ -28,7 +40,7 @@ export const getTasksByProject = async (req, res) => {
 export const createTask = async (req, res) => {
   try {
     const projectId = req.params.id;
-    let {
+    const {
       title,
       description,
       priority,
@@ -47,6 +59,15 @@ export const createTask = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Title and dueDate are required.",
+      });
+    }
+
+    // Check project tồn tại
+    const projectExists = await Project.findById(projectId);
+    if (!projectExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
       });
     }
 
@@ -94,6 +115,38 @@ export const createTask = async (req, res) => {
 export const updateTask = async (req, res) => {
   try {
     const taskId = req.params.id;
+    const userRole = req.user?.role;
+    const userId = req.user?._id;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    // Nếu user là Member → chỉ được đổi status của task chính mình
+    if (userRole === "Member") {
+      if (String(task.assigneeId) !== String(userId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only update your own tasks.",
+        });
+      }
+
+      // Chỉ cho phép đổi status (không được đổi title, projectId,...)
+      if (
+        Object.keys(req.body).some(
+          (key) => key !== "status" && key !== "updatedAt"
+        )
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Members can only update task status.",
+        });
+      }
+    }
 
     // ép kiểu nếu có assigneeId mới
     if (req.body.assigneeId) {
@@ -103,13 +156,6 @@ export const updateTask = async (req, res) => {
     const updatedTask = await Task.findByIdAndUpdate(taskId, req.body, {
       new: true,
     });
-
-    if (!updatedTask) {
-      return res.status(404).json({
-        success: false,
-        message: "Task not found",
-      });
-    }
 
     res.status(200).json({
       success: true,
@@ -129,6 +175,16 @@ export const updateTask = async (req, res) => {
 export const deleteTask = async (req, res) => {
   try {
     const taskId = req.params.id;
+    const userRole = req.user?.role;
+
+    // Chỉ Admin/Manager được xóa
+    if (!["Admin", "Manager"].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to delete tasks.",
+      });
+    }
+
     const deletedTask = await Task.findByIdAndUpdate(
       taskId,
       { deletedAt: new Date() },

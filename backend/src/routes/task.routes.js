@@ -18,10 +18,10 @@ router.get("/projects/:id/tasks", verifyToken, getTasksByProject);
 
 /**
  * @route   POST /projects/:id/tasks
- * @desc    Tạo task mới trong project
+ * @desc    Tạo task mới trong project (Chỉ admin/manager mới được tạo)
  * @access  Private (Admin/Manager)
  */
-router.post("/projects/:id/tasks", verifyToken, createTask);
+router.post("/projects/:id/tasks", verifyToken, checkRole(["Admin", "Manager"]), createTask);
 
 /**
  * @route   PUT /tasks/:id
@@ -35,6 +35,6 @@ router.put("/tasks/:id", verifyToken, updateTask);
  * @desc    Xóa mềm 1 task (đánh dấu deletedAt)
  * @access  Private (Admin/Manager)
  */
-router.delete("/tasks/:id", verifyToken, deleteTask);
+router.delete("/tasks/:id", verifyToken, checkRole(["Admin", "Manager"]), deleteTask);
 
 export default router;
