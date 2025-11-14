@@ -27,6 +27,7 @@ backend/logs/
 backend/uploads/
 backend/tmp/
 backend/.env
+backend/node_modules
 
 # ===== Frontend specific =====
 frontend/.next/
