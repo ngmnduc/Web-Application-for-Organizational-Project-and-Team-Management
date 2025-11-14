@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import SideBar from '../components/SideBar';
 import Navbar from '../components/NavBar'; 
+import { mockKanbanTasks } from '../mocks/tasks.jsx';
+import { 
+    ClipboardDocumentListIcon as TotalSolid, 
+    ClockIcon as ClockSolid,
+    ArrowPathIcon as ProgressSolid, 
+    CheckCircleIcon as DoneSolid,
+    ExclamationTriangleIcon as WarningSolid, 
+} from '@heroicons/react/24/solid';
 
 const MainLayout = () => {
   const [headerData, setHeaderData] = useState({ title: '', subtitle: '' });
@@ -44,6 +52,23 @@ const MainLayout = () => {
     }
   }, [location.pathname]); 
 
+  const [tasks, setTasks] = useState(mockKanbanTasks);
+
+  // -- Summary cho MyTasks --
+  const totalCount = tasks.length;
+  const todoCount = tasks.filter(t => t.status === 'Todo').length;
+  const inProgressCount = tasks.filter(t => t.status === 'In Progress').length;
+  const doneCount = tasks.filter(t => t.status === 'Done').length;
+  const dueSoonCount = tasks.filter(t => t.dueSoon === true).length;
+
+  const dynamicTasksSummary = [
+    { number: totalCount, label: 'Total', icon: <TotalSolid />, iconColor: "text-gray-500", bgColor: "bg-gray-100", textColor: "text-gray-800" },
+    { number: todoCount, label: 'Todo', icon: <ClockSolid />, iconColor: "text-gray-500", bgColor: "bg-gray-100", textColor: "text-gray-600" },
+    { number: inProgressCount, label: 'In Progress', icon: <ProgressSolid />, iconColor: "text-blue-500", bgColor: "bg-blue-100", textColor: "text-blue-600" },
+    { number: doneCount, label: 'Done', icon: <DoneSolid />, iconColor: "text-green-500", bgColor: "bg-green-100", textColor: "text-green-600" },
+    { number: dueSoonCount, label: '1 day left', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
+  ];
+
   return (
     <>
       <div className='flex h-screen'>
@@ -58,7 +83,12 @@ const MainLayout = () => {
 
           {/* Sửa <main> để nó tự động nhận padding từ trang con */}
           <main className='flex-1'>
-            <Outlet />
+            {/*  Truyền data xuống */}
+            <Outlet context={{ 
+              tasks, 
+              setTasks, 
+              dynamicTasksSummary
+            }} /> 
           </main>
         </div>
       </div>
