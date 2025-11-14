@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { 
-  ClipboardDocumentListIcon as TotalSolid, 
-  ClockIcon as ClockSolid,
-  ArrowPathIcon as ProgressSolid, 
-  CheckCircleIcon as DoneSolid,
-  ExclamationTriangleIcon as WarningSolid, 
-} from '@heroicons/react/24/solid';
-
-import { useNavigate } from 'react-router-dom';
+  ClipboardDocumentListIcon, 
+  ClockIcon, 
+  ArrowPathIcon, 
+  CheckCircleIcon, 
+  BellIcon,
+  ChevronDownIcon,
+  EllipsisVerticalIcon,
+  ExclamationTriangleIcon, 
+} from '@heroicons/react/24/outline'; 
 
 // ===== Kanban drag & drop =====
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -88,7 +89,6 @@ const MyTasks = () => {
   ];
 
   const columns = [
-    { id: 'Backlog', label: 'Backlog' },
     { id: 'Todo', label: 'Todo' },
     { id: 'In Progress', label: 'In Progress' },
     { id: 'Done', label: 'Done' },
