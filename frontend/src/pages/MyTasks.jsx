@@ -10,21 +10,12 @@ import {
   ExclamationTriangleIcon, 
 } from '@heroicons/react/24/outline'; 
 
-import { 
-    ClipboardDocumentListIcon as TotalSolid, 
-    ClockIcon as ClockSolid,
-    ArrowPathIcon as ProgressSolid, 
-    CheckCircleIcon as DoneSolid,
-    ExclamationTriangleIcon as WarningSolid, 
-} from '@heroicons/react/24/solid';
-
 // ===== Kanban drag & drop =====
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 // ===== end =====
 
 import { useOutletContext } from 'react-router-dom';
 import TaskSummary from '../components/TaskSummary';
-
 // ======= Kanban Card (UI giống ảnh mẫu) =======
 const PriorityBadge = ({ level }) => {
   const map = {
@@ -116,7 +107,6 @@ const MyTasks = () => {
   ]);
 
   const columns = [
-    { id: 'Backlog', label: 'Backlog' },
     { id: 'Todo', label: 'Todo' },
     { id: 'In Progress', label: 'In Progress' },
     { id: 'Done', label: 'Done' },
@@ -185,7 +175,7 @@ const MyTasks = () => {
 
       {/* =================== KANBAN =================== */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {columns.map((col) => {
             const list = tasks
               .filter(t => t.status === col.id)
