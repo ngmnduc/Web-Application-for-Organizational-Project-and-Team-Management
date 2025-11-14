@@ -85,6 +85,7 @@ const MyTasks = () => {
   ];
 
   const columns = [
+    { id: 'Backlog', label: 'Backlog' },
     { id: 'Todo', label: 'Todo' },
     { id: 'In Progress', label: 'In Progress' },
     { id: 'Done', label: 'Done' },
@@ -127,6 +128,17 @@ const MyTasks = () => {
   };
   // ===== end sort =====
 
+// ===== Sort tasks by priority (High -> Medium -> Low) =====
+  const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+  const sortTasks = (a, b) => {
+    const pa = PRIORITY_ORDER[a.priority] ?? 99;
+    const pb = PRIORITY_ORDER[b.priority] ?? 99;
+    if (pa !== pb) return pa - pb;               // High trước Medium trước Low
+    return (a.due || '').localeCompare(b.due || ''); // tie-break theo ngày (tuỳ chọn)
+  };
+  // ===== end sort =====
+
   return (
     <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
 
@@ -153,7 +165,7 @@ const MyTasks = () => {
 
       {/* =================== KANBAN =================== */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {columns.map((col) => {
             const list = tasks
               .filter(t => t.status === col.id)
