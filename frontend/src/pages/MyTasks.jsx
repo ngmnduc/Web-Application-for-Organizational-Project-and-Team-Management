@@ -89,6 +89,7 @@ const MyTasks = () => {
   ];
 
   const columns = [
+    { id: 'Backlog', label: 'Backlog' },
     { id: 'Todo', label: 'Todo' },
     { id: 'In Progress', label: 'In Progress' },
     { id: 'Done', label: 'Done' },
