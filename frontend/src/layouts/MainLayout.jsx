@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideBar from '../components/SideBar';
 import Navbar from '../components/NavBar'; 
 import { mockKanbanTasks } from '../mocks/tasks.jsx';
+import { usePollingNotifications } from '../hooks/usePollingNotifications';
 import { 
     ClipboardDocumentListIcon as TotalSolid, 
     ClockIcon as ClockSolid,
@@ -14,6 +15,7 @@ import {
 const MainLayout = () => {
   const [headerData, setHeaderData] = useState({ title: '', subtitle: '' });
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Xác định title và subtitle dựa trên pathname
@@ -81,16 +83,36 @@ const MainLayout = () => {
     { number: dueSoonCount, label: '1 day left', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
   ];
 
+  // Mock user (giả lập /auth/me)
+  const mockUser = {
+    name: 'Alex Hayes', 
+    initials: 'AH',      
+    role: 'Admin'        
+  };
+  
+  // Gọi hook polling 
+  const { unreadCount } = usePollingNotifications(30000); 
+
+  // Hàm Logout
+  const handleLogout = () => {
+    console.log("Logging out (UI-only)...");
+    // ( sẽ xóa token ở đây)
+    navigate('/login'); // Chuyển về trang login
+  };
+
   return (
     <>
       <div className='flex h-screen'>
-        <SideBar />
+        <SideBar unreadCount={unreadCount} />
         <div className="flex-1 flex flex-col bg-gray-50 overflow-y-auto">
           
           {/* Navbar sẽ nhận props từ state */}
           <Navbar 
             title={headerData.title} 
-            subtitle={headerData.subtitle} 
+            subtitle={headerData.subtitle}
+            user={mockUser}
+            unreadCount={unreadCount}
+            onLogout={handleLogout}
           />
 
           {/* Sửa <main> để nó tự động nhận padding từ trang con */}
