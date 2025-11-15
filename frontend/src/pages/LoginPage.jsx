@@ -1,8 +1,25 @@
-import React from 'react'
-import logo from '../assets/images/syncora.png'
+import React, {useState} from 'react'
 import tag from '../assets/images/logo.png'
+import api from "../services/api.js"
+import { useNavigate } from "react-router-dom"
 
 const LoginPage = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post("/auth/login", { email, password });
+      if (res.status === 200) {
+        localStorage.setItem("token", res.data.token);
+        navigate("/tasks"); 
+      }
+    } catch (err) {
+      alert("Wrong Username or Password");
+    }
+  };
   return (
     <>
     <section className="bg-background2 bg-center bg-cover min-h-screen flex items-center justify-end  pr-32  relative text-white">
@@ -24,19 +41,19 @@ const LoginPage = () => {
       <h2 className="font-bold font-sans text-2xl text-gray-600  justify-center flex items-center">Welcome Back</h2>
       <p className=" text-gray-500 mt-4 mb-4 flex items-center justify-center ">Sign in to continue your work</p>
 
-      <form action="" className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <label className="block text-gray-200 text-sm  mt-1">Email address</label>
-        <input className="p-2  rounded-xl border" type="email" name="email" placeholder="Enter your Email"/>
+        <input className="p-2  rounded-xl border" type="email" value={email} onChange={(e) => setEmail(e.target.value)} name="email" placeholder="Enter your Email"/>
         <div className="relative">
             <label className="block text-gray-200 text-sm mb-2 mt-1">Password</label>
-          <input className="p-2 rounded-xl border w-full" type="password" name="password" placeholder="Enter your Password"/>
+          <input className="p-2 rounded-xl border w-full" type="password" value={password} onChange={(e) => setPassword(e.target.value)} name="password" placeholder="Enter your Password"/>
         </div>
         <div className="text-right ">
             <a href="/" className="text-sm  text-brand hover:underline   ">
               Forgot Password?
             </a>
           </div>
-        <button className="bg-brand rounded-xl font-medium text-white py-2 hover:scale-105 duration-300">Login</button>
+        <button type='submit' className="bg-brand rounded-xl font-medium text-white py-2 hover:scale-105 duration-300">Login</button>
       </form>
       
 
