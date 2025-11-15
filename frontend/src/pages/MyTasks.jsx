@@ -128,17 +128,6 @@ const MyTasks = () => {
   };
   // ===== end sort =====
 
-// ===== Sort tasks by priority (High -> Medium -> Low) =====
-  const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
-
-  const sortTasks = (a, b) => {
-    const pa = PRIORITY_ORDER[a.priority] ?? 99;
-    const pb = PRIORITY_ORDER[b.priority] ?? 99;
-    if (pa !== pb) return pa - pb;               // High trước Medium trước Low
-    return (a.due || '').localeCompare(b.due || ''); // tie-break theo ngày (tuỳ chọn)
-  };
-  // ===== end sort =====
-
   return (
     <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
 
