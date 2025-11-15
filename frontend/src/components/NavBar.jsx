@@ -1,95 +1,97 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import logo from '../assets/images/syncora.png'; 
 import { 
-    ChevronDownIcon, 
-    ArrowRightEndOnRectangleIcon, 
-    UserCircleIcon 
+    Squares2X2Icon, 
+    CalendarDaysIcon, 
+    BellIcon, 
+    Cog6ToothIcon, 
+    FolderIcon, 
+    BriefcaseIcon,  
+    UsersIcon,     
 } from '@heroicons/react/24/outline';
-import NotificationBell from './NotificationBell'; 
-import { useAuth } from '../services/AuthContext'; 
 
 
-// === TÁCH HEADERICONS VÀ NHẬN PROPS ===
-const HeaderIcons = ({   unreadCount, onLogout }) => {
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const { user, logout } = useAuth();
-    const initials = user?.name
-  ? user.name
-      .split(" ")
-      .map(word => word[0])
-      .join("")
-      .toUpperCase()
-  : "??";
+const PRIMARY_COLOR = '#f35640'; 
+
+// === MENU ITEMS CHO SIDEBAR ===
+const menuItems = [
+    { name: 'Dashboard', icon: Squares2X2Icon, href: '/home' },
+    { name: 'My Tasks', icon: FolderIcon, href: '/tasks' },
+    { name: 'Calendar', icon: CalendarDaysIcon, href: '/calendar' },
+    { name: 'Members', icon: UsersIcon, href: '/members' },
+    { name: 'Projects', icon: BriefcaseIcon, href: '/projects' },
+    { name: 'Notifications', icon: BellIcon, href: '/notifications' },
+    { name: 'Settings', icon: Cog6ToothIcon, href: '/settings' },
+];
+
+// --- Sub-component: Sidebar Item ---
+const SidebarItem = ({ item, isActive, unreadCount }) => {
+    // (Style động giữ nguyên)
+    const activeStyle = {
+        backgroundColor: isActive ? PRIMARY_COLOR : 'transparent',
+    };
 
     return (
-        <div className="flex space-x-4 items-center">
-            {/* Dùng prop unreadCount */}
-            <NotificationBell notificationCount={unreadCount} />
-
-            {/* Avatar/User Info */}
-            <div className="relative">
-                {/* Nút bấm (avatar) */}
-                <button 
-                    className="flex items-center space-x-2 cursor-pointer p-1"
-                    onClick={() => setIsDropdownOpen(prev => !prev)}
-                >
-                    <div className="relative w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
-                        {user.initials || '??'}
-                    </div>
-                    {/* Hiển thị tên (ẩn trên mobile) */}
-                    <span className="text-sm font-medium text-gray-700 hidden md:block">{user.name}</span>
-                    <ChevronDownIcon className="w-4 h-4 text-gray-700" />
-                </button>
-
-                {/* Dropdown Menu */}
-                {isDropdownOpen && (
-                    <div 
-                        className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border py-1 z-50"
-                        onMouseLeave={() => setIsDropdownOpen(false)} // (Tự đóng khi di chuột ra)
-                    >
-                        {/* Hiển thị thông tin user */}
-                        <div className="px-4 py-3 border-b">
-                            <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-                            <p className="text-xs text-gray-500 truncate">{user.role}</p>
-                        </div>
-                        {/* Nút Profile (UI-only) */}
-                        <a href="#" className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            <UserCircleIcon className="w-5 h-5" />
-                            Profile
-                        </a>
-                        {/* Nút Logout */}
-                        <button
-                            onClick={onLogout}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                        >
-                            <ArrowRightEndOnRectangleIcon className="w-5 h-5" />
-                            Logout
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
+        <Link
+            to={item.href} 
+            className="flex items-center space-x-2 p-2 rounded-lg transition-all duration-200 cursor-pointer text-sm font-medium group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            style={activeStyle}
+        >
+            {/* (Icon và Tên mục) */}
+            <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
+            <span className={isActive ? 'text-white font-semibold' : 'text-gray-700 group-hover:text-gray-900'}>
+                {item.name}
+            </span>
+            
+            {/* === HIỂN THỊ SỐ ĐẾM CHO NOTIFICATIONS === */}
+            {item.name === 'Notifications' && !isActive && unreadCount > 0 && (
+                <span className="ml-auto min-w-4 h-4 px-1 text-[10px] bg-red-500 rounded-full flex items-center justify-center text-white font-bold">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+            )}
+        </Link>
     );
 };
 
 
-// Component Navbar chính (nhận props từ MainLayout)
-const Navbar = ({ title, subtitle, user, unreadCount, onLogout }) => {
-  return (
-    <header className="flex justify-between items-start p-5 border-b bg-white sticky top-0 z-40">
-        {/* Phần Title */}
-        <div>
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            <p className="text-sm text-gray-500">{subtitle}</p>
-        </div>
+const SideBar = ({ unreadCount }) => {
+    const location = useLocation();
+    const currentPath = location.pathname;
 
-        {/* 4. Truyền tất cả props xuống HeaderIcons */}
-        <HeaderIcons 
-            user={user}
-            unreadCount={unreadCount}
-            onLogout={onLogout}
-        />
-    </header>
-  );
+    const isActive = (href) => {
+        if (href === '/dashboard') return currentPath === '/dashboard';
+        return currentPath.startsWith(href);
+    };
+
+    return (
+        <div 
+            className="w-56 bg-white border-r h-screen flex flex-col shadow-lg" 
+        >
+            {/* (Logo Section) */}
+            <div className="flex items-center justify-center gap-2 px-3 pt-8 pb-4">
+                <a className='flex items-center' href='/home'> 
+                    <img
+                        className="h-9 w-auto"
+                        src={ logo } 
+                        alt="Syncora Logo" 
+                    />
+                </a>
+            </div>
+
+            {/* Menu chính */}
+            <nav className="space-y-2 px-3 pb-4 flex-grow">
+                {menuItems.map((item) => (
+                    <SidebarItem 
+                        key={item.href}
+                        item={item}
+                        isActive={isActive(item.href)}
+                        unreadCount={unreadCount}
+                    />
+                ))}
+            </nav>
+            </div>
+    );
 }
 
-export default Navbar;
+export default SideBar;
