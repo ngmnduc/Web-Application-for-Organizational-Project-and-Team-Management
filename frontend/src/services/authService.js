@@ -10,6 +10,7 @@ export const signup = async (name, email, password) => {
     });
     if (response.data.token) {
       localStorage.setItem("token", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
       // Thêm token vào header cho các request sau
       axiosInstance.defaults.headers.common["Authorization"] = `Bearer ${response.data.token}`;
     }
