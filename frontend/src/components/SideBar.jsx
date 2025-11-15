@@ -6,7 +6,9 @@ import {
     CalendarDaysIcon, 
     BellIcon, 
     Cog6ToothIcon, 
-    FolderIcon 
+    FolderIcon, 
+    BriefcaseIcon,  
+    UsersIcon,     
 } from '@heroicons/react/24/outline';
 
 
@@ -16,6 +18,8 @@ const menuItems = [
     { name: 'Dashboard', icon: Squares2X2Icon, href: '/' },
     { name: 'My Tasks', icon: FolderIcon, href: '/tasks' },
     { name: 'Calendar', icon: CalendarDaysIcon, href: '/calendar' },
+    { name: 'Members', icon: UsersIcon, href: '/members' },
+    { name: 'Projects', icon: BriefcaseIcon, href: '/projects' },
     { name: 'Notifications', icon: BellIcon, href: '/notifications' },
     { name: 'Settings', icon: Cog6ToothIcon, href: '/settings' },
 ];

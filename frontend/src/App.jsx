@@ -7,11 +7,16 @@ import Calendar from "./pages/Calendar.jsx";
 import Notification from "./pages/Notification.jsx";
 import Settings from "./pages/Settings.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
+import Members from "./pages/Members.jsx";
+import Projects from "./pages/Projects.jsx";
+
 // sau này thêm Dashboard, NotFound,...
 
 function App() {
   return (
     <Routes>
+
+      <Route path="/" element={<Navigate to="/login" />} />
 
       {/* login */}
       <Route path="/login" element={<LoginPage />} />
@@ -20,11 +25,15 @@ function App() {
 
       {/* home */}
       <Route path="/" element={<MainLayout />}>
-        <Route index element={<HomePage />} />
+        
+        <Route path="home" element={<HomePage />} />
         <Route path="tasks" element={<MyTasks />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="notifications" element={<Notification />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="members" element={<Members />} />
+        <Route path="projects" element={<Projects />} />
+
       </Route>
 
       {/* fallback 404 */}

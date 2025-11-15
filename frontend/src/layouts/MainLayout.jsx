@@ -30,6 +30,18 @@ const MainLayout = () => {
           subtitle: 'View meetings and events by day'
         });
         break;
+        case '/members':
+        setHeaderData({
+          title: 'Team members',
+          subtitle: 'Mange your projects team members and their roles'
+        });
+        break;
+        case '/projects':
+        setHeaderData({
+          title: 'Test Workspace',
+          subtitle: 'Manage all projects and their collaboration'
+        });
+        break;
       case '/notifications':
         setHeaderData({
           title: 'Notifications',
