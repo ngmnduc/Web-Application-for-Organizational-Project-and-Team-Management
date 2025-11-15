@@ -19,6 +19,8 @@ function App() {
       {/* trang mặc định */}
       <Route path="/" element={<Navigate to="/home" />} />
 
+      <Route path="/" element={<Navigate to="/login" />} />
+
       {/* login */}
       <Route path="/login" element={<LoginPage />} />
       {/*signup*/}
