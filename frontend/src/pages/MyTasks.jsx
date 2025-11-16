@@ -172,18 +172,7 @@ const MyTasks = () => {
     });
   };
 
-  const addTask = (status) => {
-    const newTask = {
-      id: Date.now().toString(),
-      title: 'New task',
-      status,
-      priority: 'Low',
-      due: 'Dec 20',
-      project: 'Website Redesign',
-      assignee: 'SC',
-    };
-    setTasks(prev => [...prev, newTask]);
-  };
+
 
   // ===== Sort tasks by priority (High -> Medium -> Low) =====
   const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
@@ -226,13 +215,13 @@ const MyTasks = () => {
         </div>
       </div>
 
-      {/* =================== KANBAN (giống ảnh mẫu) =================== */}
+      {/* =================== KANBAN  =================== */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {columns.map((col) => {
             const list = tasks
               .filter(t => t.status === col.id)
-              .sort(sortTasks); // ✅ sắp theo Priority
+              .sort(sortTasks); //  sắp theo Priority
             return (
               <div key={col.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                 {/* Header cột */}
@@ -241,12 +230,7 @@ const MyTasks = () => {
                     <h3 className="font-semibold text-gray-700">{col.label}</h3>
                     <span className="text-xs text-gray-500">({list.length})</span>
                   </div>
-                  <button
-                    onClick={() => addTask(col.id)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
-                  >
-                    + Add
-                  </button>
+                 
                 </div>
 
                 {/* Danh sách thẻ kéo thả */}
