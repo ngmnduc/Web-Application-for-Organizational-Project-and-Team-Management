@@ -1,139 +1,183 @@
-import React from 'react'
-import logo from '../assets/images/syncora.png'
-import tag from '../assets/images/logo.png'
-import { Mail, Lock, Building, Phone, User } from "lucide-react";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signup } from '../services/authService';
+import tag from '../assets/images/logo.png';
+import { Mail, Lock, User } from "lucide-react";
 
 const SignUpPage = () => {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+  });
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!formData.firstName || !formData.email || !formData.password) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const name = `${formData.firstName} ${formData.lastName}`.trim();
+      await signup(name, formData.email, formData.password);
+      // Đăng ký thành công, chuyển hướng về trang chủ
+      navigate('/home');
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError(err.error?.message || 'Signup failed. Please try again!');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <>
-    <section className="bg-background bg-center bg-cover min-h-screen flex items-center justify-center  relative">
-  
-  <div className="backdrop-blur-[30px] bg-white/20 border border-white/30 flex rounded-3xl shadow-[0_8px_32px_rgba(31,38,135,0.37)] w-[500px] p-5 items-center justify-center " style={{
-      WebkitBackdropFilter: "blur(30px) saturate(150%)",
-      backdropFilter: "blur(30px) saturate(150%)",
-    }}>
-  
-    <div className="w-full px-8 md:px-10 ">
-      <h2 className="font-bold font-sans text-2xl text-gray-100  justify-center flex items-center space-x-2"><span>Welcome to </span><span className="text-brand">Syncora</span></h2>
-      <p className=" text-gray-200 mt-4 mb-4 flex items-center justify-center text-center ">Join thousands of teams already using Syncora to streamline their workflow</p>
+    <section className="bg-background bg-center bg-cover min-h-screen flex items-center justify-center relative">
+      <div className="backdrop-blur-[30px] bg-white/20 border border-white/30 flex rounded-3xl shadow-[0_8px_32px_rgba(31,38,135,0.37)] w-[500px] p-5 items-center justify-center" 
+           style={{
+             WebkitBackdropFilter: "blur(30px) saturate(150%)",
+             backdropFilter: "blur(30px) saturate(150%)",
+           }}>
+        
+        <div className="w-full px-8 md:px-10">
+          <h2 className="font-bold font-sans text-2xl text-gray-100 justify-center flex items-center space-x-2">
+            <span>Welcome to </span><span className="text-brand">Syncora</span>
+          </h2>
+          <p className="text-gray-200 mt-4 mb-4 flex items-center justify-center text-center">
+            Join thousands of teams already using Syncora to streamline their workflow
+          </p>
 
-      <form action="" className="flex flex-col gap-4">
-        {/* First & Last Name */}
-          <div className="grid grid-cols-2 gap-3">
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-200 mb-1">First Name</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  placeholder="First Name"
+                  className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-brand focus:outline-none text-gray-800"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-200 mb-1">Last Name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Last Name"
+                  className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-brand focus:outline-none text-gray-800"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-200 mb-1">First Name</label>
-              <input
-                type="text"
-                placeholder="First Name"
-                className="w-full border rounded-lg p-2 focus:ring-2 focus-within:ring-brand focus:outline-none"
-              />
+              <label className="block text-sm font-medium text-gray-200 mb-1">Work Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="email@example.com"
+                  className="w-full border rounded-lg p-2 pl-9 focus:ring-2 focus:ring-brand focus:outline-none text-gray-800"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-200 mb-1">Last Name</label>
-              <input
-                type="text"
-                placeholder="Last Name"
-                className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-brand focus:outline-none"
-              />
+              <label className="block text-sm font-medium text-gray-200 mb-1">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Password"
+                  className="w-full border rounded-lg p-2 pl-9 focus:ring-2 focus:ring-brand focus:outline-none text-gray-800"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
+
+            <button
+              type="submit"
+              className="w-full font-medium bg-brand rounded-xl text-white py-2 hover:scale-105 duration-300 flex items-center justify-center"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating account...
+                </>
+              ) : 'Create My Account'}
+            </button>
+          </form>
+
+          <div className="mt-6 grid grid-cols-3 items-center text-gray-400">
+            <hr className="border-gray-400" />
+            <p className="text-center text-sm">OR</p>
+            <hr className="border-gray-400" />
           </div>
 
-          {/* Work Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-200 mb-1">Work Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-2.5 text-gray-400" size={18} />
-              <input
-                type="email"
-                placeholder="email@example.com"
-                className="w-full border rounded-lg p-2 pl-9 focus:ring-2 focus:ring-brand focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Phone Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-200 mb-1">Phone Number</label>
-            <div className="flex border rounded-lg focus-within:ring-2 focus-within:ring-brand overflow-hidden">
-              <select className="bg-gray-100 text-gray-700 px-2 py-2 focus:outline-none border-none rounded-none">
-                <option>+1</option>
-                <option>+84</option>
-                <option>+44</option>
-              </select>
-              <input
-                type="tel"
-                placeholder="0123456789"
-                className="w-full p-2  focus:outline-none border-none rounded-none"
-              />
-            </div>
-          </div>
-
-          {/* Organization */}
-          <div>
-            <label className="block text-sm font-medium text-gray-200 mb-1">Organization</label>
-            <div className="relative">
-              <Building className="absolute left-3 top-2.5 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Acme Inc"
-                className="w-full border rounded-lg p-2 pl-9 focus:ring-2 focus:ring-brand focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-200 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-2.5 text-gray-400" size={18} />
-              <input
-                type="password"
-                placeholder="Password"
-                className="w-full border rounded-lg p-2 pl-9 focus:ring-2 focus:ring-brand focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="w-full font-medium bg-brand rounded-xl text-white py-2 hover:scale-105 duration-300"
-          >
-            Create My Account
+          <button className="bg-white border py-2 w-full rounded-xl mt-5 flex justify-center items-center text-sm hover:scale-105 duration-300 text-black" disabled={isLoading}>
+            <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.28-1.93-6.14-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.86 14.1c-.25-.75-.38-1.56-.38-2.4 0-.84.14-1.65.38-2.4V6.46H2.18C1.43 8.26 1 10.24 1 12.25s.43 4 1.18 5.79l3.68-2.84z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 6.96l3.68 2.84c.86-2.6 3.28-4.42 6.14-4.42z" fill="#EA4335"/>
+            </svg>
+            Sign up with Google
           </button>
-      </form>
-      
 
-      <div className="mt-6 grid grid-cols-3 items-center text-gray-400">
-        <hr className="border-gray-400"/>
-        <p className="text-center text-sm">OR</p>
-        <hr className="border-gray-400"/>
+          <p className="text-center text-white mt-6 text-sm">
+            Already have an account?{" "}
+            <a href="/login" className="text-brand font-medium hover:underline">
+              Sign in
+            </a>
+          </p>
+        </div>
       </div>
+      
+      <img src={tag} alt="logo" className="absolute top-1 right-1 w-40 h-auto" />
+    </section>
+  );
+};
 
-      <button className="bg-white border py-2 w-full rounded-xl mt-5 flex justify-center items-center text-sm hover:scale-105 duration-300 ">
-        {/* {logo google} */}
-        <svg className="mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="25px">
-          <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
-          <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
-          <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
-          <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
-        </svg>
-        Signup with Google
-      </button>
-
-
-      <p className="text-center text-white mt-6 text-sm">
-          Already have an account?{" "}
-          <a href="/" className="text-brand font-medium hover:underline">
-            Sign in
-          </a>
-        </p>
-      </div>    
-  </div>
-  <img src={tag} alt="logo" className="absolute  top-1 right-1  w-40 h-auto" />
-</section>  
-    </>
-  )
-}
-
-export default SignUpPage
+export default SignUpPage;

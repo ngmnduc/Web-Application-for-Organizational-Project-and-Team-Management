@@ -20,4 +20,8 @@ const projectSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
+<<<<<<< HEAD
 export default mongoose.model("Project", projectSchema);
+=======
+export default mongoose.model("Project", projectSchema);
+>>>>>>> main
