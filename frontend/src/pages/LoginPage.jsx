@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../services/authService';
+import { login as apiLogin } from '../services/authService';
 import tag from '../assets/images/logo.png';
+import { useAuth } from '../services/AuthContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -9,6 +10,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { saveLogin } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,7 +23,8 @@ const LoginPage = () => {
 
     try {
       setIsLoading(true);
-      await login(email, password);
+      const res = await apiLogin(email, password);
+      saveLogin(res.user, res.token);
       // Đăng nhập thành công, chuyển hướng về trang chủ
       navigate('/home');
     } catch (err) {
