@@ -2,12 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login as apiLogin } from '../services/authService';
 import tag from '../assets/images/logo.png';
-<<<<<<< HEAD
 import { useAuth } from '../services/AuthContext';
-=======
 import { GoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../services/authService';
->>>>>>> 6ab4936beea8389f0b5896a6087c4d4365657630
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -15,9 +12,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-<<<<<<< HEAD
   const { saveLogin } = useAuth();
-=======
   //GG trả về
   const handleGoogleSuccess = async (credentialResponse) => {
   try {
@@ -34,7 +29,6 @@ const LoginPage = () => {
     setError("Google login failed. Please try again.");
   }
 };
->>>>>>> 6ab4936beea8389f0b5896a6087c4d4365657630
 
 const handleGoogleError = () => {
   console.error('Google Login Failed');

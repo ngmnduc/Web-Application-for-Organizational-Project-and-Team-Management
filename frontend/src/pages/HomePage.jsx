@@ -14,7 +14,7 @@ const HomePage = () => {
             <option>This week</option>
           </select>
 
-          <button className="px-4 py-2 border border-brand text-brand rounded-lg hover:scale-105 duration-300">
+          <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-brand text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity">
             Export report
           </button>
         </div>
