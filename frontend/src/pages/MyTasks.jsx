@@ -1,4 +1,3 @@
-// (giữ nguyên import cũ, chỉ chỉnh React để dùng useState)
 import React, { useState } from 'react';
 import { 
   ClipboardDocumentListIcon, 
@@ -23,10 +22,9 @@ import {
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 // ===== end =====
 
-
 import { useOutletContext } from 'react-router-dom';
 import TaskSummary from '../components/TaskSummary';
-  
+
 // ======= Kanban Card (UI giống ảnh mẫu) =======
 const PriorityBadge = ({ level }) => {
   const map = {
@@ -84,80 +82,15 @@ const KanbanCard = ({ task }) => {
 };
 // ======= end Kanban Card =======
 
-// ======= Kanban Card  =======
-const PriorityBadge = ({ level }) => {
-  const map = {
-    High:   { bg: 'bg-red-100', text: 'text-red-600' },
-    Medium: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-    Low:    { bg: 'bg-green-100', text: 'text-green-700' },
-  };
-  const c = map[level] ?? map.Medium;
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${c.bg} ${c.text}`}>
-      {level}
-    </span>
-  );
-};
-
-const KanbanCard = ({ task }) => {
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition">
-      {/* dòng badge */}
-      <div className="flex items-center gap-2 mb-2">
-        <PriorityBadge level={task.priority} />
-        {task.dueSoon && (
-          <span className="text-xs px-2 py-0.5 rounded-md bg-orange-100 text-orange-700">
-            1 day left
-          </span>
-        )}
-      </div>
-      {/* title */}
-      <h4 className="font-semibold text-gray-800 leading-snug">
-        {task.title}
-      </h4>
-
-      {/* meta */}
-      <div className="mt-3 flex items-center justify-between text-sm">
-        <div className="flex items-center gap-3 text-gray-500">
-          <div className="flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span>{task.due}</span>
-          </div>
-          <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-md ${
-            task.projectColor ?? 'bg-blue-50 text-blue-700'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-current opacity-60" />
-            {task.project}
-          </span>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs font-semibold">
-          {task.assignee}
-        </div>
-      </div>
-    </div>
-  );
-};
-// ======= end Kanban Card =======
-
-
 // --- MyTasks Component ---
 const MyTasks = () => {
-  const { tasks, setTasks, dynamicTasksSummary } = useOutletContext();
+  const { dynamicTasksSummary } = useOutletContext();
 
   const filterOptions = [
     { label: 'All statuses', active: true },
     { label: 'Me', active: false },
     { label: 'All projects', active: false },
     { label: 'All', active: false },
-  ];
-
-  const columns = [
-    { id: 'Backlog', label: 'Backlog' },
-    { id: 'Todo', label: 'Todo' },
-    { id: 'In Progress', label: 'In Progress' },
-    { id: 'Done', label: 'Done' },
   ];
 
   // ===== Kanban data & handlers (local state) =====
@@ -201,7 +134,19 @@ const MyTasks = () => {
     });
   };
 
-
+  // Hàm addTask bị thiếu
+  const addTask = (columnId) => {
+    const newTask = {
+      id: `t${Date.now()}`,
+      title: 'New Task',
+      status: columnId,
+      priority: 'Medium',
+      due: 'Dec 31',
+      project: 'New Project',
+      assignee: 'ME'
+    };
+    setTasks(prev => [...prev, newTask]);
+  };
 
   // ===== Sort tasks by priority (High -> Medium -> Low) =====
   const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
@@ -238,7 +183,7 @@ const MyTasks = () => {
       {/* Task Summary Section (Cards) */}
       <TaskSummary summaryData={dynamicTasksSummary} />
 
-      {/* =================== KANBAN (giống ảnh mẫu) =================== */}
+      {/* =================== KANBAN =================== */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {columns.map((col) => {
@@ -259,24 +204,6 @@ const MyTasks = () => {
                   >
                     + Add
                   </button>
-                </div>
-
-      {/* =================== KANBAN  =================== */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {columns.map((col) => {
-            const list = tasks
-              .filter(t => t.status === col.id)
-              .sort(sortTasks); //  sắp theo Priority
-            return (
-              <div key={col.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                {/* Header cột */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-700">{col.label}</h3>
-                    <span className="text-xs text-gray-500">({list.length})</span>
-                  </div>
-                 
                 </div>
 
                 {/* Danh sách thẻ kéo thả */}
