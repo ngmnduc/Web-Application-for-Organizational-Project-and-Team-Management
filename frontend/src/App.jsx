@@ -15,11 +15,15 @@ import Projects from "./pages/Projects.jsx";
 function App() {
   return (
     <Routes>
-
+      
+      {/* trang mặc định */}
       <Route path="/" element={<Navigate to="/login" />} />
 
       {/* login */}
       <Route path="/login" element={<LoginPage />} />
+      {/*signup*/}
+      <Route path="/signup" element={<SignUpPage />} />
+
       {/*signup*/}
       <Route path="/signup" element={<SignUpPage />} />
 
