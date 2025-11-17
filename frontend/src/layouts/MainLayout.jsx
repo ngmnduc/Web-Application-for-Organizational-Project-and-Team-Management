@@ -34,7 +34,7 @@ const MainLayout = () => {
           subtitle: 'Manage your account information and preferences'
         });
         break;
-      case '/':
+      case '/home':
       default:
         setHeaderData({
           title: 'Dashboard',

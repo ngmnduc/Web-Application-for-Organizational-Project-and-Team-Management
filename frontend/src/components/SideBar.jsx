@@ -65,7 +65,7 @@ const SideBar = () => {
         >
             {/* Logo Section */}
             <div className="flex items-center justify-center gap-2 px-3 pt-8 pb-4">
-                <a className='flex items-center' href='/'> 
+                <a className='flex items-center' href='/home'> 
                     <img
                         className="h-9 w-auto"
                         src={ logo } 

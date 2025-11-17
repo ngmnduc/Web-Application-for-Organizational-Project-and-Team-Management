@@ -15,7 +15,7 @@ function App() {
     <Routes>
       
       {/* trang mặc định */}
-      <Route path="/" element={<Navigate to="/login" />} />
+      <Route path="/" element={<Navigate to="/home" />} />
 
       {/* login */}
       <Route path="/login" element={<LoginPage />} />
