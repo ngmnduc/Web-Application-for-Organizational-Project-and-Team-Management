@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../services/authService';
+import { login as apiLogin } from '../services/authService';
 import tag from '../assets/images/logo.png';
+import { useAuth } from '../services/AuthContext';
 import { GoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../services/authService';
 
@@ -11,6 +12,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { saveLogin } = useAuth();
   //GG trả về
   const handleGoogleSuccess = async (credentialResponse) => {
   try {
@@ -43,7 +45,8 @@ const handleGoogleError = () => {
 
     try {
       setIsLoading(true);
-      await login(email, password);
+      const res = await apiLogin(email, password);
+      saveLogin(res.user, res.token);
       // Đăng nhập thành công, chuyển hướng về trang chủ
       navigate('/home');
     } catch (err) {

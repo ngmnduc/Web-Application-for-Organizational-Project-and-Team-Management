@@ -62,8 +62,8 @@ const handleGoogleError = () => {
       setIsLoading(true);
       const name = `${formData.firstName} ${formData.lastName}`.trim();
       await signup(name, formData.email, formData.password);
-      // Đăng ký thành công, chuyển hướng về trang chủ
-      navigate('/home');
+      // Đăng ký thành công, chuyển hướng về trang đăng nhập
+      navigate('/login');
     } catch (err) {
       console.error('Signup error:', err);
       setError(err.error?.message || 'Signup failed. Please try again!');
