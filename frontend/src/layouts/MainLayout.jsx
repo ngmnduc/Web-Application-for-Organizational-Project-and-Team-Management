@@ -11,11 +11,14 @@ import {
     CheckCircleIcon as DoneSolid,
     ExclamationTriangleIcon as WarningSolid, 
 } from '@heroicons/react/24/solid';
+import { useAuth } from '../services/AuthContext';
 
 const MainLayout = () => {
   const [headerData, setHeaderData] = useState({ title: '', subtitle: '' });
   const location = useLocation();
   const navigate = useNavigate();
+  // Lấy user + logout từ AuthContext
+  const { user } = useAuth();
 
   useEffect(() => {
     // Xác định title và subtitle dựa trên pathname
@@ -56,7 +59,7 @@ const MainLayout = () => {
           subtitle: 'Manage your account information and preferences'
         });
         break;
-      case '/':
+      case '/home':
       default:
         setHeaderData({
           title: 'Dashboard',
@@ -83,12 +86,6 @@ const MainLayout = () => {
     { number: dueSoonCount, label: '1 day left', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
   ];
 
-  // Mock user (giả lập /auth/me)
-  const mockUser = {
-    name: 'Alex Hayes', 
-    initials: 'AH',      
-    role: 'Admin'        
-  };
   
   // Gọi hook polling 
   const { unreadCount } = usePollingNotifications(30000); 
@@ -110,9 +107,10 @@ const MainLayout = () => {
           <Navbar 
             title={headerData.title} 
             subtitle={headerData.subtitle}
-            user={mockUser}
             unreadCount={unreadCount}
+            user={user}
             onLogout={handleLogout}
+            
           />
 
           {/* Sửa <main> để nó tự động nhận padding từ trang con */}
