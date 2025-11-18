@@ -151,13 +151,6 @@ const handleGoogleError = () => {
             size="large"
             width="100%"
           />
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={handleGoogleError}
-            theme="outline" // Tùy chỉnh giao diện
-            size="large"
-            width="100%"
-          />
 
           <p className="text-center text-white mt-6 text-sm">
             Don't have an account?{" "}
