@@ -17,8 +17,9 @@ const app = express();
 app.use(cors({
   origin: ['http://localhost:5173',
            'http://localhost:3000',
-          'https://web-application-for-organizational-project-and-team.vercel.app', // Link chính
-          'https://web-application-for-organizational.vercel.app'],
+          'https://web-application-for-organizational-project-and-team.vercel.app', 
+          'https://web-application-for-organizational.vercel.app',
+          'https://web-application-for-organizational-project-and-team-rl1wsormn.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
