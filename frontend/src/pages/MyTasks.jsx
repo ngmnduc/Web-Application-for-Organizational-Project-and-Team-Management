@@ -1,4 +1,3 @@
-// (giữ nguyên import cũ, chỉ chỉnh React để dùng useState)
 import React, { useState } from 'react';
 import { 
   ClipboardDocumentListIcon, 
@@ -23,30 +22,8 @@ import {
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 // ===== end =====
 
-
-// --- Task Summary Card Component ---
-const TaskSummaryCard = ({ icon, number, label, iconColor, bgColor, textColor }) => {
-  
-  // Áp dụng iconColorClass vào icon
-  const coloredIcon = React.cloneElement(icon, { className: `w-5 h-5 ${iconColor}` });
-  
-  return (
-    <div className="flex items-center space-x-3 p-4 bg-white rounded-xl flex-1 border border-gray-100 transition duration-150 hover:shadow-md cursor-pointer"> 
-      {/* Icon Circle */}
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${bgColor} ${iconColor}`}>
-          {coloredIcon}
-      </div>
-      
-      {/* Text Content */}
-      <div>
-          <div className={`text-xl font-semibold ${textColor}`}>{number}</div>
-          <div className="text-sm text-gray-500 flex items-center">
-              {label}
-          </div>
-      </div>
-    </div>
-  );
-};
+import { useOutletContext } from 'react-router-dom';
+import TaskSummary from '../components/TaskSummary';
 
 // ======= Kanban Card (UI giống ảnh mẫu) =======
 const PriorityBadge = ({ level }) => {
@@ -105,30 +82,15 @@ const KanbanCard = ({ task }) => {
 };
 // ======= end Kanban Card =======
 
-
 // --- MyTasks Component ---
 const MyTasks = () => {
-
-  const taskDataFixed = [
-    { number: 14, label: 'Total', icon: <TotalSolid />, iconColor: "text-gray-500", bgColor: "bg-gray-100", textColor: "text-gray-800" },
-    { number: 6, label: 'Todo', icon: <ClockSolid />, iconColor: "text-gray-500", bgColor: "bg-gray-100", textColor: "text-gray-600" },
-    { number: 5, label: 'In Progress', icon: <ProgressSolid />, iconColor: "text-blue-500", bgColor: "bg-blue-100", textColor: "text-blue-600" },
-    { number: 3, label: 'Done', icon: <DoneSolid />, iconColor: "text-green-500", bgColor: "bg-green-100", textColor: "text-green-600" },
-    { number: 1, label: '1 day left', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
-  ];
+  const { dynamicTasksSummary } = useOutletContext();
 
   const filterOptions = [
     { label: 'All statuses', active: true },
     { label: 'Me', active: false },
     { label: 'All projects', active: false },
     { label: 'All', active: false },
-  ];
-  
-  const statusCounts = [
-    { label: 'Backlog', count: 8 },
-    { label: 'Todo', count: 6 },
-    { label: 'In Progress', count: 4 },
-    { label: 'Done', count: 12 },
   ];
 
   // ===== Kanban data & handlers (local state) =====
@@ -172,19 +134,30 @@ const MyTasks = () => {
     });
   };
 
-  const addTask = (status) => {
+  // Hàm addTask bị thiếu
+  const addTask = (columnId) => {
     const newTask = {
-      id: Date.now().toString(),
-      title: 'New task',
-      status,
-      priority: 'Low',
-      due: 'Dec 20',
-      project: 'Website Redesign',
-      assignee: 'SC',
+      id: `t${Date.now()}`,
+      title: 'New Task',
+      status: columnId,
+      priority: 'Medium',
+      due: 'Dec 31',
+      project: 'New Project',
+      assignee: 'ME'
     };
     setTasks(prev => [...prev, newTask]);
   };
-  // ===== end Kanban =====
+
+  // ===== Sort tasks by priority (High -> Medium -> Low) =====
+  const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+  const sortTasks = (a, b) => {
+    const pa = PRIORITY_ORDER[a.priority] ?? 99;
+    const pb = PRIORITY_ORDER[b.priority] ?? 99;
+    if (pa !== pb) return pa - pb;               // High trước Medium trước Low
+    return (a.due || '').localeCompare(b.due || ''); // tie-break theo ngày (tuỳ chọn)
+  };
+  // ===== end sort =====
 
   return (
     <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
@@ -208,19 +181,15 @@ const MyTasks = () => {
       <div className="border-t border-gray-200 mb-8"></div>
 
       {/* Task Summary Section (Cards) */}
-      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg mb-8">
-        <div className="flex flex-wrap md:flex-nowrap justify-between gap-4">
-          {taskDataFixed.map((task, index) => (
-            <TaskSummaryCard key={index} {...task} />
-          ))}
-        </div>
-      </div>
+      <TaskSummary summaryData={dynamicTasksSummary} />
 
-      {/* =================== KANBAN (giống ảnh mẫu) =================== */}
+      {/* =================== KANBAN =================== */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {columns.map((col) => {
-            const list = tasks.filter(t => t.status === col.id);
+            const list = tasks
+              .filter(t => t.status === col.id)
+              .sort(sortTasks);
             return (
               <div key={col.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                 {/* Header cột */}
