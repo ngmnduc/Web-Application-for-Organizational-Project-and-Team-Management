@@ -3,7 +3,7 @@ import Task from "../models/task.model.js";
 import Project from "../models/project.model.js";
 
 /**
- * @desc    Lấy tất cả task trong 1 project (chưa bị xóa)
+ * @desc    Get all tasks in a project (not deleted)
  * @route   GET /projects/:id/tasks
  * @access  Private (Admin/Manager/Member)
  */
@@ -40,7 +40,7 @@ export const getTasksByProject = async (req, res) => {
 };
 
 /**
- * @desc    Lọc task theo project, assignee hoặc status
+ * @desc    Filter tasks by project, assignee, or status
  * @route   GET /tasks?project=...&assignee=...&status=...
  * @access  Private (Admin/Manager/Member)
  */
@@ -67,7 +67,7 @@ export const getFilteredTasks = async (req, res) => {
 };
 
 /**
- * @desc    Tạo task mới trong project
+ * @desc    Create a new task inside a project
  * @route   POST /projects/:id/tasks
  * @access  Private (Admin/Manager)
  */
@@ -139,7 +139,7 @@ export const createTask = async (req, res) => {
 };
 
 /**
- * @desc    Cập nhật thông tin task (Admin/Manager/Member)
+ * @desc    Update task details (Admin/Manager/Member)
  * @route   PUT /tasks/:id
  * @access  Private
  */
@@ -157,7 +157,7 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // Member chỉ được update task của chính mình
+    // Members can only update their own tasks
     if (userRole === "Member") {
       if (String(task.assigneeId) !== String(userId)) {
         return res.status(403).json({
@@ -166,7 +166,7 @@ export const updateTask = async (req, res) => {
         });
       }
 
-      // Không cho Member đổi ngoài status
+      // Members can only change status
       const allowedKeys = ["status"];
       const invalid = Object.keys(req.body).some(
         (key) => !allowedKeys.includes(key)
@@ -194,7 +194,7 @@ export const updateTask = async (req, res) => {
 };
 
 /**
- * @desc    Cập nhật trạng thái task (PATCH)
+ * @desc    Update only the status of a task (PATCH)
  * @route   PATCH /tasks/:id
  * @access  Private
  */
@@ -206,9 +206,12 @@ export const updateTaskStatus = async (req, res) => {
     const userId = req.user?._id;
 
     const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+    if (!task)
+      return res
+        .status(404)
+        .json({ success: false, message: "Task not found" });
 
-    // Member chỉ được đổi status task chính mình
+    // Members can only update the status of their own tasks
     if (userRole === "Member" && String(task.assigneeId) !== String(userId)) {
       return res.status(403).json({
         success: false,
@@ -230,7 +233,7 @@ export const updateTaskStatus = async (req, res) => {
 };
 
 /**
- * @desc    Soft delete task (Admin/Manager)
+ * @desc    Soft delete a task (Admin/Manager only)
  * @route   DELETE /tasks/:id
  * @access  Private
  */

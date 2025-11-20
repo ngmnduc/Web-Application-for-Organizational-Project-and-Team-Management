@@ -13,7 +13,7 @@ const router = express.Router();
 
 /**
  * @route   GET /tasks
- * @desc    Lọc task theo project / assignee / status
+ * @desc    Filter tasks by project / assignee / status
  * @access  Private (Admin/Manager/Member)
  * @example /api/tasks?project=...&assignee=...&status=TODO
  */
@@ -21,14 +21,14 @@ router.get("/tasks", verifyToken, getFilteredTasks);
 
 /**
  * @route   GET /projects/:id/tasks
- * @desc    Lấy danh sách task trong 1 project (chưa bị xóa)
+ * @desc    Get all tasks within a specific project (not deleted)
  * @access  Private (Admin/Manager/Member)
  */
 router.get("/projects/:id/tasks", verifyToken, getTasksByProject);
 
 /**
  * @route   POST /projects/:id/tasks
- * @desc    Tạo task mới trong project (chỉ Admin/Manager)
+ * @desc    Create a new task in a project (Admin/Manager only)
  * @access  Private (Admin/Manager)
  */
 // đã add checkprj active
@@ -36,21 +36,21 @@ router.post("/projects/:id/tasks", verifyToken, checkRole("Admin", "Manager"),ch
 
 /**
  * @route   PUT /tasks/:id
- * @desc    Cập nhật thông tin task (title, assignee,...)
+ * @desc    Update task details (title, assignee, etc.)
  * @access  Private (Admin/Manager/Member)
  */
 router.put("/tasks/:id", verifyToken,checkProjectActive, updateTask);
 
 /**
  * @route   PATCH /tasks/:id
- * @desc    Cập nhật trạng thái task (TODO → DOING → DONE)
+ * @desc    Update task status (TODO → DOING → DONE)
  * @access  Private (Admin/Manager/Member)
  */
 router.patch("/tasks/:id", verifyToken, updateTaskStatus);
 
 /**
  * @route   DELETE /tasks/:id
- * @desc    Xóa mềm 1 task (đánh dấu deletedAt)
+ * @desc    Soft delete a task (mark as deletedAt)
  * @access  Private (Admin/Manager)
  */
 router.delete("/tasks/:id", verifyToken, checkRole("Admin", "Manager"), checkProjectActive,deleteTask);
