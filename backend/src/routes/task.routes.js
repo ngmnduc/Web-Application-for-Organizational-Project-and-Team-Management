@@ -8,7 +8,7 @@ import {
   deleteTask,
 } from "../controllers/task.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
-import { checkProjectActive } from "../middlewares/project.middlewares.js";
+import { checkProjectActive } from "../middlewares/archive.middleware.js";
 const router = express.Router();
 
 /**

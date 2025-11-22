@@ -107,3 +107,23 @@ export const getProjectMembers = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// PATCH /projects/:id/archive
+export const toggleArchive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archive } = req.body || {}; // true to archive, false to unarchive
+
+    const project = await Project.findById(id);
+    if (!project || project.deletedAt) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    project.status = archive ? "archived" : "active";
+    await project.save();
+
+    res.json({ success: true, message: `Project ${archive ? "archived" : "unarchived"}`, data: project });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
