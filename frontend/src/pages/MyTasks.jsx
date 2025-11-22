@@ -80,6 +80,26 @@ const KanbanCard = ({ task }) => {
 const MyTasks = () => {
   const navigate = useNavigate();
 
+  // ====== USER + PERMISSION (Tuần 3) ======
+  // Tạm thời mock user, sau này bạn thay bằng data thật từ authService / /auth/me
+  const currentUser = {
+    id: 'USER_1',          // id user hiện tại
+    role: 'ADMIN',         // ADMIN | MANAGER | MEMBER (ví dụ)
+  };
+
+  // Admin và Manager có quyền giống nhau
+  const isManagerOrAdmin = ['ADMIN', 'MANAGER'].includes(
+    (currentUser.role || '').toUpperCase()
+  );
+
+  // Member chỉ được kéo task nếu assigneeId === currentUser.id
+  const canDragTask = (task) => {
+    if (isManagerOrAdmin) return true;
+    if (!task.assigneeId) return false;
+    return task.assigneeId === currentUser.id;
+  };
+  // ====== END PERMISSION ======
+
   // ====== FILTER UI  ======
   const filterOptions = [
     { label: 'All statuses', active: true },
@@ -164,6 +184,7 @@ const MyTasks = () => {
           due: t.dueDate || t.due || '—',
           project: t.projectName || 'Project',
           assignee: t.assigneeInitials || t.assignee || '??',
+          assigneeId: t.assigneeId || null,      // <== thêm field này để check permission
           dueSoon: t.dueSoon || false,
           //api chưa có order index thì default 0
           position: t.orderIndex || t.position || 0,
@@ -194,7 +215,7 @@ const MyTasks = () => {
     fetchTasks();
   }, [currentProjectId, navigate]);
 
-  // ===== Drag & Drop + PATCH status =====
+  // ===== Drag & Drop + PATCH status (có permission) =====
   const handleDragEnd = async ({ source, destination, draggableId }) => {
   // 1. Check cơ bản
   if (!destination) return;
@@ -348,7 +369,7 @@ const MyTasks = () => {
         </div>
       )}
 
-      {/* =================== KANBAN (data thật) =================== */}
+      {/* =================== KANBAN (data thật + permission) =================== */}
       {isLoading ? (
         <div className="mt-8 py-10 text-center text-gray-500 text-sm">
           Loading tasks...
@@ -386,19 +407,28 @@ const MyTasks = () => {
                           {...provided.droppableProps}
                           className="flex flex-col gap-3 min-h-[220px]"
                         >
-                          {list.map((task, index) => (
-                            <Draggable draggableId={task.id} index={index} key={task.id}>
-                              {(provided) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                >
-                                  <KanbanCard task={task} />
-                                </div>
-                              )}
-                            </Draggable>
-                          ))}
+                          {list.map((task, index) => {
+                            const disabled = !canDragTask(task); // Manager/Admin: false; Member: tuỳ assignee
+                            return (
+                              <Draggable
+                                draggableId={task.id}
+                                index={index}
+                                key={task.id}
+                                isDragDisabled={disabled}
+                              >
+                                {(provided) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    /* Member không được kéo thì bỏ dragHandleProps */
+                                    {...(!disabled ? provided.dragHandleProps : {})}
+                                  >
+                                    <KanbanCard task={task} />
+                                  </div>
+                                )}
+                              </Draggable>
+                            );
+                          })}
                           {provided.placeholder}
                         </div>
                       )}
