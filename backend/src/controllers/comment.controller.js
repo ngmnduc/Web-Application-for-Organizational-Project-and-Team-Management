@@ -43,6 +43,7 @@ export const createComment = async (req, res) => {
       content,
     });
     await comment.save();
+    
     const mentions = [...content.matchAll(/@([A-Za-zÀ-ỹ0-9_]+)/gi)].map((m) => m[1]);
     if (mentions.length > 0) {
       const uniqueNames = [...new Set(mentions)];
@@ -54,6 +55,7 @@ export const createComment = async (req, res) => {
            return Notification.create({
             userId: mentionedUser._id,
             type: "MENTION",
+            taskId: task._id,
             payload: `${currentUser.name} mentioned you in task "${task.title}"`,
             read: false
           });

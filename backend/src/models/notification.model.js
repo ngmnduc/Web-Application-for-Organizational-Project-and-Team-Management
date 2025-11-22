@@ -7,17 +7,19 @@ const notificationSchema = new mongoose.Schema(
       ref: "User", 
       required: true 
     },
-   
     type: { 
       type: String, 
       required: true 
     },
-    
+    taskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+      required: false 
+    },
     payload: { 
       type: String, 
       required: true 
     },
-
     read: { 
       type: Boolean, 
       default: false 
