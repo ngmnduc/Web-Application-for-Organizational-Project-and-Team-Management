@@ -5,15 +5,15 @@ import { verifyToken } from "../middlewares/auth.js";
 const router = express.Router();
 
 /**
- * @route  POST /comments
- * @desc   Create a new comment, parse mentions, and generate notifications
+ * @route   GET /tasks/:taskId/comments
+ * @access  Private
  */
-router.post("/comments", verifyToken, createComment);
+router.get("/tasks/:taskId/comments", verifyToken, getCommentsByTask);
 
 /**
- * @route  GET /comments/:taskId
- * @desc   Get all comments for a specific task
+ * @route   POST /tasks/:taskId/comments
+ * @access  Private
  */
-router.get("/comments/:taskId", verifyToken, getCommentsByTask);
+router.post("/tasks/:taskId/comments", verifyToken, createComment);
 
 export default router;

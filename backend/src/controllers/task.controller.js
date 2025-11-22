@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Task from "../models/task.model.js";
 import Project from "../models/project.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 
 /**
  * @desc    Get all tasks in a project (not deleted)
@@ -128,6 +129,19 @@ export const createTask = async (req, res) => {
 
     await task.save();
 
+    // Activity Log: Create Task
+    try {
+      await ActivityLog.create({
+        projectId: task.projectId,
+        userId: req.user._id,
+        taskId: task._id,
+        action: "CREATE_TASK",
+        content: `created task "${task.title}"`
+      });
+    } catch (logError) {
+      console.error("Logging failed:", logError.message);
+    }
+
     res.status(201).json({
       success: true,
       message: "Task created successfully",
@@ -222,6 +236,19 @@ export const updateTaskStatus = async (req, res) => {
     task.status = status || task.status;
     await task.save();
 
+    // Activity Log: Update Status
+    try {
+      await ActivityLog.create({
+        projectId: task.projectId,
+        userId: req.user._id,
+        taskId: task._id,
+        action: "UPDATE_STATUS",
+        content: `updated status of task "${task.title}" to ${status}`
+      });
+    } catch (logError) {
+      console.error("Logging failed:", logError.message);
+    }
+
     res.status(200).json({
       success: true,
       message: "Task status updated successfully",
@@ -266,6 +293,54 @@ export const deleteTask = async (req, res) => {
       success: true,
       message: "Task soft-deleted successfully",
       data: deletedTask,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Create a subtask (checklist item)
+ * @route   POST /tasks/:taskId/subtasks
+ * @access  Private
+ */
+export const createSubtask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { title } = req.body;
+    const userId = req.user._id;
+
+    if (!title) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Title is required" 
+      });
+    }
+
+    const parentTask = await Task.findById(taskId);
+    if (!parentTask) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Parent task not found" 
+      });
+    }
+
+    // Create subtask inheriting projectId from parent
+    const subtask = new Task({
+      title,
+      projectId: parentTask.projectId,
+      parentId: taskId,
+      assigneeId: userId,
+      status: "TODO",
+      priority: parentTask.priority
+    });
+
+    await subtask.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Subtask created successfully",
+      data: subtask,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

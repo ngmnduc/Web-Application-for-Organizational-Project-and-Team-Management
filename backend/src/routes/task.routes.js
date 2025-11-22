@@ -6,6 +6,7 @@ import {
   updateTask,
   updateTaskStatus,
   deleteTask,
+  createSubtask
 } from "../controllers/task.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
 import { checkProjectActive } from "../middlewares/project.middlewares.js";
@@ -54,5 +55,12 @@ router.patch("/tasks/:id", verifyToken, updateTaskStatus);
  * @access  Private (Admin/Manager)
  */
 router.delete("/tasks/:id", verifyToken, checkRole("Admin", "Manager"), checkProjectActive,deleteTask);
+
+/**
+ * @route   POST /tasks/:taskId/subtasks
+ * @desc    Create a subtask
+ * @access  Private
+ */
+router.post("/tasks/:taskId/subtasks", verifyToken, createSubtask);
 
 export default router;
