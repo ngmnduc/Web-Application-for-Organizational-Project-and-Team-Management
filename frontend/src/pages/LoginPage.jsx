@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login as apiLogin } from '../services/authService';
 import tag from '../assets/images/logo.png';
@@ -13,6 +13,15 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { saveLogin } = useAuth();
+
+  useEffect(() => {
+    // Khi component LoginPage hiện lên, xóa ngay lập tức token cũ
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    
+    // Nếu AuthContext của bạn có state user, việc xóa localStorage
+    // sẽ giúp khi F5 hoặc navigate, AppRouter sẽ tự hiểu là user = null
+  }, []);
   //GG trả về
   const handleGoogleSuccess = async (credentialResponse) => {
   try {

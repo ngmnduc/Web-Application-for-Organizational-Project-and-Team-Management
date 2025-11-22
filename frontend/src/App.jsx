@@ -26,23 +26,20 @@ function App() {
       {/*signup*/}
       <Route path="/signup" element={<SignUpPage />} />
 
-      {/*signup*/}
-      <Route path="/signup" element={<SignUpPage />} />
-
       {/* user */}
-      <Route path="/" element={<AppRouter requiredRole="user"> <MainLayout /> </AppRouter> }>
+      <Route path="" element={<AppRouter requiredRole={["Member", "Manager"]}> <MainLayout /> </AppRouter> }>
         
-        <Route path="home" element={<HomePage />} />
-        <Route path="tasks" element={<MyTasks />} />
-        <Route path="calendar" element={<Calendar />} />
-        <Route path="notifications" element={<Notification />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="members" element={<Members />} />
-        <Route path="projects" element={<Projects />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/tasks" element={<MyTasks />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/notifications" element={<Notification />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/members" element={<Members />} />
+        <Route path="/projects" element={<Projects />} />
 
       </Route>
       {/* admin */}
-      <Route path="/" element={<AppRouter requiredRole="admin"> <AdminLayout /> </AppRouter> }>
+      <Route path="/admin" element={<AppRouter requiredRole={["Admin"]}> <AdminLayout /> </AppRouter> }>
         
         <Route path="home" element={<HomePage />} />
         <Route path="tasks" element={<MyTasks />} />
