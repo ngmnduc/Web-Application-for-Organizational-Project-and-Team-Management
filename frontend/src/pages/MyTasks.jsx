@@ -117,7 +117,7 @@ const MyTasks = () => {
     setTasks(prev => [...prev, newTask]);
   };
 
-  // ===== Sort tasks by priority (High -> Medium -> Low) =====
+// ===== Sort tasks by priority (High -> Medium -> Low) =====
   const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
   const sortTasks = (a, b) => {

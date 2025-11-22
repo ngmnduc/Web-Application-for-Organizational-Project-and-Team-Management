@@ -15,8 +15,7 @@ import Projects from "./pages/Projects.jsx";
 function App() {
   return (
     <Routes>
-      
-      {/* trang mặc định */}
+
       <Route path="/" element={<Navigate to="/login" />} />
 
       {/* login */}
