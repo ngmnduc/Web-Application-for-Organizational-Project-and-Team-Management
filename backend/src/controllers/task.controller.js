@@ -6,7 +6,7 @@ import ActivityLog from "../models/activityLog.model.js";
 /**
  * @desc    Get all tasks in a project (not deleted)
  * @route   GET /projects/:id/tasks
- * @access  Private (Admin/Manager/Member)
+ * @access  Private
  */
 export const getTasksByProject = async (req, res) => {
   try {
@@ -21,14 +21,8 @@ export const getTasksByProject = async (req, res) => {
     }
 
     const tasks = await Task.find({ projectId, deletedAt: null })
-      .populate({
-        path: "assigneeId",
-        select: "name email role",
-      })
-      .populate({
-        path: "projectId",
-        select: "name",
-      });
+      .populate("assigneeId", "name email role")
+      .populate("projectId", "name");
 
     res.status(200).json({
       success: true,
@@ -42,8 +36,8 @@ export const getTasksByProject = async (req, res) => {
 
 /**
  * @desc    Filter tasks by project, assignee, or status
- * @route   GET /tasks?project=...&assignee=...&status=...
- * @access  Private (Admin/Manager/Member)
+ * @route   GET /tasks
+ * @access  Private
  */
 export const getFilteredTasks = async (req, res) => {
   try {
@@ -86,13 +80,12 @@ export const createTask = async (req, res) => {
       estimateHours,
       spentHours,
       orderIndex,
-      parentId,
     } = req.body;
 
-    if (!title || !dueDate) {
+    if (!title) {
       return res.status(400).json({
         success: false,
-        message: "Title and dueDate are required.",
+        message: "Title is required.",
       });
     }
 
@@ -108,9 +101,6 @@ export const createTask = async (req, res) => {
     const convertedAssigneeId = assigneeId
       ? new mongoose.Types.ObjectId(assigneeId)
       : null;
-    const convertedParentId = parentId
-      ? new mongoose.Types.ObjectId(parentId)
-      : null;
 
     const task = new Task({
       title,
@@ -123,7 +113,6 @@ export const createTask = async (req, res) => {
       estimateHours,
       spentHours,
       orderIndex,
-      parentId: convertedParentId,
       projectId: convertedProjectId,
     });
 
@@ -153,7 +142,7 @@ export const createTask = async (req, res) => {
 };
 
 /**
- * @desc    Update task details (Admin/Manager/Member)
+ * @desc    Update task details
  * @route   PUT /tasks/:id
  * @access  Private
  */
@@ -171,7 +160,6 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // Members can only update their own tasks
     if (userRole === "Member") {
       if (String(task.assigneeId) !== String(userId)) {
         return res.status(403).json({
@@ -179,8 +167,6 @@ export const updateTask = async (req, res) => {
           message: "You can only update your own tasks.",
         });
       }
-
-      // Members can only change status
       const allowedKeys = ["status"];
       const invalid = Object.keys(req.body).some(
         (key) => !allowedKeys.includes(key)
@@ -208,7 +194,7 @@ export const updateTask = async (req, res) => {
 };
 
 /**
- * @desc    Update only the status of a task (PATCH)
+ * @desc    Update only the status of a task
  * @route   PATCH /tasks/:id
  * @access  Private
  */
@@ -221,11 +207,8 @@ export const updateTaskStatus = async (req, res) => {
 
     const task = await Task.findById(taskId);
     if (!task)
-      return res
-        .status(404)
-        .json({ success: false, message: "Task not found" });
+      return res.status(404).json({ success: false, message: "Task not found" });
 
-    // Members can only update the status of their own tasks
     if (userRole === "Member" && String(task.assigneeId) !== String(userId)) {
       return res.status(403).json({
         success: false,
@@ -233,6 +216,7 @@ export const updateTaskStatus = async (req, res) => {
       });
     }
 
+    const oldStatus = task.status;
     task.status = status || task.status;
     await task.save();
 
@@ -243,7 +227,7 @@ export const updateTaskStatus = async (req, res) => {
         userId: req.user._id,
         taskId: task._id,
         action: "UPDATE_STATUS",
-        content: `updated status of task "${task.title}" to ${status}`
+        content: `updated status from ${oldStatus} to ${status}`
       });
     } catch (logError) {
       console.error("Logging failed:", logError.message);
@@ -260,9 +244,9 @@ export const updateTaskStatus = async (req, res) => {
 };
 
 /**
- * @desc    Soft delete a task (Admin/Manager only)
+ * @desc    Soft delete a task
  * @route   DELETE /tasks/:id
- * @access  Private
+ * @access  Private (Admin/Manager)
  */
 export const deleteTask = async (req, res) => {
   try {
@@ -289,6 +273,17 @@ export const deleteTask = async (req, res) => {
       });
     }
 
+    // Activity Log: Delete Task
+    try {
+      await ActivityLog.create({
+        projectId: deletedTask.projectId,
+        userId: req.user._id,
+        taskId: deletedTask._id,
+        action: "DELETE_TASK",
+        content: `deleted task "${deletedTask.title}"`
+      });
+    } catch (e) { console.error(e); }
+
     res.status(200).json({
       success: true,
       message: "Task soft-deleted successfully",
@@ -300,7 +295,7 @@ export const deleteTask = async (req, res) => {
 };
 
 /**
- * @desc    Create a subtask (checklist item)
+ * @desc    Create a subtask (Embedded)
  * @route   POST /tasks/:taskId/subtasks
  * @access  Private
  */
@@ -308,7 +303,6 @@ export const createSubtask = async (req, res) => {
   try {
     const { taskId } = req.params;
     const { title } = req.body;
-    const userId = req.user._id;
 
     if (!title) {
       return res.status(400).json({ 
@@ -317,31 +311,81 @@ export const createSubtask = async (req, res) => {
       });
     }
 
-    const parentTask = await Task.findById(taskId);
-    if (!parentTask) {
+    const task = await Task.findById(taskId);
+    if (!task) {
       return res.status(404).json({ 
         success: false, 
-        message: "Parent task not found" 
+        message: "Task not found" 
       });
     }
 
-    // Create subtask inheriting projectId from parent
-    const subtask = new Task({
-      title,
-      projectId: parentTask.projectId,
-      parentId: taskId,
-      assigneeId: userId,
-      status: "TODO",
-      priority: parentTask.priority
-    });
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      { 
+        $push: { subtasks: { title, isCompleted: false } } 
+      },
+      { new: true }
+    );
 
-    await subtask.save();
+    // Get the last element (newly created subtask)
+    const newSubtask = updatedTask.subtasks[updatedTask.subtasks.length - 1];
 
     res.status(201).json({
       success: true,
       message: "Subtask created successfully",
-      data: subtask,
+      data: newSubtask,
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Toggle subtask completion status
+ * @route   PATCH /tasks/:taskId/subtasks/:subtaskId
+ * @access  Private
+ */
+export const toggleSubtask = async (req, res) => {
+  try {
+    const { taskId, subtaskId } = req.params;
+    const { isCompleted } = req.body;
+
+    const updatedTask = await Task.findOneAndUpdate(
+      { "_id": taskId, "subtasks._id": subtaskId },
+      { 
+        $set: { "subtasks.$.isCompleted": isCompleted }
+      },
+      { new: true }
+    );
+
+    if (!updatedTask) return res.status(404).json({ success: false, message: "Task or Subtask not found" });
+
+    res.status(200).json({ success: true, message: "Subtask status updated", data: updatedTask });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Delete a subtask
+ * @route   DELETE /tasks/:taskId/subtasks/:subtaskId
+ * @access  Private
+ */
+export const deleteSubtask = async (req, res) => {
+  try {
+    const { taskId, subtaskId } = req.params;
+
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      { 
+        $pull: { subtasks: { _id: subtaskId } } 
+      },
+      { new: true }
+    );
+
+    if (!updatedTask) return res.status(404).json({ success: false, message: "Task not found" });
+
+    res.status(200).json({ success: true, message: "Subtask deleted", data: updatedTask });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
