@@ -48,7 +48,11 @@ const handleGoogleError = () => {
       const res = await apiLogin(email, password);
       saveLogin(res.user, res.token);
       // Đăng nhập thành công, chuyển hướng về trang chủ
-      navigate('/home');
+      if(res.user.role === "admin"){
+        navigate('admin/home');
+      }else{
+        navigate('/home');
+      }
     } catch (err) {
       console.error('Login error:', err);
       setError(err.error?.message || 'Login failed. Please try again!');
