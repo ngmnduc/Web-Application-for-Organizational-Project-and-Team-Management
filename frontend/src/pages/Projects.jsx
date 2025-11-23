@@ -6,8 +6,8 @@ import {
     CalendarDaysIcon,
     ListBulletIcon,
     Squares2X2Icon,
-    CheckCircleIcon,        // Icon cho thông báo thành công
-    ExclamationCircleIcon,  // Icon cho thông báo lỗi
+    CheckCircleIcon,        
+    ExclamationCircleIcon,  
     XMarkIcon
 } from '@heroicons/react/24/outline';
 import { LoaderOverlay } from '../components/LoaderOverlay';
@@ -18,7 +18,7 @@ import NewProjectModal from '../components/NewProjectModal';
 const PRIMARY_COLOR = '#f35640'; 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-// --- 1. Sub-component: Notification Banner ---
+// --- Sub-component: Notification Banner ---
 const NotificationBanner = ({ message, type, onClose }) => {
     if (!message) return null;
 

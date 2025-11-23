@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { 
-  ClipboardDocumentListIcon, 
-  ClockIcon, 
-  ArrowPathIcon, 
-  CheckCircleIcon, 
-  BellIcon,
-  ChevronDownIcon,
-  EllipsisVerticalIcon,
-  ExclamationTriangleIcon, 
-} from '@heroicons/react/24/outline'; 
+  ClipboardDocumentListIcon as TotalSolid, 
+  ClockIcon as ClockSolid,
+  ArrowPathIcon as ProgressSolid, 
+  CheckCircleIcon as DoneSolid,
+  ExclamationTriangleIcon as WarningSolid, 
+} from '@heroicons/react/24/solid';
+
+import { useNavigate } from 'react-router-dom';
 
 // ===== Kanban drag & drop =====
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -199,20 +198,7 @@ const MyTasks = () => {
     }
   };
 
-  // Hàm addTask bị thiếu
-  const addTask = (columnId) => {
-    const newTask = {
-      id: `t${Date.now()}`,
-      title: 'New Task',
-      status: columnId,
-      priority: 'Medium',
-      due: 'Dec 31',
-      project: 'New Project',
-      assignee: 'ME'
-    };
-    setTasks(prev => [...prev, newTask]);
-  };
-
+  // ===== Sort tasks by priority (High -> Medium -> Low) =====
   // ===== Sort tasks by priority (High -> Medium -> Low) =====
   const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 

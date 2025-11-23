@@ -86,19 +86,13 @@ const MainLayout = () => {
     { number: dueSoonCount, label: '1 day left', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
   ];
 
-  // Mock user (giả lập /auth/me)
-  const mockUser = {
-    name: 'Alex Hayes', 
-    initials: 'AH',      
-    role: 'Admin'        
-  };
   
   // Gọi hook polling 
   const { unreadCount } = usePollingNotifications(30000); 
 
   // Hàm Logout
   const handleLogout = () => {
-    logout(); 
+    logout();
     navigate('/login'); // Chuyển về trang login
   };
 
@@ -112,9 +106,10 @@ const MainLayout = () => {
           <Navbar 
             title={headerData.title} 
             subtitle={headerData.subtitle}
-            user={mockUser}
             unreadCount={unreadCount}
+            user={user}
             onLogout={handleLogout}
+            
           />
 
           {/* Sửa <main> để nó tự động nhận padding từ trang con */}
