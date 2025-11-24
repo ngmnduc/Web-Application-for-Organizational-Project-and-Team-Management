@@ -1,24 +1,41 @@
+import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
-import mongoose from "mongoose";
+import Task from "../models/task.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 
 // POST /projects
 export const createProject = async (req, res) => {
   try {
-    const { name, description } = req.body || {};
+    const { name, description, deadline, manager } = req.body || {};
     if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Project name is required" });
 
     const creatorId = req.user && req.user._id;
     if (!creatorId) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
 
+    // Auto-promote manager if needed
+    if (manager && manager !== creatorId) {
+        const userToPromote = await User.findById(manager);
+        if (userToPromote && userToPromote.role === "Member") {
+            userToPromote.role = "Manager";
+            await userToPromote.save();
+            console.log(`Auto-promoted user ${userToPromote.email} to Manager`);
+        }
+    }
+
+    const initialMembers = [{ user: creatorId, role: "Admin" }];
+    if (manager && manager !== creatorId) {
+        initialMembers.push({ user: manager, role: "Manager" });
+    }
+
     const project = new Project({
       name,
       description,
+      deadline: deadline || null,
       createdBy: creatorId,
-      members: [{ user: creatorId, role: "Manager" }],
+      members: initialMembers,
     });
-
     await project.save();
     res.status(201).json({ success: true, message: "Project created successfully", data: project });
   } catch (err) {
@@ -62,7 +79,7 @@ export const updateProject = async (req, res) => {
   }
 };
 
-// DELETE /projects/:id (soft delete)
+// DELETE /projects/:id
 export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
@@ -74,7 +91,7 @@ export const deleteProject = async (req, res) => {
   }
 };
 
-// GET /projects/:id/members -> return mock list if no populated members
+// GET /projects/:id/members
 export const getProjectMembers = async (req, res) => {
   try {
     const { id } = req.params; //  projectId
@@ -125,5 +142,69 @@ export const toggleArchive = async (req, res) => {
     res.json({ success: true, message: `Project ${archive ? "archived" : "unarchived"}`, data: project });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * @desc    Get project dashboard stats (Tasks count, Days left)
+ * @route   GET /projects/:id/summary
+ */
+export const getProjectSummary = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const project = await Project.findById(id);
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+
+    const tasks = await Task.find({ projectId: id, deletedAt: null });
+    
+    const totalTasks = tasks.length;
+    const todo = tasks.filter(t => t.status === "TODO").length;
+    const doing = tasks.filter(t => t.status === "DOING").length;
+    const done = tasks.filter(t => t.status === "DONE").length;
+
+    let daysLeft = 0;
+    if (project.endDate) {
+      const end = new Date(project.endDate);
+      const now = new Date();
+      const diffTime = end - now;
+      daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      if (daysLeft < 0) daysLeft = 0;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalTasks,
+        todo,
+        doing,
+        done,
+        daysLeft
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Get recent activity logs for project
+ * @route   GET /projects/:id/activities
+ */
+export const getProjectActivities = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const activities = await ActivityLog.find({ projectId: id })
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    res.status(200).json({
+      success: true,
+      data: activities
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -13,53 +13,53 @@ import {
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../services/AuthContext';
 
-const MainLayout = () => {
+const AdminLayout = () => {
   const [headerData, setHeaderData] = useState({ title: '', subtitle: '' });
   const location = useLocation();
   const navigate = useNavigate();
   // Lấy user + logout từ AuthContext
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     // Xác định title và subtitle dựa trên pathname
     switch (location.pathname) {
-      case '/tasks':
+      case '/admin/tasks':
         setHeaderData({
           title: 'My Tasks',
           subtitle: 'Manage and track your assigned tasks across all projects'
         });
         break;
-      case '/calendar':
+      case '/admin/calendar':
         setHeaderData({
           title: 'Calendar',
           subtitle: 'View meetings and events by day'
         });
         break;
-        case '/members':
+        case '/admin/members':
         setHeaderData({
           title: 'Team members',
           subtitle: 'Mange your projects team members and their roles'
         });
         break;
-        case '/projects':
+        case '/admin/projects':
         setHeaderData({
           title: 'Test Workspace',
           subtitle: 'Manage all projects and their collaboration'
         });
         break;
-      case '/notifications':
+      case '/admin/notifications':
         setHeaderData({
           title: 'Notifications',
           subtitle: 'View recent updates and mentions across your projects'
         });
         break;
-      case '/settings':
+      case '/admin/settings':
         setHeaderData({
           title: 'Profile Settings',
           subtitle: 'Manage your account information and preferences'
         });
         break;
-      case '/home':
+      case '/admin/home':
       default:
         setHeaderData({
           title: 'Dashboard',
@@ -92,14 +92,15 @@ const MainLayout = () => {
 
   // Hàm Logout
   const handleLogout = () => {
-    logout();
+    console.log("Logging out (UI-only)...");
+    // ( sẽ xóa token ở đây)
     navigate('/login'); // Chuyển về trang login
   };
 
   return (
     <>
       <div className='flex h-screen'>
-        <SideBar unreadCount={unreadCount} />
+        <SideBar basePath="/admin" unreadCount={unreadCount} />
         <div className="flex-1 flex flex-col bg-gray-50 overflow-y-auto">
           
           {/* Navbar sẽ nhận props từ state */}
@@ -127,4 +128,4 @@ const MainLayout = () => {
   );
 }
 
-export default MainLayout;
+export default AdminLayout;

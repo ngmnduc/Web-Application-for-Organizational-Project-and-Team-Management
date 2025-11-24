@@ -10,6 +10,8 @@ import {
   deleteProject,
   getProjectMembers,
   toggleArchive,
+  getProjectSummary,
+  getProjectActivities,
 } from "./controllers/project.controller.js";
 import { listUsers, searchUsers } from "./controllers/user.controller.js";
 import { getLabels, createLabel, updateLabel, deleteLabel } from "./controllers/label.controller.js";
@@ -54,6 +56,8 @@ router.get("/projects/:id", verifyToken, getProject);
 router.put("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateProject);
 router.delete("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), deleteProject);
 router.patch("/projects/:id/archive", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), toggleArchive);
+router.get("/projects/:id/summary", verifyToken, getProjectSummary);
+router.get("/projects/:id/activities", verifyToken, getProjectActivities);
 
 // Project Members
 router.get("/projects/:id/members", verifyToken, getMembers);
@@ -69,7 +73,7 @@ router.patch("/projects/:id/labels/:labelId", verifyToken, checkRole(ROLES.ADMIN
 router.delete("/projects/:id/labels/:labelId", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, deleteLabel);
 
 // Users
-router.get("/users", verifyToken, checkRole(ROLES.ADMIN), listUsers);
+router.get("/users", verifyToken, listUsers); // Member cũng có thể xem danh sách users
 router.get("/users/search", verifyToken, searchUsers);
 
 export default router;

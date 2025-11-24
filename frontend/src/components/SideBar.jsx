@@ -26,7 +26,7 @@ const menuItems = [
 ];
 
 // --- Sub-component: Sidebar Item ---
-const SidebarItem = ({ item, isActive, unreadCount }) => {
+const SidebarItem = ({ item, isActive, unreadCount, fullPath }) => {
     // (Style động giữ nguyên)
     const activeStyle = {
         backgroundColor: isActive ? PRIMARY_COLOR : 'transparent',
@@ -34,7 +34,7 @@ const SidebarItem = ({ item, isActive, unreadCount }) => {
 
     return (
         <Link
-            to={item.href} 
+            to={fullPath} 
             className="flex items-center space-x-2 p-2 rounded-lg transition-all duration-200 cursor-pointer text-sm font-medium group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             style={activeStyle}
         >
@@ -55,13 +55,14 @@ const SidebarItem = ({ item, isActive, unreadCount }) => {
 };
 
 
-const SideBar = ({ unreadCount }) => {
+const SideBar = ({ unreadCount, basePath="" }) => {
     const location = useLocation();
     const currentPath = location.pathname;
 
     const isActive = (href) => {
-        if (href === '/dashboard') return currentPath === '/dashboard';
-        return currentPath.startsWith(href);
+        const fullPath = `${basePath}${href}`;
+        if (href === '/home') return currentPath === fullPath;
+        return currentPath.startsWith(fullPath);
     };
 
     return (
@@ -87,6 +88,7 @@ const SideBar = ({ unreadCount }) => {
                         item={item}
                         isActive={isActive(item.href)}
                         unreadCount={unreadCount}
+                        fullPath={`${basePath}${item.href}`}
                     />
                 ))}
             </nav>

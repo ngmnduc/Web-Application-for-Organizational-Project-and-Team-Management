@@ -4,9 +4,11 @@ import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import router from "./routes.js";
-import taskRoutes from "./routes/task.routes.js"; 
+import taskRoutes from "./routes/task.routes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
-
+import commentRoutes from "./routes/comment.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
+import projectRoutes from "./routes/project.routes.js";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import path from "path";
@@ -31,6 +33,9 @@ app.use(morgan("dev"));
 
 app.use("/api", router);
 app.use("/api", taskRoutes);
+app.use("/api", commentRoutes);
+app.use("/api", notificationRoutes);
+app.use("/api", projectRoutes);
 
 // Hàm log routes
 function printRoutes(stack, parentPath = '') {

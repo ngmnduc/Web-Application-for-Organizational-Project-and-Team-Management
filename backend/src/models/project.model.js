@@ -27,6 +27,7 @@ const projectSchema = new mongoose.Schema(
 		labels: { type: [labelSchema], default: [] },
 		meta: { type: Object, default: {} },
 		deletedAt: { type: Date, default: null },
+		deadline: { type: Date },
 	},
 	{ timestamps: true }
 );
