@@ -15,7 +15,7 @@ export const searchUsers = async (req, res) => {
   try {
     const { q } = req.query;
     if (!q || q.trim().length < 2) {
-      return res.status(400).json({ message: "Query must be at least 2 characters" });
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Query must be at least 2 characters" });
     }
 
     const users = await User.find({

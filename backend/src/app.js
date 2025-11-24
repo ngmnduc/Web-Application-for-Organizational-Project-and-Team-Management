@@ -5,6 +5,7 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import router from "./routes.js";
 import taskRoutes from "./routes/task.routes.js"; 
+import { errorHandler } from "./middlewares/errorHandler.js";
 
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
@@ -57,5 +58,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const swaggerDoc = YAML.load(path.join(__dirname, "..", "openapi.yaml"));
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+
+// Global Error Handler (MUST be last middleware)
+app.use(errorHandler);
 
 export default app;

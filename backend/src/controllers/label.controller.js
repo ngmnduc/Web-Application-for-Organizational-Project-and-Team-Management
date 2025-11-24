@@ -7,7 +7,7 @@ export const getLabels = async (req, res) => {
     const { id } = req.params;
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
     res.json({ success: true, data: project.labels || [] });
   } catch (err) {
@@ -20,11 +20,11 @@ export const createLabel = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, color } = req.body || {};
-    if (!name) return res.status(400).json({ message: "Label name is required" });
+    if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Label name is required" });
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     project.labels.push({ name, color: color || "#3b82f6" });
@@ -44,11 +44,11 @@ export const updateLabel = async (req, res) => {
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     const label = project.labels.id(labelId);
-    if (!label) return res.status(404).json({ message: "Label not found" });
+    if (!label) return res.status(404).json({ success: false, error: "NotFoundError", message: "Label not found" });
 
     if (name) label.name = name;
     if (color) label.color = color;
@@ -67,7 +67,7 @@ export const deleteLabel = async (req, res) => {
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     project.labels.pull({ _id: labelId });

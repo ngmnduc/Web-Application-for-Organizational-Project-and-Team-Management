@@ -11,7 +11,7 @@ export const getMembers = async (req, res) => {
 
     const project = await Project.findById(id).populate("members.user", "name email role");
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     // Paginate members
@@ -45,20 +45,20 @@ export const addMember = async (req, res) => {
   try {
     const { id } = req.params;
     const { userId, role } = req.body || {};
-    if (!userId) return res.status(400).json({ message: "userId is required" });
+    if (!userId) return res.status(400).json({ success: false, error: "ValidationError", message: "userId is required" });
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     // Check user exists
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ success: false, error: "NotFoundError", message: "User not found" });
 
     // Check if already member
     const existing = project.members.find(m => String(m.user) === String(userId));
-    if (existing) return res.status(409).json({ message: "User is already a member" });
+    if (existing) return res.status(409).json({ success: false, error: "ConflictError", message: "User is already a member" });
 
     project.members.push({ user: userId, role: role || "Member", status: "ACTIVE" });
     await project.save();
@@ -76,7 +76,7 @@ export const removeMember = async (req, res) => {
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     project.members.pull({ _id: memberId });
@@ -93,23 +93,23 @@ export const joinRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user && req.user._id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!userId) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     // Check if already member
     const existing = project.members.find(m => String(m.user) === String(userId));
     if (existing) {
-      return res.status(409).json({ message: `Already a member with status: ${existing.status}` });
+      return res.status(409).json({ success: false, error: "ConflictError", message: `Already a member with status: ${existing.status}` });
     }
 
     project.members.push({ user: userId, role: "Member", status: "PENDING" });
     await project.save();
 
-    res.status(201).json({ success: true, message: "Join request submitted", status: "PENDING" });
+    res.status(201).json({ success: true, message: "Join request submitted", data: { status: "PENDING" } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -123,18 +123,18 @@ export const approveMember = async (req, res) => {
 
     const project = await Project.findById(projectId);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     const member = project.members.id(memberId);
-    if (!member) return res.status(404).json({ message: "Member not found" });
+    if (!member) return res.status(404).json({ success: false, error: "NotFoundError", message: "Member not found" });
 
     if (action === "approve") {
       member.status = "ACTIVE";
     } else if (action === "reject") {
       member.status = "REJECTED";
     } else {
-      return res.status(400).json({ message: "Invalid action. Use 'approve' or 'reject'" });
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid action. Use 'approve' or 'reject'" });
     }
 
     await project.save();

@@ -7,10 +7,10 @@ import mongoose from "mongoose";
 export const createProject = async (req, res) => {
   try {
     const { name, description } = req.body || {};
-    if (!name) return res.status(400).json({ message: "Project name is required" });
+    if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Project name is required" });
 
     const creatorId = req.user && req.user._id;
-    if (!creatorId) return res.status(401).json({ message: "Unauthorized" });
+    if (!creatorId) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
 
     const project = new Project({
       name,
@@ -20,7 +20,7 @@ export const createProject = async (req, res) => {
     });
 
     await project.save();
-    res.status(201).json({ success: true, data: project });
+    res.status(201).json({ success: true, message: "Project created successfully", data: project });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -40,9 +40,9 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid id" });
     const project = await Project.findById(id).populate("members.user", "name email role");
-    if (!project || project.deletedAt) return res.status(404).json({ message: "Project not found" });
+    if (!project || project.deletedAt) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, data: project });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -55,7 +55,7 @@ export const updateProject = async (req, res) => {
     const { id } = req.params;
     const data = req.body || {};
     const project = await Project.findByIdAndUpdate(id, data, { new: true });
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, data: project });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -67,7 +67,7 @@ export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
     const project = await Project.findByIdAndUpdate(id, { deletedAt: new Date() }, { new: true });
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, message: "Project deleted", data: project });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -116,7 +116,7 @@ export const toggleArchive = async (req, res) => {
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
     project.status = archive ? "archived" : "active";
