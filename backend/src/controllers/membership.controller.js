@@ -36,7 +36,7 @@ export const getMembers = async (req, res) => {
       data: membersData
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -65,7 +65,7 @@ export const addMember = async (req, res) => {
 
     res.status(201).json({ success: true, message: "Member added", data: project.members[project.members.length - 1] });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -84,7 +84,7 @@ export const removeMember = async (req, res) => {
 
     res.json({ success: true, message: "Member removed" });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -111,7 +111,7 @@ export const joinRequest = async (req, res) => {
 
     res.status(201).json({ success: true, message: "Join request submitted", data: { status: "PENDING" } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -141,6 +141,6 @@ export const approveMember = async (req, res) => {
 
     res.json({ success: true, message: `Member ${action}d`, data: member });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };

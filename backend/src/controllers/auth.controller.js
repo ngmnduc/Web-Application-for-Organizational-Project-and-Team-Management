@@ -86,7 +86,7 @@ export async function handleGoogleLogin(req, res, next) {
   try {
     const { credential } = req.body;
     if (!credential) {
-      return res.status(400).json({ success: false, message: "No credential provided" });
+      return res.status(400).json({ success: false, error: "ValidationError", message: "No credential provided" });
     }
 
     const ticket = await client.verifyIdToken({
@@ -128,9 +128,9 @@ export async function handleGoogleLogin(req, res, next) {
   } catch (err) {
     console.error("Google Auth Error:", err);
     return res.status(400).json({ 
-      success: false, 
-      message: "Google authentication failed",
-      error: err.message 
+      success: false,
+      error: "AuthenticationError",
+      message: "Google authentication failed"
     });
   }
 }

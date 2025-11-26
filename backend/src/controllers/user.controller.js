@@ -6,7 +6,7 @@ export const listUsers = async (req, res) => {
     const users = await User.find().select("name email role createdAt updatedAt");
     res.json({ success: true, count: users.length, data: users });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -29,6 +29,6 @@ export const searchUsers = async (req, res) => {
 
     res.json({ success: true, count: users.length, data: users });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
