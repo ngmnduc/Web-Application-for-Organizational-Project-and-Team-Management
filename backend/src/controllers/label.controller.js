@@ -5,6 +5,12 @@ import mongoose from "mongoose";
 export const getLabels = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
+    
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
       return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
@@ -20,6 +26,11 @@ export const createLabel = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, color } = req.body || {};
+    
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
     if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Label name is required" });
 
     const project = await Project.findById(id);
@@ -29,8 +40,20 @@ export const createLabel = async (req, res) => {
 
     project.labels.push({ name, color: color || "#3b82f6" });
     await project.save();
+    
+    const createdLabel = project.labels[project.labels.length - 1];
 
-    res.status(201).json({ success: true, message: "Label created", data: project.labels[project.labels.length - 1] });
+    res.status(201).json({ 
+      success: true, 
+      message: "Label created", 
+      data: {
+        _id: createdLabel._id,
+        name: createdLabel.name,
+        color: createdLabel.color,
+        createdAt: createdLabel.createdAt,
+        updatedAt: createdLabel.updatedAt
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -41,6 +64,14 @@ export const updateLabel = async (req, res) => {
   try {
     const { id, labelId } = req.params;
     const { name, color } = req.body || {};
+    
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(labelId)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid label ID format" });
+    }
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
@@ -64,6 +95,14 @@ export const updateLabel = async (req, res) => {
 export const deleteLabel = async (req, res) => {
   try {
     const { id, labelId } = req.params;
+    
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(labelId)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid label ID format" });
+    }
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {

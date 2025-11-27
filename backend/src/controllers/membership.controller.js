@@ -6,22 +6,35 @@ import mongoose from "mongoose";
 export const getMembers = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID format" 
+      });
+    }
+    
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 100); // Max 100, default 10
 
     const project = await Project.findById(id).populate("members.user", "name email role");
     if (!project || project.deletedAt) {
       return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
 
+    // Filter out members with null user (deleted users)
+    const activeMembers = project.members.filter(m => m.user != null);
+
     // Paginate members
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
-    const paginatedMembers = project.members.slice(startIndex, endIndex);
+    const paginatedMembers = activeMembers.slice(startIndex, endIndex);
 
     const membersData = paginatedMembers.map(m => ({
       _id: m._id,
-      user: m.user ? { id: m.user._id, name: m.user.name, email: m.user.email, role: m.user.role } : null,
+      user: { id: m.user._id, name: m.user.name, email: m.user.email, role: m.user.role },
       role: m.role,
       status: m.status,
       createdAt: m.createdAt,
@@ -32,7 +45,7 @@ export const getMembers = async (req, res) => {
       success: true,
       page,
       limit,
-      total: project.members.length,
+      total: activeMembers.length,
       data: membersData
     });
   } catch (err) {
@@ -45,7 +58,15 @@ export const addMember = async (req, res) => {
   try {
     const { id } = req.params;
     const { userId, role } = req.body || {};
+    
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
     if (!userId) return res.status(400).json({ success: false, error: "ValidationError", message: "userId is required" });
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid user ID format" });
+    }
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
@@ -62,8 +83,26 @@ export const addMember = async (req, res) => {
 
     project.members.push({ user: userId, role: role || "Member", status: "ACTIVE" });
     await project.save();
+    
+    // Populate user data before returning
+    await project.populate("members.user", "name email role");
+    const addedMember = project.members[project.members.length - 1];
+    
+    const memberData = {
+      _id: addedMember._id,
+      user: {
+        id: addedMember.user._id,
+        name: addedMember.user.name,
+        email: addedMember.user.email,
+        role: addedMember.user.role
+      },
+      role: addedMember.role,
+      status: addedMember.status,
+      createdAt: addedMember.createdAt,
+      updatedAt: addedMember.updatedAt
+    };
 
-    res.status(201).json({ success: true, message: "Member added", data: project.members[project.members.length - 1] });
+    res.status(201).json({ success: true, message: "Member added", data: memberData });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
@@ -73,6 +112,14 @@ export const addMember = async (req, res) => {
 export const removeMember = async (req, res) => {
   try {
     const { id, memberId } = req.params;
+    
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(memberId)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid member ID format" });
+    }
 
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
@@ -92,6 +139,12 @@ export const removeMember = async (req, res) => {
 export const joinRequest = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
+    
     const userId = req.user && req.user._id;
     if (!userId) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
 
@@ -120,6 +173,14 @@ export const approveMember = async (req, res) => {
   try {
     const { projectId, memberId } = req.params;
     const { action } = req.body || {}; // "approve" or "reject"
+    
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID format" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(memberId)) {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid member ID format" });
+    }
 
     const project = await Project.findById(projectId);
     if (!project || project.deletedAt) {
@@ -129,17 +190,20 @@ export const approveMember = async (req, res) => {
     const member = project.members.id(memberId);
     if (!member) return res.status(404).json({ success: false, error: "NotFoundError", message: "Member not found" });
 
+    let statusMessage;
     if (action === "approve") {
       member.status = "ACTIVE";
+      statusMessage = "Member request has been approved";
     } else if (action === "reject") {
       member.status = "REJECTED";
+      statusMessage = "Member request has been rejected";
     } else {
       return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid action. Use 'approve' or 'reject'" });
     }
 
     await project.save();
 
-    res.json({ success: true, message: `Member ${action}d`, data: member });
+    res.json({ success: true, message: statusMessage, data: member });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
