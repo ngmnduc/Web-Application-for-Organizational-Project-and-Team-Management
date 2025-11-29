@@ -12,6 +12,7 @@ import {
   toggleArchive,
   getProjectSummary,
   getProjectActivities,
+  getPendingRequests, 
 } from "./controllers/project.controller.js";
 import { listUsers, searchUsers } from "./controllers/user.controller.js";
 import { getLabels, createLabel, updateLabel, deleteLabel } from "./controllers/label.controller.js";
@@ -52,6 +53,7 @@ router.use("/", taskRoutes);
 // Projects
 router.post("/projects", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), createProject);
 router.get("/projects", verifyToken, listProjects);
+router.get("/projects/pending-requests", verifyToken, checkRole(ROLES.ADMIN), getPendingRequests);
 router.get("/projects/:id", verifyToken, getProject);
 router.put("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateProject);
 router.delete("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), deleteProject);
