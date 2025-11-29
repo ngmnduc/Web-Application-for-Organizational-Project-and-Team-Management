@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ChevronDownIcon, PlusIcon, FunnelIcon, UserIcon, TagIcon, XMarkIcon, FolderIcon } from '@heroicons/react/24/outline'; // Thêm FolderIcon
 import { 
@@ -102,7 +103,7 @@ const KanbanCard = ({ task, onOpenDetail }) => {
           )}
         </div>
       </div>
-    </div>
+    </button>
   );
 };
 
