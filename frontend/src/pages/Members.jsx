@@ -10,7 +10,8 @@ import {
     XMarkIcon,
     CheckCircleIcon,
     ExclamationCircleIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    InboxIcon,
 } from '@heroicons/react/24/outline';
 import { useParams } from 'react-router-dom'; 
 
@@ -208,11 +209,93 @@ const Members = () => {
 
     const [notification, setNotification] = useState({ message: '', type: '' });
     const [currentUserRole, setCurrentUserRole] = useState('Member');
+    const [assignRequests, setAssignRequests] = useState([]);  
+    const [isSlidePanelOpen, setIsSlidePanelOpen] = useState(false);
+
+    const fetchAssignRequests = async () => {
+    try {
+        
+        const res = await fetch(`${API_BASE_URL}/projects/pending-requests`, {
+            headers: getHeaders(),
+        });
+        
+        const result = await res.json();
+        
+        if (result.success) {
+            setAssignRequests(result.data || []);
+        } else {
+            console.error("Failed to fetch requests:", result.message);
+        }
+    } catch (error) {
+        console.error("Error fetching requests:", error);
+    }
+};
+    
+    useEffect(() => {
+    if (currentUserRole === 'Admin') {
+        fetchAssignRequests();
+    }
+}, [currentUserRole]);
 
     const showNotification = (message, type = 'success') => {
         setNotification({ message, type });
         setTimeout(() => setNotification({ message: '', type: '' }), 3000);
     };
+
+const acceptRequest = async (item) => {
+    // item chính là 1 phần tử trong mảng pendingList trả về từ backend
+    // Cần: projectId và requestId (memberId)
+    try {
+        const url = `${API_BASE_URL}/projects/${item.projectId}/members/${item.requestId}/approve`;
+        
+        const res = await fetch(url, {
+            method: 'PATCH', // Backend quy định là PATCH
+            headers: {
+                ...getHeaders(),
+                'Content-Type': 'application/json' // Bắt buộc khi gửi body
+            },
+            body: JSON.stringify({ action: 'approve' }) // Body theo quy định backend
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            showNotification("Approved successfully!", "success");
+            fetchAssignRequests(); // Load lại danh sách để ẩn request đã xử lý
+        } else {
+            showNotification(data.message || "Failed to approve", "error");
+        }
+    } catch (error) {
+        console.error("Approve error:", error);
+        showNotification("Something went wrong", "error");
+    }
+};
+
+const denyRequest = async (item) => {
+    try {
+        const url = `${API_BASE_URL}/projects/${item.projectId}/members/${item.requestId}/approve`;
+        
+        const res = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                ...getHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ action: 'reject' }) // Body 'reject'
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            showNotification("Request rejected.", "info");
+            fetchAssignRequests(); // Load lại danh sách
+        } else {
+            showNotification(data.message || "Failed to reject", "error");
+        }
+    } catch (error) {
+        console.error("Deny error:", error);
+    }
+};
 
     const getHeaders = () => ({
         'Content-Type': 'application/json',
@@ -320,6 +403,48 @@ const Members = () => {
     return (
         <div className="flex-1 p-6 md:p-8 bg-gray-50 min-h-screen relative">
             <NotificationBanner message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
+                {/* NÚT MỞ SLIDE PANEL CHO ADMIN */}
+    
+    {/* SLIDE PANEL */}
+    {isAdmin && isSlidePanelOpen && (
+        <div className="fixed top-0 right-0 w-96 h-full bg-white shadow-xl z-50 p-6 border-l border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Assign Requests</h2>
+                <button onClick={() => setIsSlidePanelOpen(false)}>
+                    <XMarkIcon className="w-6 h-6 text-gray-500" />
+                </button>
+            </div>
+
+            {assignRequests.length === 0 && (
+                <p className="text-gray-500">No pending requests.</p>
+            )}
+
+            <ul className="space-y-4">
+                {assignRequests.map(req => (
+                    <li key={req.requestId} className="p-4 border rounded-lg bg-gray-50">
+                        <p className="font-semibold">{req.user?.name}</p>
+                        <p className="text-sm text-gray-500">Wants to join: {req.projectName}</p>
+
+                        <div className="flex gap-3 mt-3">
+                            <button 
+                                onClick={() => acceptRequest(req)}
+                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm"
+                            >
+                                Accept
+                            </button>
+
+                            <button 
+                                onClick={() => denyRequest(req)}
+                                className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm"
+                            >
+                                Deny
+                            </button>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    )}
             <ConfirmModal isOpen={!!userToDelete} title="Delete User" message={`Are you sure you want to delete "${userToDelete?.name}"?`} onClose={() => setUserToDelete(null)} onConfirm={confirmDeleteUser} />
 
             <div className="max-w-7xl mx-auto">
@@ -328,11 +453,21 @@ const Members = () => {
                         <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input type="text" placeholder="Search members..." className="w-full md:w-96 pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-1 shadow-sm" style={{ '--tw-ring-color': PRIMARY_COLOR }} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
+                    <div className="flex items-center gap-3">
                     {isAdmin && (
                         <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-bold shadow-sm hover:opacity-90 transition-all active:scale-95" style={{ backgroundColor: PRIMARY_COLOR }}>
                             <UserPlusIcon className="w-5 h-5" /> Add Member
                         </button>
                     )}
+                    {isAdmin && (
+                         <button
+                            onClick={() => setIsSlidePanelOpen(true)}
+                            className=" flex items-center gap-2 px-5 py-2.5 bg-brand text-white rounded-lg text-sm font-bold shadow-sm hover:opacity-90 transition-all active:scale-95"
+                         >
+                            <InboxIcon className="w-5 h-5"/><span>Assign Requests ({assignRequests.length})</span>
+                         </button>
+                    )}
+                    </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
