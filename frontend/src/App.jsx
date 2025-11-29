@@ -3,6 +3,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import MainLayout from "./layouts/MainLayout.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import MyTasks from "./pages/MyTasks.jsx";
+import TaskDetail from "./pages/TaskDetail.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Notification from "./pages/Notification.jsx";
 import Settings from "./pages/Settings.jsx";
@@ -31,6 +32,7 @@ function App() {
         
         <Route path="/home" element={<HomePage />} />
         <Route path="/tasks" element={<MyTasks />} />
+        <Route path="/tasks/:taskId" element={<TaskDetail />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/notifications" element={<Notification />} />
         <Route path="/settings" element={<Settings />} />
@@ -43,6 +45,7 @@ function App() {
         
         <Route path="home" element={<HomePage />} />
         <Route path="tasks" element={<MyTasks />} />
+        <Route path="tasks/:taskId" element={<TaskDetail />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="notifications" element={<Notification />} />
         <Route path="settings" element={<Settings />} />
