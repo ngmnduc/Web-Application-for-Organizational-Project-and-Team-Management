@@ -53,21 +53,32 @@ const handleGoogleError = () => {
     }
 
     try {
-      setIsLoading(true);
-      const res = await apiLogin(email, password);
-      saveLogin(res.user, res.token);
-      // Đăng nhập thành công, chuyển hướng về trang chủ
-      if(res.user.role === "admin"){
-        navigate('admin/home');
-      }else{
-        navigate('/home');
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err.error?.message || 'Login failed. Please try again!');
-    } finally {
-      setIsLoading(false);
+    setIsLoading(true);
+    const res = await apiLogin(email, password);
+    console.log("Response:", res);   
+    
+    const user = res.data?.user || res.user; 
+    const token = res.data?.token || res.token;
+
+    if (!user || !user.role) {
+        throw new Error("Dữ liệu user trả về bị thiếu role!");
     }
+    saveLogin(user, token);
+    const roleCheck = user.role.toLowerCase(); 
+
+    if (roleCheck === 'admin') {
+        navigate('/admin/home');
+    } else {
+        navigate('/home');
+    }
+
+} catch (err) {
+    console.error("Login Error:", err);
+    // Hiển thị lỗi ra UI để biết đường sửa
+    setError(err.message || err.response?.data?.message || "Login failed");
+} finally {
+    setIsLoading(false);
+}
   };
 
   return (
