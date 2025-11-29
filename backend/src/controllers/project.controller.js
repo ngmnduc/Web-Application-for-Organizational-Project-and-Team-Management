@@ -9,35 +9,37 @@ import ActivityLog from "../models/activityLog.model.js";
 export const createProject = async (req, res) => {
   try {
     const { name, description, deadline, manager } = req.body || {};
-    if (!name) return res.status(400).json({ message: "Project name is required" });
+    if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Project name is required" });
+
     const creatorId = req.user && req.user._id;
-    if (!creatorId) return res.status(401).json({ message: "Unauthorized" });
+    if (!creatorId) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
+
+    // Auto-promote manager if needed
     if (manager && manager !== creatorId) {
         const userToPromote = await User.findById(manager);
-        // Nếu tìm thấy user và họ đang là Member -> Thăng chức lên Manager
         if (userToPromote && userToPromote.role === "Member") {
             userToPromote.role = "Manager";
             await userToPromote.save();
             console.log(`Auto-promoted user ${userToPromote.email} to Manager`);
         }
     }
+
     const initialMembers = [{ user: creatorId, role: "Admin" }];
-    // - Nếu người dùng chọn Manager khác với người tạo, thêm họ vào danh sách
     if (manager && manager !== creatorId) {
         initialMembers.push({ user: manager, role: "Manager" });
-    } else if (manager === creatorId) {
     }
+
     const project = new Project({
       name,
       description,
-      deadline: deadline || null, 
+      deadline: deadline || null,
       createdBy: creatorId,
-      members: initialMembers,  
+      members: initialMembers,
     });
     await project.save();
-    res.status(201).json({ success: true, data: project });
+    res.status(201).json({ success: true, message: "Project created successfully", data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -47,7 +49,7 @@ export const listProjects = async (req, res) => {
     const projects = await Project.find({ deletedAt: null });
     res.json({ success: true, count: projects.length, data: projects });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -55,12 +57,12 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid id" });
     const project = await Project.findById(id).populate("members.user", "name email role");
-    if (!project || project.deletedAt) return res.status(404).json({ message: "Project not found" });
+    if (!project || project.deletedAt) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -70,10 +72,10 @@ export const updateProject = async (req, res) => {
     const { id } = req.params;
     const data = req.body || {};
     const project = await Project.findByIdAndUpdate(id, data, { new: true });
-    if (!project) return res.status(404).json({ message: "Project not found" });
-    res.json({ success: true, data: project });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    res.json({ success: true, message: "Project updated successfully", data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -82,10 +84,10 @@ export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
     const project = await Project.findByIdAndUpdate(id, { deletedAt: new Date() }, { new: true });
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, message: "Project deleted", data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -119,7 +121,27 @@ export const getProjectMembers = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+  }
+};
+
+// PATCH /projects/:id/archive
+export const toggleArchive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archive } = req.body || {}; // true to archive, false to unarchive
+
+    const project = await Project.findById(id);
+    if (!project || project.deletedAt) {
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    }
+
+    project.status = archive ? "archived" : "active";
+    await project.save();
+
+    res.json({ success: true, message: `Project ${archive ? "archived" : "unarchived"}`, data: project });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -132,7 +154,7 @@ export const getProjectSummary = async (req, res) => {
     const { id } = req.params;
 
     const project = await Project.findById(id);
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
 
     const tasks = await Task.find({ projectId: id, deletedAt: null });
     
@@ -161,7 +183,7 @@ export const getProjectSummary = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, error: "ServerError", message: error.message });
   }
 };
 
@@ -183,6 +205,6 @@ export const getProjectActivities = async (req, res) => {
       data: activities
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, error: "ServerError", message: error.message });
   }
 };
