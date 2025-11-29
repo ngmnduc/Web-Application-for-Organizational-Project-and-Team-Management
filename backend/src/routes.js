@@ -9,8 +9,14 @@ import {
   updateProject,
   deleteProject,
   getProjectMembers,
+  toggleArchive,
+  getProjectSummary,
+  getProjectActivities,
 } from "./controllers/project.controller.js";
-import { listUsers } from "./controllers/user.controller.js";
+import { listUsers, searchUsers } from "./controllers/user.controller.js";
+import { getLabels, createLabel, updateLabel, deleteLabel } from "./controllers/label.controller.js";
+import { getMembers, addMember, removeMember, joinRequest, approveMember } from "./controllers/membership.controller.js";
+import { checkProjectActive } from "./middlewares/archive.middleware.js";
 import taskRoutes from "./routes/task.routes.js";
 
 const router = Router();
@@ -47,11 +53,27 @@ router.use("/", taskRoutes);
 router.post("/projects", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), createProject);
 router.get("/projects", verifyToken, listProjects);
 router.get("/projects/:id", verifyToken, getProject);
-router.put("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), updateProject);
+router.put("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateProject);
 router.delete("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), deleteProject);
-router.get("/projects/:id/members", verifyToken, getProjectMembers);
+router.patch("/projects/:id/archive", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), toggleArchive);
+router.get("/projects/:id/summary", verifyToken, getProjectSummary);
+router.get("/projects/:id/activities", verifyToken, getProjectActivities);
 
-// Users (admin)
-router.get("/users", verifyToken, listUsers); // bỏ checkrole để member cũng xem được
+// Project Members
+router.get("/projects/:id/members", verifyToken, getMembers);
+router.post("/projects/:id/members", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, addMember);
+router.delete("/projects/:id/members/:memberId", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, removeMember);
+router.post("/projects/:id/join", verifyToken, joinRequest);
+router.patch("/projects/:projectId/members/:memberId/approve", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), approveMember);
+
+// Project Labels
+router.get("/projects/:id/labels", verifyToken, getLabels);
+router.post("/projects/:id/labels", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, createLabel);
+router.patch("/projects/:id/labels/:labelId", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateLabel);
+router.delete("/projects/:id/labels/:labelId", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, deleteLabel);
+
+// Users
+router.get("/users", verifyToken, listUsers); // Member cũng có thể xem danh sách users
+router.get("/users/search", verifyToken, searchUsers);
 
 export default router;

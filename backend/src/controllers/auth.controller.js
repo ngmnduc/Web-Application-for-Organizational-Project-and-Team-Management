@@ -20,15 +20,15 @@ export async function signup(req, res, next) {
   try {
     const { name, email, password } = req.body || {};
     if (!name || !email || !password) {
-      return res.status(400).json({ error: { message: "name, email, password are required" } });
+      return res.status(400).json({ success: false, error: "ValidationError", message: "name, email, password are required" });
     }
     // password minimum length
     if (typeof password !== "string" || password.length < 6) {
-      return res.status(400).json({ error: { message: "Password must be at least 6 characters" } });
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Password must be at least 6 characters" });
     }
     const existing = await User.findOne({ email });
     if (existing) {
-      return res.status(409).json({ error: { message: "Email already registered" } });
+      return res.status(409).json({ success: false, error: "ConflictError", message: "Email already registered" });
     }
 
     // User đầu tiên -> Admin (hỗ trợ test phân quyền)
@@ -39,10 +39,13 @@ export async function signup(req, res, next) {
     const token = signToken({ sub: user._id.toString(), role: user.role });
 
     return res.status(201).json({
-      message: "Signup successful",
-      token,
-      tokenType: "Bearer",
-      user: toPublicUser(user),
+      success: true,
+      message: "User created successfully",
+      data: {
+        token,
+        tokenType: "Bearer",
+        user: toPublicUser(user),
+      }
     });
   } catch (err) {
     next(err);
@@ -54,21 +57,24 @@ export async function login(req, res, next) {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
-      return res.status(400).json({ error: { message: "email and password are required" } });
+      return res.status(400).json({ success: false, error: "ValidationError", message: "email and password are required" });
     }
     const user = await User.findOne({ email }).select("+password");
-    if (!user) return res.status(401).json({ error: { message: "Invalid email or password" } });
+    if (!user) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Invalid email or password" });
 
     const match = await user.comparePassword(password);
-    if (!match) return res.status(401).json({ error: { message: "Invalid email or password" } });
+    if (!match) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Invalid email or password" });
 
     const token = signToken({ sub: user._id.toString(), role: user.role });
 
     return res.json({
+      success: true,
       message: "Login successful",
-      token,
-      tokenType: "Bearer",
-      user: toPublicUser(user),
+      data: {
+        token,
+        tokenType: "Bearer",
+        user: toPublicUser(user),
+      }
     });
   } catch (err) {
     next(err);
@@ -80,7 +86,7 @@ export async function handleGoogleLogin(req, res, next) {
   try {
     const { credential } = req.body;
     if (!credential) {
-      return res.status(400).json({ success: false, message: "No credential provided" });
+      return res.status(400).json({ success: false, error: "ValidationError", message: "No credential provided" });
     }
 
     const ticket = await client.verifyIdToken({
@@ -122,9 +128,9 @@ export async function handleGoogleLogin(req, res, next) {
   } catch (err) {
     console.error("Google Auth Error:", err);
     return res.status(400).json({ 
-      success: false, 
-      message: "Google authentication failed",
-      error: err.message 
+      success: false,
+      error: "AuthenticationError",
+      message: "Google authentication failed"
     });
   }
 }
@@ -133,8 +139,8 @@ export async function me(req, res, next) {
   try {
     // verifyToken middleware attaches req.user
     const user = req.user;
-    if (!user) return res.status(401).json({ error: { message: "Unauthorized" } });
-    return res.json({ user: toPublicUser(user) });
+    if (!user) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
+    return res.json({ success: true, data: { user: toPublicUser(user) } });
   } catch (err) {
     next(err);
   }
@@ -151,16 +157,16 @@ export async function promoteRole(req, res, next) {
     if (!Array.isArray(User.schema.path("role").enumValues) || !User.schema.path("role").enumValues.includes(newRole)) {
       // fallback: check common roles
       const allowed = ["Admin", "Manager", "Member"];
-      if (!allowed.includes(newRole)) return res.status(400).json({ error: { message: "Invalid role" } });
+      if (!allowed.includes(newRole)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
     }
 
     const user = await User.findById(id);
-    if (!user) return res.status(404).json({ error: { message: "User not found" } });
+    if (!user) return res.status(404).json({ success: false, error: "NotFoundError", message: "User not found" });
 
     user.role = newRole;
     await user.save();
 
-    return res.json({ message: "User role updated", user: toPublicUser(user) });
+    return res.json({ success: true, message: "User role updated", data: { user: toPublicUser(user) } });
   } catch (err) {
     next(err);
   }
