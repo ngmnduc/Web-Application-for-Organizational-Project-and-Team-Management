@@ -214,15 +214,23 @@ const Members = () => {
 
     const fetchAssignRequests = async () => {
     try {
-        const res = await fetch(`${API_BASE_URL}/assign-requests`, {
+        
+        const res = await fetch(`${API_BASE_URL}/projects/pending-requests`, {
             headers: getHeaders(),
         });
+        
         const result = await res.json();
-        setAssignRequests(result.data || []);
+        
+        if (result.success) {
+            setAssignRequests(result.data || []);
+        } else {
+            console.error("Failed to fetch requests:", result.message);
+        }
     } catch (error) {
-        console.error(error);
+        console.error("Error fetching requests:", error);
     }
-    };
+};
+    
     useEffect(() => {
     if (currentUserRole === 'Admin') {
         fetchAssignRequests();
@@ -234,36 +242,58 @@ const Members = () => {
         setTimeout(() => setNotification({ message: '', type: '' }), 3000);
     };
 
-const acceptRequest = async (requestId) => {
+const acceptRequest = async (item) => {
+    // item chính là 1 phần tử trong mảng pendingList trả về từ backend
+    // Cần: projectId và requestId (memberId)
     try {
-        const res = await fetch(`${API_BASE_URL}/assign-requests/${requestId}/accept`, {
-            method: 'PUT',
-            headers: getHeaders()
+        const url = `${API_BASE_URL}/projects/${item.projectId}/members/${item.requestId}/approve`;
+        
+        const res = await fetch(url, {
+            method: 'PATCH', // Backend quy định là PATCH
+            headers: {
+                ...getHeaders(),
+                'Content-Type': 'application/json' // Bắt buộc khi gửi body
+            },
+            body: JSON.stringify({ action: 'approve' }) // Body theo quy định backend
         });
 
-        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
 
-        showNotification("Request approved!", "success");
-        fetchAssignRequests();
-        fetchData();  // Refresh danh sách member trong project
+        if (data.success) {
+            showNotification("Approved successfully!", "success");
+            fetchAssignRequests(); // Load lại danh sách để ẩn request đã xử lý
+        } else {
+            showNotification(data.message || "Failed to approve", "error");
+        }
     } catch (error) {
-        showNotification("Failed to approve", "error");
+        console.error("Approve error:", error);
+        showNotification("Something went wrong", "error");
     }
 };
 
-const denyRequest = async (requestId) => {
+const denyRequest = async (item) => {
     try {
-        const res = await fetch(`${API_BASE_URL}/assign-requests/${requestId}/deny`, {
-            method: 'PUT',
-            headers: getHeaders()
+        const url = `${API_BASE_URL}/projects/${item.projectId}/members/${item.requestId}/approve`;
+        
+        const res = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                ...getHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ action: 'reject' }) // Body 'reject'
         });
 
-        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
 
-        showNotification("Request denied!", "success");
-        fetchAssignRequests();
+        if (data.success) {
+            showNotification("Request rejected.", "info");
+            fetchAssignRequests(); // Load lại danh sách
+        } else {
+            showNotification(data.message || "Failed to reject", "error");
+        }
     } catch (error) {
-        showNotification("Failed to deny", "error");
+        console.error("Deny error:", error);
     }
 };
 
@@ -391,20 +421,20 @@ const denyRequest = async (requestId) => {
 
             <ul className="space-y-4">
                 {assignRequests.map(req => (
-                    <li key={req._id} className="p-4 border rounded-lg bg-gray-50">
+                    <li key={req.requestId} className="p-4 border rounded-lg bg-gray-50">
                         <p className="font-semibold">{req.user?.name}</p>
-                        <p className="text-sm text-gray-500">Wants to join: {req.project?.name}</p>
+                        <p className="text-sm text-gray-500">Wants to join: {req.projectName}</p>
 
                         <div className="flex gap-3 mt-3">
                             <button 
-                                onClick={() => acceptRequest(req._id)}
+                                onClick={() => acceptRequest(req)}
                                 className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm"
                             >
                                 Accept
                             </button>
 
                             <button 
-                                onClick={() => denyRequest(req._id)}
+                                onClick={() => denyRequest(req)}
                                 className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm"
                             >
                                 Deny
