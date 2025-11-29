@@ -163,13 +163,21 @@ export const getProjectSummary = async (req, res) => {
     const doing = tasks.filter(t => t.status === "DOING").length;
     const done = tasks.filter(t => t.status === "DONE").length;
 
+    const now = new Date();
+    const overdue = tasks.filter(t => {
+      if(!t.dueDate) return false;
+      return new Date(t.dueDate) < now && t.status !== "DONE";
+    }).length;
+
     let daysLeft = 0;
     if (project.endDate) {
-      const end = new Date(project.endDate);
-      const now = new Date();
-      const diffTime = end - now;
-      daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      if (daysLeft < 0) daysLeft = 0;
+      const endDateField = project.endDate || project.deadline;
+      if (endDateField) {
+        const end = new Date(endDateField);
+        const diffTime = end - now;
+        daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (daysLeft < 0) daysLeft = 0;
+      }
     }
 
     res.status(200).json({
@@ -179,6 +187,7 @@ export const getProjectSummary = async (req, res) => {
         todo,
         doing,
         done,
+        overdue,
         daysLeft
       }
     });
@@ -194,14 +203,21 @@ export const getProjectSummary = async (req, res) => {
 export const getProjectActivities = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
     
     const activities = await ActivityLog.find({ projectId: id })
       .populate("userId", "name email")
       .sort({ createdAt: -1 })
-      .limit(20);
+      .skip(skip)
+      .limit(limit);
 
     res.status(200).json({
       success: true,
+      page,
+      limit,
       data: activities
     });
   } catch (error) {

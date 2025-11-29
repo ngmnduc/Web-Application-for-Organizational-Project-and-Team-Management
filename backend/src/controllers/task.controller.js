@@ -183,6 +183,18 @@ export const updateTask = async (req, res) => {
       new: true,
     });
 
+    try {
+      if (!req.body.status || Object.keys(req.body).length > 1) {
+        await ActivityLog.create({
+          projectId: task.projectId,
+          userId: req.user._id,
+          taskId: task._id,
+          action: "UPDATE_TASK",
+          content: `updated details for task "${updatedTask.title}"`
+        });
+      }
+    } catch (e) { console.error(e); }
+
     res.status(200).json({
       success: true,
       message: "Task updated successfully",
