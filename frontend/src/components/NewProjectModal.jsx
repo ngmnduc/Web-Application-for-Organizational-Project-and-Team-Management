@@ -99,7 +99,7 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
 
                     <div className="pt-4 flex justify-end space-x-3">
                         <button type="button" onClick={onClose} className="px-5 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                        <button type="submit" className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style={{ backgroundColor: PRIMARY_COLOR }}>Create</button>
+                        <button type="submit" className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style={{ backgroundColor: 'var(--color-brand)' }}>Create</button>
                     </div>
                 </form>
             </div>

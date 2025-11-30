@@ -23,7 +23,7 @@ import { useOutletContext } from 'react-router-dom';
 import TaskSummary from '../components/TaskSummary';
 import { CalendarDayCell } from '../components/CalendarDayCell';
 
-const PRIMARY_COLOR = '#f35640'; 
+
 
 // ---Calendar Panel---
 const CalendarPanel = ({ isLoading }) => {
@@ -50,7 +50,7 @@ const CalendarPanel = ({ isLoading }) => {
                 </div>
                 <button 
                     className="px-4 py-1 text-sm text-white font-medium rounded-lg hover:opacity-90 transition duration-150 border-2" 
-                    style={{ backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR, }}
+                    style={{ backgroundColor: 'var(--color-brand)', borderColor: 'var(--color-brand)' }}
                 >
                     Today
                 </button>
@@ -104,11 +104,11 @@ const EventPanel = () => {
     };
 
     let buttonText = "Check in";
-    let buttonStyle = { backgroundColor: PRIMARY_COLOR };
+    let buttonStyle = { backgroundColor: 'var(--color-brand)' };
     
     if (isCheckingIn) {
         buttonText = "Checking In...";
-        buttonStyle = { backgroundColor: '#f97316' }; // Loading (màu cam)
+        buttonStyle = { backgroundColor: 'var(--color-brand)' }; // Loading (màu cam)
     } else if (isCheckedIn) {
         buttonText = `Checked In (${checkInTime})`;
         buttonStyle = { backgroundColor: '#10b981' }; // Success (màu xanh lá)

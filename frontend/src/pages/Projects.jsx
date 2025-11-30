@@ -255,7 +255,7 @@ const Projects = () => {
                         </button>
                         <button 
                             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity"
-                            style={{ backgroundColor: PRIMARY_COLOR }}
+                            style={{ backgroundColor: 'var(--color-brand)' }}
                             onClick={() => setIsNewProjectModalOpen(true)}
                         >
                             <PlusIcon className="w-5 h-5" /> New Project

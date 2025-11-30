@@ -55,10 +55,16 @@ const handleGoogleError = () => {
     try {
       setIsLoading(true);
       const res = await apiLogin(email, password);
-      saveLogin(res.user, res.token);
+      console.log("API RESPONSE:", res);
+      const loginData = res.data || res;
+      if (!loginData.user || !loginData.token) {
+        throw new Error("Dữ liệu đăng nhập không hợp lệ (Thiếu user hoặc token)");
+      }
+      saveLogin(loginData.user, loginData.token);
+      const role = loginData.user.role ? loginData.user.role.toLowerCase() : "member";
       // Đăng nhập thành công, chuyển hướng về trang chủ
-      if(res.user.role === "admin"){
-        navigate('admin/home');
+      if(role === "admin"){
+        navigate('/admin/home');
       }else{
         navigate('/home');
       }
@@ -129,14 +135,14 @@ const handleGoogleError = () => {
             </div>
             
             <div className="text-right">
-              <button type="button" className="text-sm text-brand hover:underline">
+              <button type="button" className="text-sm text-[#f35640] hover:underline">
                 Forgot Password?
               </button>
             </div>
             
             <button
               type="submit"
-              className="bg-brand rounded-xl font-medium text-white py-3 hover:scale-105 duration-300 flex items-center justify-center"
+              className="bg-[#f35640] rounded-xl font-medium text-white py-3 hover:scale-105 duration-300 flex items-center justify-center"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -167,7 +173,7 @@ const handleGoogleError = () => {
 
           <p className="text-center text-white mt-6 text-sm">
             Don't have an account?{" "}
-            <a href="/signup" className="text-brand font-medium hover:underline">
+            <a href="/signup" className="text-[#f35640] font-medium hover:underline">
               Sign Up
             </a>
           </p>
