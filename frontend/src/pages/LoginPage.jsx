@@ -53,28 +53,6 @@ const handleGoogleError = () => {
     }
 
     try {
-<<<<<<< HEAD
-      setIsLoading(true);
-      const res = await apiLogin(email, password);
-      console.log("API RESPONSE:", res);
-      const loginData = res.data || res;
-      if (!loginData.user || !loginData.token) {
-        throw new Error("Dữ liệu đăng nhập không hợp lệ (Thiếu user hoặc token)");
-      }
-      saveLogin(loginData.user, loginData.token);
-      const role = loginData.user.role ? loginData.user.role.toLowerCase() : "member";
-      // Đăng nhập thành công, chuyển hướng về trang chủ
-      if(role === "admin"){
-        navigate('/admin/home');
-      }else{
-        navigate('/home');
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err.error?.message || 'Login failed. Please try again!');
-    } finally {
-      setIsLoading(false);
-=======
     setIsLoading(true);
     const res = await apiLogin(email, password);
     console.log("Response:", res);   
@@ -84,7 +62,6 @@ const handleGoogleError = () => {
 
     if (!user || !user.role) {
         throw new Error("Dữ liệu user trả về bị thiếu role!");
->>>>>>> d81c7d453dd7e9037bbe221a80736ca15ed1efec
     }
     saveLogin(user, token);
     const roleCheck = user.role.toLowerCase(); 
