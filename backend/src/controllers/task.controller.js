@@ -184,7 +184,6 @@ export const updateTask = async (req, res) => {
     });
 
     try {
-      if (!req.body.status || Object.keys(req.body).length > 1) {
         await ActivityLog.create({
           projectId: task.projectId,
           userId: req.user._id,
@@ -192,7 +191,6 @@ export const updateTask = async (req, res) => {
           action: "UPDATE_TASK",
           content: `updated details for task "${updatedTask.title}"`
         });
-      }
     } catch (e) { console.error(e); }
 
     res.status(200).json({
