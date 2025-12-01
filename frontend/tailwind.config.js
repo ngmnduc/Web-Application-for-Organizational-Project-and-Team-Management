@@ -7,7 +7,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: "#f35640",
+        brand: "var(--color-brand)",
       },
       backgroundImage: {
         'background': "url('/src/assets/images/background.png')",
