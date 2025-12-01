@@ -37,6 +37,8 @@ router.get("/projects/:id/tasks", verifyToken, getTasksByProject);
  */
 router.post("/projects/:id/tasks", verifyToken, checkRole("Admin", "Manager"), createTask);
 
+router.patch('/tasks/reorder', reorderTask);
+
 /**
  * @route   PUT /tasks/:id
  * @desc    Update task details (title, assignee, etc.)
@@ -57,5 +59,8 @@ router.patch("/tasks/:id", verifyToken, updateTaskStatus);
  * @access  Private (Admin/Manager)
  */
 router.delete("/tasks/:id", verifyToken, checkRole("Admin", "Manager"), deleteTask);
-router.patch('/reorder', reorderTask);
+
+
+
+
 export default router;
