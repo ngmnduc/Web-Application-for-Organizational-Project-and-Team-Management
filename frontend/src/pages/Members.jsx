@@ -455,7 +455,7 @@ const denyRequest = async (item) => {
                     </div>
                     <div className="flex items-center gap-3">
                     {isAdmin && (
-                        <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-bold shadow-sm hover:opacity-90 transition-all active:scale-95" style={{ backgroundColor: PRIMARY_COLOR }}>
+                        <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-bold shadow-sm hover:opacity-90 transition-all active:scale-95" style={{ backgroundColor: 'var(--color-brand)' }}>
                             <UserPlusIcon className="w-5 h-5" /> Add Member
                         </button>
                     )}

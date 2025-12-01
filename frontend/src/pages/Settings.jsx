@@ -12,9 +12,9 @@ import {
 } from '@heroicons/react/24/outline'; 
 import { CheckCircleIcon as SolidCheckCircleIcon, MoonIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 
-const PRIMARY_COLOR = '#f35640'; 
+const PRIMARY_COLOR = 'var(--color-brand)'; 
 const RED_ORANGE_BG = { backgroundColor: PRIMARY_COLOR };
-const RED_ORANGE_TEXT = { color: PRIMARY_COLOR };
+const RED_ORANGE_TEXT = { color: 'var(--color-brand)' };
 
 // ---Sub-Component: Profile Info---
 const ProfileInfo = () => {
@@ -91,7 +91,7 @@ const ProfileInfo = () => {
             <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
                 <button 
                     className="px-6 py-2 text-white font-semibold rounded-lg shadow-md hover:opacity-90 transition"
-                    style={RED_ORANGE_BG}
+                    style={{ backgroundColor: 'var(--color-brand)' }}
                 >
                     Save Changes
                 </button>
@@ -135,7 +135,7 @@ const AccountSettings = () => {
                 </div>
                 <button 
                     className="mt-4 px-6 py-2 text-white font-semibold rounded-lg shadow-md hover:opacity-90 transition"
-                    style={RED_ORANGE_BG}
+                    style={{ backgroundColor: 'var(--color-brand)' }}
                 >
                     Update Password
                 </button>
@@ -289,7 +289,7 @@ const Preferences = () => {
             <div className="mt-8 pt-6 border-t border-gray-100">
                 <button 
                     className="px-6 py-2 text-white font-semibold rounded-lg shadow-md hover:opacity-90 transition"
-                    style={RED_ORANGE_BG}
+                    style={{ backgroundColor: 'var(--color-brand)' }}
                 >
                     Save All Preferences
                 </button>
