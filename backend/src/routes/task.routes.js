@@ -6,6 +6,7 @@ import {
   updateTask,
   updateTaskStatus,
   deleteTask,
+  reorderTask,
   createSubtask,
   toggleSubtask, // Imported new controller
   deleteSubtask  // Imported new controller
@@ -56,5 +57,5 @@ router.patch("/tasks/:id", verifyToken, updateTaskStatus);
  * @access  Private (Admin/Manager)
  */
 router.delete("/tasks/:id", verifyToken, checkRole("Admin", "Manager"), deleteTask);
-
+router.patch('/reorder', reorderTask);
 export default router;
