@@ -90,7 +90,7 @@ const AddMemberModal = ({ isOpen, onClose, onAddMember }) => {
 
                     <div className="pt-4 flex justify-end space-x-3">
                         <button type="button" onClick={onClose} className="px-5 py-2 text-sm bg-white border rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                        <button type="submit" disabled={isSubmitting} className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style={{ backgroundColor: PRIMARY_COLOR }}>
+                        <button type="submit" disabled={isSubmitting} className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style={{ backgroundColor: 'var(--color-brand)' }}>
                             {isSubmitting ? 'Creating...' : 'Add Member'}
                         </button>
                     </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PRIMARY_COLOR = '#f35640'; 
+ 
 
 export const CalendarDayCell = ({ date, isSelected, isCheckedIn, hasEvent }) => {
     // Nếu không có ngày (ô trống), render một ô trống
@@ -29,7 +29,7 @@ export const CalendarDayCell = ({ date, isSelected, isCheckedIn, hasEvent }) => 
         <div className="p-0.5">
             <div 
                 className={dayClasses}
-                style={isSelected ? { backgroundColor: PRIMARY_COLOR } : {}}
+                style={isSelected ? { backgroundColor: 'var(--color-brand)' } : {}}
             >
                 <div className={isSelected ? 'relative top-[1px]' : ''}>
                     {date}
