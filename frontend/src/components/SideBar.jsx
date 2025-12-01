@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../assets/images/syncora.png'; 
+//import logoadmin from '../assets/images/syncora_admin.png'; sau này sửa đc logo dep thi them vao day
+import { useAuth } from '../services/AuthContext'; 
+
 import { 
     Squares2X2Icon, 
     CalendarDaysIcon, 
@@ -12,7 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 
-const PRIMARY_COLOR = '#f35640'; 
+
 
 // === MENU ITEMS CHO SIDEBAR ===
 const menuItems = [
@@ -29,13 +32,13 @@ const menuItems = [
 const SidebarItem = ({ item, isActive, unreadCount, fullPath }) => {
     // (Style động giữ nguyên)
     const activeStyle = {
-        backgroundColor: isActive ? PRIMARY_COLOR : 'transparent',
+        backgroundColor: isActive ? 'var(--color-brand)' : 'transparent',
     };
 
     return (
         <Link
             to={fullPath} 
-            className="flex items-center space-x-2 p-2 rounded-lg transition-all duration-200 cursor-pointer text-sm font-medium group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            className="flex items-center space-x-2 p-2 rounded-lg transition-all duration-200 cursor-pointer text-sm font-medium group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-brand)]"
             style={activeStyle}
         >
             {/* (Icon và Tên mục) */}
@@ -57,7 +60,9 @@ const SidebarItem = ({ item, isActive, unreadCount, fullPath }) => {
 
 const SideBar = ({ unreadCount, basePath="" }) => {
     const location = useLocation();
+    const { user } = useAuth(); 
     const currentPath = location.pathname;
+    const currentLogo = user?.role === 'Admin' ? logo : logo; // có logo thì đổi thành logoadmin : logo
 
     const isActive = (href) => {
         const fullPath = `${basePath}${href}`;
@@ -74,7 +79,7 @@ const SideBar = ({ unreadCount, basePath="" }) => {
                 <a className='flex items-center' href='/home'> 
                     <img
                         className="h-9 w-auto"
-                        src={ logo } 
+                        src={ currentLogo } 
                         alt="Syncora Logo" 
                     />
                 </a>
