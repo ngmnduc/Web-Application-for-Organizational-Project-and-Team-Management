@@ -9,6 +9,7 @@ import ActivityLog from "../models/activityLog.model.js";
 export const createProject = async (req, res) => {
   try {
     const { name, description, deadline, manager } = req.body || {};
+<<<<<<< HEAD
     if (!name) return res.status(400).json({ message: "Project name is required" });
     const creatorId = req.user && req.user._id;
     if (!creatorId) return res.status(401).json({ message: "Unauthorized" });
@@ -16,12 +17,30 @@ export const createProject = async (req, res) => {
     // Nếu có chọn Manager từ giao diện
     if (manager) {
         // Logic thăng chức (nếu đang là Member -> Manager)
+=======
+    if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Project name is required" });
+
+    const creatorId = req.user && req.user._id;
+    if (!creatorId) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
+
+    // Auto-promote manager if needed
+    if (manager && manager !== creatorId) {
+>>>>>>> main
         const userToPromote = await User.findById(manager);
         if (userToPromote && userToPromote.role === "Member") {
             userToPromote.role = "Manager";
             await userToPromote.save();
+<<<<<<< HEAD
         }
         // Thêm người này vào danh sách thành viên với vai trò Manager
+=======
+            console.log(`Auto-promoted user ${userToPromote.email} to Manager`);
+        }
+    }
+
+    const initialMembers = [{ user: creatorId, role: "Admin" }];
+    if (manager && manager !== creatorId) {
+>>>>>>> main
         initialMembers.push({ user: manager, role: "Manager" });
     }
 
@@ -29,13 +48,18 @@ export const createProject = async (req, res) => {
       name,
       description,
       deadline: deadline || null,
+<<<<<<< HEAD
       createdBy: creatorId, 
       members: initialMembers, 
+=======
+      createdBy: creatorId,
+      members: initialMembers,
+>>>>>>> main
     });
     await project.save();
-    res.status(201).json({ success: true, data: project });
+    res.status(201).json({ success: true, message: "Project created successfully", data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -45,7 +69,7 @@ export const listProjects = async (req, res) => {
     const projects = await Project.find({ deletedAt: null });
     res.json({ success: true, count: projects.length, data: projects });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -53,12 +77,12 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid id" });
     const project = await Project.findById(id).populate("members.user", "name email role");
-    if (!project || project.deletedAt) return res.status(404).json({ message: "Project not found" });
+    if (!project || project.deletedAt) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -68,10 +92,10 @@ export const updateProject = async (req, res) => {
     const { id } = req.params;
     const data = req.body || {};
     const project = await Project.findByIdAndUpdate(id, data, { new: true });
-    if (!project) return res.status(404).json({ message: "Project not found" });
-    res.json({ success: true, data: project });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    res.json({ success: true, message: "Project updated successfully", data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -80,10 +104,10 @@ export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
     const project = await Project.findByIdAndUpdate(id, { deletedAt: new Date() }, { new: true });
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, message: "Project deleted", data: project });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -117,7 +141,27 @@ export const getProjectMembers = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+  }
+};
+
+// PATCH /projects/:id/archive
+export const toggleArchive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archive } = req.body || {}; // true to archive, false to unarchive
+
+    const project = await Project.findById(id);
+    if (!project || project.deletedAt) {
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    }
+
+    project.status = archive ? "archived" : "active";
+    await project.save();
+
+    res.json({ success: true, message: `Project ${archive ? "archived" : "unarchived"}`, data: project });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
 
@@ -127,27 +171,36 @@ export const getProjectMembers = async (req, res) => {
  */
 export const getProjectSummary = async (req, res) => {
   try {
-    const { id } = req.params;
+    const {id} = req.params;
 
     const project = await Project.findById(id);
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+    if(!project) return res.status(404).json({success:false,error:"NotFoundError", message: "Project not found"});
 
-    const tasks = await Task.find({ projectId: id, deletedAt: null });
-    
-    const totalTasks = tasks.length;
-    const todo = tasks.filter(t => t.status === "TODO").length;
-    const doing = tasks.filter(t => t.status === "DOING").length;
-    const done = tasks.filter(t => t.status === "DONE").length;
+    const now = new Date();
+
+    const [totalTasks, todo , doing , done , overdue] = await Promise.all([
+      Task.countDocuments({projectId: id, deletedAt: null}),
+      Task.countDocuments({projectId: id, status: "TODO", deletedAt: null}),
+      Task.countDocuments({projectId: id, status: "DOING", deletedAt: null}),
+      Task.countDocuments({projectId: id, status: "DONE", deletedAt: null}),
+      Task.countDocuments({
+        projectId : id,
+        deletedAt: null,
+        dueDate: { $lt: now},
+        status: { $ne: "DONE" }
+      })
+    ]);
 
     let daysLeft = 0;
     if (project.endDate) {
-      const end = new Date(project.endDate);
-      const now = new Date();
-      const diffTime = end - now;
-      daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      if (daysLeft < 0) daysLeft = 0;
+      const endDateField = project.endDate || project.deadline;
+      if (endDateField) {
+        const end = new Date(endDateField);
+        const diffTime = end - now;
+        daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (daysLeft < 0) daysLeft = 0;
+      }
     }
-
     res.status(200).json({
       success: true,
       data: {
@@ -155,14 +208,14 @@ export const getProjectSummary = async (req, res) => {
         todo,
         doing,
         done,
+        overdue,
         daysLeft
       }
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  } catch (error){
+    res.status(500).json({success:false, error: "ServerError", message: error.message});
   }
 };
-
 /**
  * @desc    Get recent activity logs for project
  * @route   GET /projects/:id/activities
@@ -170,17 +223,62 @@ export const getProjectSummary = async (req, res) => {
 export const getProjectActivities = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
     
+    const total = await ActivityLog.countDocuments({projectId: id});
+
     const activities = await ActivityLog.find({ projectId: id })
       .populate("userId", "name email")
       .sort({ createdAt: -1 })
-      .limit(20);
+      .skip(skip)
+      .limit(limit);
 
     res.status(200).json({
       success: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
       data: activities
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, error: "ServerError", message: error.message });
   }
 };
+<<<<<<< HEAD
+=======
+
+// GET /projects/pending-requests
+// Hàm này quét tất cả dự án, tìm thành viên có status = "PENDING"
+export const getPendingRequests = async (req, res) => {
+  try {
+    // Tìm các dự án có chứa thành viên PENDING
+    const projects = await Project.find({ "members.status": "PENDING" })
+      .select("name members") 
+      .populate("members.user", "name email avatarUrl");
+
+    let pendingList = [];
+
+    // Tách mảng để lấy ra từng request cụ thể
+    projects.forEach(proj => {
+      const pendingMembers = proj.members.filter(m => m.status === "PENDING");
+      
+      pendingMembers.forEach(member => {
+        pendingList.push({
+          requestId: member._id,      // ID của request (quan trọng để duyệt)
+          projectId: proj._id,        // ID dự án (quan trọng để duyệt)
+          projectName: proj.name,     // Tên dự án để hiển thị
+          user: member.user           // Thông tin user
+        });
+      });
+    });
+
+    res.json({ success: true, data: pendingList });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+>>>>>>> main

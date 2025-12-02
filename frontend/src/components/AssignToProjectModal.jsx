@@ -60,7 +60,7 @@ const AssignToProjectModal = ({ isOpen, onClose, onAssignSuccess }) => {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/projects/${selectedProject}/members`, {
+            const response = await fetch(`${API_BASE_URL}/projects/${selectedProject}/assign-requests`, {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify({ userId: selectedUser, role: 'Member' })
@@ -69,11 +69,12 @@ const AssignToProjectModal = ({ isOpen, onClose, onAssignSuccess }) => {
             const data = await response.json();
 
             if (!response.ok) {
-                setErrors({ form: data.message || "Assignment failed." });
+                setErrors({ form: data.message || "Request failed." });
                 return;
             }
-
             if (onAssignSuccess) onAssignSuccess();
+
+            alert("Assign request sent to Admin!");
             
             setSelectedUser('');
             setSelectedProject('');
@@ -124,7 +125,7 @@ const AssignToProjectModal = ({ isOpen, onClose, onAssignSuccess }) => {
                     <div className="pt-4 flex justify-end space-x-3">
                         <button type="button" onClick={onClose} className="px-5 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
                         <button type="submit" disabled={isSubmitting || isLoading} className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style={{ backgroundColor: PRIMARY_COLOR }}>
-                            {isSubmitting ? 'Assigning...' : 'Assign'}
+                            {isSubmitting ? 'Sending...' : 'Send Request'}
                         </button>
                     </div>
                 </form>

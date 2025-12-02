@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../assets/images/syncora.png'; 
+//import logoadmin from '../assets/images/syncora_admin.png'; sau này sửa đc logo dep thi them vao day
+import { useAuth } from '../services/AuthContext'; 
+
 import { 
     Squares2X2Icon, 
     CalendarDaysIcon, 
@@ -10,27 +13,41 @@ import {
     BriefcaseIcon,  
     UsersIcon,     
 } from '@heroicons/react/24/outline';
-import { useAuth } from '../services/AuthContext';
 
-const PRIMARY_COLOR = '#f35640'; 
 
-// --- Sidebar Item ---
+
+
+// === MENU ITEMS CHO SIDEBAR ===
+const menuItems = [
+    { name: 'Dashboard', icon: Squares2X2Icon, href: '/home' },
+    { name: 'My Tasks', icon: FolderIcon, href: '/tasks' },
+    { name: 'Calendar', icon: CalendarDaysIcon, href: '/calendar' },
+    { name: 'Members', icon: UsersIcon, href: '/members' },
+    { name: 'Projects', icon: BriefcaseIcon, href: '/projects' },
+    { name: 'Notifications', icon: BellIcon, href: '/notifications' },
+    { name: 'Settings', icon: Cog6ToothIcon, href: '/settings' },
+];
+
+// --- Sub-component: Sidebar Item ---
 const SidebarItem = ({ item, isActive, unreadCount, fullPath }) => {
+    // (Style động giữ nguyên)
     const activeStyle = {
-        backgroundColor: isActive ? PRIMARY_COLOR : 'transparent',
+        backgroundColor: isActive ? 'var(--color-brand)' : 'transparent',
     };
 
     return (
         <Link
             to={fullPath} 
-            className="flex items-center space-x-2 p-2 rounded-lg transition-all duration-200 cursor-pointer text-sm font-medium group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            className="flex items-center space-x-2 p-2 rounded-lg transition-all duration-200 cursor-pointer text-sm font-medium group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-brand)]"
             style={activeStyle}
         >
+            {/* (Icon và Tên mục) */}
             <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
             <span className={isActive ? 'text-white font-semibold' : 'text-gray-700 group-hover:text-gray-900'}>
                 {item.name}
             </span>
             
+            {/* === HIỂN THỊ SỐ ĐẾM CHO NOTIFICATIONS === */}
             {item.name === 'Notifications' && !isActive && unreadCount > 0 && (
                 <span className="ml-auto min-w-4 h-4 px-1 text-[10px] bg-red-500 rounded-full flex items-center justify-center text-white font-bold">
                     {unreadCount > 9 ? '9+' : unreadCount}
@@ -40,30 +57,12 @@ const SidebarItem = ({ item, isActive, unreadCount, fullPath }) => {
     );
 };
 
+
 const SideBar = ({ unreadCount, basePath="" }) => {
     const location = useLocation();
-    const currentPath = location.pathname;
-    
-    // Lấy thông tin user để check quyền
     const { user } = useAuth(); 
-    const isAdmin = user?.role === 'Admin';
-
-    // Định nghĩa menu gốc
-    const allMenuItems = [
-        { name: 'Dashboard', icon: Squares2X2Icon, href: '/home' },
-        { name: 'My Tasks', icon: FolderIcon, href: '/tasks' },
-        { name: 'Calendar', icon: CalendarDaysIcon, href: '/calendar' },
-        { name: 'Members', icon: UsersIcon, href: '/members' },
-        { name: 'Projects', icon: BriefcaseIcon, href: '/projects', adminOnly: true }, 
-        { name: 'Notifications', icon: BellIcon, href: '/notifications' },
-        { name: 'Settings', icon: Cog6ToothIcon, href: '/settings' },
-    ];
-
-    // Lọc menu dựa trên quyền
-    const visibleMenuItems = allMenuItems.filter(item => {
-        if (item.adminOnly && !isAdmin) return false; // Ẩn nếu là Admin Only mà user không phải Admin
-        return true;
-    });
+    const currentPath = location.pathname;
+    const currentLogo = user?.role === 'Admin' ? logo : logo; // có logo thì đổi thành logoadmin : logo
 
     const isActive = (href) => {
         const fullPath = `${basePath}${href}`;
@@ -72,15 +71,23 @@ const SideBar = ({ unreadCount, basePath="" }) => {
     };
 
     return (
-        <div className="w-56 bg-white border-r h-screen flex flex-col shadow-lg">
+        <div 
+            className="w-56 bg-white border-r h-screen flex flex-col shadow-lg" 
+        >
+            {/* (Logo Section) */}
             <div className="flex items-center justify-center gap-2 px-3 pt-8 pb-4">
                 <a className='flex items-center' href='/home'> 
-                    <img className="h-9 w-auto" src={ logo } alt="Syncora Logo" />
+                    <img
+                        className="h-9 w-auto"
+                        src={ currentLogo } 
+                        alt="Syncora Logo" 
+                    />
                 </a>
             </div>
 
+            {/* Menu chính */}
             <nav className="space-y-2 px-3 pb-4 flex-grow">
-                {visibleMenuItems.map((item) => (
+                {menuItems.map((item) => (
                     <SidebarItem 
                         key={item.href}
                         item={item}
@@ -90,7 +97,7 @@ const SideBar = ({ unreadCount, basePath="" }) => {
                     />
                 ))}
             </nav>
-        </div>
+            </div>
     );
 }
 

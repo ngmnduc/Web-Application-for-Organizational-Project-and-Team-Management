@@ -6,11 +6,16 @@ import {
   updateTask,
   updateTaskStatus,
   deleteTask,
+  reorderTask,
   createSubtask,
   toggleSubtask, // Imported new controller
   deleteSubtask  // Imported new controller
 } from "../controllers/task.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
+<<<<<<< HEAD
+=======
+import { checkProjectActive } from "../middlewares/archive.middleware.js";
+>>>>>>> main
 
 const router = express.Router();
 
@@ -34,6 +39,11 @@ router.get("/projects/:id/tasks", verifyToken, getTasksByProject);
  * @access  Private (Admin/Manager)
  */
 router.post("/projects/:id/tasks", verifyToken, checkRole("Admin", "Manager"), createTask);
+<<<<<<< HEAD
+=======
+
+router.patch('/tasks/reorder', reorderTask);
+>>>>>>> main
 
 /**
  * @route   PUT /tasks/:id
@@ -55,5 +65,11 @@ router.patch("/tasks/:id", verifyToken, updateTaskStatus);
  * @access  Private (Admin/Manager)
  */
 router.delete("/tasks/:id", verifyToken, checkRole("Admin", "Manager"), deleteTask);
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> main
 
 export default router;

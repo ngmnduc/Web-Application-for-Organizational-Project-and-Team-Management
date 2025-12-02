@@ -22,7 +22,7 @@ const seedProjects = async () => {
       {
         name: "Website Redesign",
         description: "Complete overhaul of company website with modern UI/UX",
-        status: "ACTIVE",
+        status: "active",
         createdBy: adminUser._id,
         startDate: new Date("2025-10-01"),
         endDate: new Date("2025-12-31")
@@ -30,7 +30,7 @@ const seedProjects = async () => {
       {
         name: "Mobile App Development",
         description: "Native iOS and Android app for customer engagement", 
-        status: "ACTIVE",
+        status: "active",
         createdBy: adminUser._id,
         startDate: new Date("2025-10-15"),
         endDate: new Date("2026-01-31")
