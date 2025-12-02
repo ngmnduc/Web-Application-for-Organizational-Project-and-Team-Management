@@ -17,6 +17,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import TaskSummary from '../components/TaskSummary';
 import { getProjects } from '../services/projectService';
 import { getTasksByProject, updateTaskStatus, createTask } from '../services/taskService';
+import { useAuth } from '../services/AuthContext';
 
 // ===== Badge priority  =====
 const PriorityBadge = ({ level }) => {
@@ -86,22 +87,24 @@ const KanbanCard = ({ task, onOpenDetail }) => {
 const MyTasks = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   // ===== USER + ROLE (tuần 3) =====
   const currentUser = {
-    id: 'USER_1',
-    role: 'ADMIN',            // ADMIN | MANAGER | MEMBER
-    name: 'Super Admin',
+    id: user?._id,
+    role: user?.role || 'Member',            // ADMIN | MANAGER | MEMBER
+    name: user?.name || user?.fullname || 'User',
   };
 
-  const isManagerOrAdmin = ['ADMIN', 'MANAGER'].includes(
-    (currentUser.role || '').toUpperCase()
-  );
+  const roleUpper = (currentUser.role || '').toUpperCase();
+  const isManagerOrAdmin = ['ADMIN', 'MANAGER', 'SUPER ADMIN'].includes(roleUpper);
   const canManageTasks = isManagerOrAdmin;
 
   const canDragTask = (task) => {
+    //Manager/Admin có thể kéo thả tất cả
     if (isManagerOrAdmin) return true;
-    if (!task.assigneeId) return false;
+// Member chỉ được kéo thả task được giao
+    if (!task.assigneeId || !currentUser.id ) return false;
     return task.assigneeId === currentUser.id;
   };
 
@@ -236,7 +239,7 @@ const MyTasks = () => {
           project: t.projectName || 'Project',
           projectColor: t.projectColor,        // nếu backend có
           assignee: t.assigneeName || t.assigneeInitials || '??',
-          assigneeId: t.assigneeId || null,
+          assigneeId: t.assigneeId ? t.assigneeId.toString() : null,
           dueSoon: t.dueSoon || false,
           labels: t.labels || [],
           subtasks: t.subtasks || [],
@@ -505,16 +508,7 @@ const MyTasks = () => {
                         <span className="text-xs text-gray-500">({list.length})</span>
                       </div>
 
-                      {canManageTasks && (
-                        <button
-                          type="button"
-                          onClick={() => openCreateModal(col.id)}
-                          className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
-                        >
-                          <PlusIcon className="w-4 h-4" />
-                          Add
-                        </button>
-                      )}
+                    
                     </div>
 
                     {/* List card */}
