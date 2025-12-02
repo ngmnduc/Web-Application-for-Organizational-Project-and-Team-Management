@@ -23,7 +23,7 @@ const menuItems = [
     { name: 'My Tasks', icon: FolderIcon, href: '/tasks' },
     { name: 'Calendar', icon: CalendarDaysIcon, href: '/calendar' },
     { name: 'Members', icon: UsersIcon, href: '/members' },
-    { name: 'Projects', icon: BriefcaseIcon, href: '/projects' },
+    { name: 'Projects', icon: BriefcaseIcon, href: '/projects', adminOnly: true },
     { name: 'Notifications', icon: BellIcon, href: '/notifications' },
     { name: 'Settings', icon: Cog6ToothIcon, href: '/settings' },
 ];
@@ -63,6 +63,11 @@ const SideBar = ({ unreadCount, basePath="" }) => {
     const { user } = useAuth(); 
     const currentPath = location.pathname;
     const currentLogo = user?.role === 'Admin' ? logo : logo; // có logo thì đổi thành logoadmin : logo
+    const isAdmin = user?.role === 'Admin';
+    const visibleMenuItems = menuItems.filter(item => {
+        if (item.adminOnly && !isAdmin) return false;
+        return true;
+    });
 
     const isActive = (href) => {
         const fullPath = `${basePath}${href}`;
@@ -87,7 +92,7 @@ const SideBar = ({ unreadCount, basePath="" }) => {
 
             {/* Menu chính */}
             <nav className="space-y-2 px-3 pb-4 flex-grow">
-                {menuItems.map((item) => (
+                {visibleMenuItems.map((item) => (
                     <SidebarItem 
                         key={item.href}
                         item={item}
