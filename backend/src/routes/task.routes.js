@@ -9,7 +9,8 @@ import {
   reorderTask,
   createSubtask,
   toggleSubtask, // Imported new controller
-  deleteSubtask  // Imported new controller
+  deleteSubtask,  // Imported new controller
+  getTasksById,
 } from "../controllers/task.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
 import { checkProjectActive } from "../middlewares/archive.middleware.js";
@@ -22,6 +23,14 @@ const router = express.Router();
  * @access  Private (Admin/Manager/Member)
  */
 router.get("/tasks", verifyToken, getFilteredTasks);
+
+// lấy chi tiết 1 task theo id
+/**
+ * @route   GET /tasks/:id
+ * @desc    Get task detail by ID
+ * @access  Private (Admin/Manager/Member)
+ */
+router.get("/tasks/:id", verifyToken, getTasksById); 
 
 /**
  * @route   GET /projects/:id/tasks
