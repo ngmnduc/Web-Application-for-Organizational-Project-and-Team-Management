@@ -123,6 +123,7 @@ const MyTasks = () => {
   const canManageTasks = isManagerOrAdmin;
 
   const canDragTask = (task) => {
+    //Manager/Admin có thể kéo thả tất cả
     if (isManagerOrAdmin) return true;
     if (!task.assigneeId || !currentUser.id ) return false;
     return task.assigneeId === currentUser.id;
