@@ -63,7 +63,13 @@ const StatusBadge = ({ status }) => {
 
 const ProgressBar = ({ progress }) => (
     <div className="w-full bg-gray-200 rounded-full h-1.5">
-        <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${progress}%` }}></div>
+        <div 
+            className="h-1.5 rounded-full" 
+            style={{ 
+                width: `${progress}%`,
+                backgroundColor: PRIMARY_COLOR 
+            }}
+        ></div>
     </div>
 );
 

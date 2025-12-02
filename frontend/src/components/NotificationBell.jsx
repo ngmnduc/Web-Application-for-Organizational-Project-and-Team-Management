@@ -1,14 +1,21 @@
 import React from 'react';
 import { BellIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom'; 
+import { useAuth } from '../services/AuthContext'; 
 
 export default function NotificationBell({ notificationCount }) {
+    const { user } = useAuth(); // Lấy thông tin user hiện tại
     
     const count = notificationCount || 0;
     const displayCount = count > 9 ? '9+' : count;
 
+    // Logic xác định đường dẫn dựa trên Role
+    const destination = user?.role === 'Admin' 
+        ? '/admin/notifications' 
+        : '/notifications';
+
     return (
-        <Link to="/notifications" className="relative cursor-pointer p-1">
+        <Link to={destination} className="relative cursor-pointer p-1">
             <BellIcon className="w-6 h-6 text-gray-700 hover:text-blue-600 transition-colors" />
             
             {count > 0 && (

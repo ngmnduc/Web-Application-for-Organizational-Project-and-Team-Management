@@ -12,27 +12,25 @@ export const createProject = async (req, res) => {
     if (!name) return res.status(400).json({ message: "Project name is required" });
     const creatorId = req.user && req.user._id;
     if (!creatorId) return res.status(401).json({ message: "Unauthorized" });
-    if (manager && manager !== creatorId) {
+    const initialMembers = []; 
+    // Nếu có chọn Manager từ giao diện
+    if (manager) {
+        // Logic thăng chức (nếu đang là Member -> Manager)
         const userToPromote = await User.findById(manager);
-        // Nếu tìm thấy user và họ đang là Member -> Thăng chức lên Manager
         if (userToPromote && userToPromote.role === "Member") {
             userToPromote.role = "Manager";
             await userToPromote.save();
-            console.log(`Auto-promoted user ${userToPromote.email} to Manager`);
         }
-    }
-    const initialMembers = [{ user: creatorId, role: "Admin" }];
-    // - Nếu người dùng chọn Manager khác với người tạo, thêm họ vào danh sách
-    if (manager && manager !== creatorId) {
+        // Thêm người này vào danh sách thành viên với vai trò Manager
         initialMembers.push({ user: manager, role: "Manager" });
-    } else if (manager === creatorId) {
     }
+
     const project = new Project({
       name,
       description,
-      deadline: deadline || null, 
-      createdBy: creatorId,
-      members: initialMembers,  
+      deadline: deadline || null,
+      createdBy: creatorId, 
+      members: initialMembers, 
     });
     await project.save();
     res.status(201).json({ success: true, data: project });
