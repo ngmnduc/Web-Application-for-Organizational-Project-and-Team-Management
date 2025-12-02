@@ -10,19 +10,16 @@ import {
     XMarkIcon,
     CheckCircleIcon,
     ExclamationCircleIcon,
-    ExclamationTriangleIcon,
-    InboxIcon,
+    ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { useParams } from 'react-router-dom'; 
 
-// Components
 import { LoaderOverlay } from '../components/LoaderOverlay';
 import { ErrorState } from '../components/ErrorState';
 import { EmptyState } from '../components/EmptyState';
 import AddMemberModal from '../components/AddMemberModal';
 import AssignToProjectModal from '../components/AssignToProjectModal';
 
-const PRIMARY_COLOR = '#f35640';
 const API_BASE_URL = 'http://localhost:4000/api'; 
 
 // --- Helper format ngày ---
@@ -51,7 +48,6 @@ const NotificationBanner = ({ message, type, onClose }) => {
     );
 };
 
-// --- Sub-component: Confirm Modal (Hộp thoại xác nhận xóa) ---
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
     if (!isOpen) return null;
     return (
@@ -73,13 +69,18 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
     );
 };
 
-// --- Sub-component: Avatar ---
+// --- Avatar ---
 const Avatar = ({ name, avatarUrl }) => {
     if (avatarUrl) return <img src={avatarUrl} alt={name} className="w-10 h-10 rounded-full object-cover" />;
     const initials = (name || "U").split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     return (
-        <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-            style={{ backgroundColor: `${PRIMARY_COLOR}20`, color: PRIMARY_COLOR }}>
+        <div 
+            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
+            style={{ 
+                backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', 
+                color: 'var(--color-brand)' 
+            }}
+        >
             {initials}
         </div>
     );
@@ -87,22 +88,33 @@ const Avatar = ({ name, avatarUrl }) => {
 
 // --- Role Select ---
 const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
+    // Helper tạo style động
     const getRoleStyle = (role) => {
         switch (role) {
             case 'Admin':
-                return { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' };
+                // Admin ăn theo màu Brand (Tím hoặc Đỏ tùy người xem)
+                return { 
+                    style: {
+                        backgroundColor: 'color-mix(in srgb, var(--color-brand) 10%, white)',
+                        color: 'var(--color-brand)',
+                        borderColor: 'color-mix(in srgb, var(--color-brand) 30%, white)'
+                    }
+                };
             case 'Manager':
-                return { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' };
+                return { className: 'bg-blue-100 text-blue-800 border-blue-200' };
             default: 
-                return { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200' };
+                return { className: 'bg-gray-100 text-gray-800 border-gray-200' };
         }
     };
 
-    const style = getRoleStyle(currentRole);
+    const { className = '', style = {} } = getRoleStyle(currentRole);
 
     if (!canEdit) {
         return (
-            <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${style.bg} ${style.text} ${style.border}`}>
+            <span 
+                className={`px-3 py-1 text-xs font-semibold rounded-full border ${className}`}
+                style={style}
+            >
                 {currentRole}
             </span>
         );
@@ -113,13 +125,22 @@ const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
             <select
                 value={currentRole}
                 onChange={(e) => onChange(userId, e.target.value)}
-                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-bold rounded-full border focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all ${style.bg} ${style.text} ${style.border}`}
+                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-bold rounded-full border focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all ${className}`}
+                style={{ 
+                    ...style,
+                    '--tw-ring-color': 'var(--color-brand)' 
+                }}
             >
                 <option value="Admin" className="text-gray-900 bg-white">Admin</option>
                 <option value="Manager" className="text-gray-900 bg-white">Manager</option>
                 <option value="Member" className="text-gray-900 bg-white">Member</option>
             </select>
-            <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${style.text}`}>
+            
+            {/* Mũi tên */}
+            <div 
+                className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${className ? '' : 'text-[var(--color-brand)]'}`}
+                style={style.color ? { color: style.color } : {}}
+            >
                 <svg className="h-3 w-3 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                     <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                 </svg>
@@ -132,14 +153,7 @@ const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
 const UserInfoModal = ({ isOpen, onClose, user }) => {
     if (!isOpen || !user) return null;
 
-    // Danh sách mã màu Hex cố định
-    const dotColors = [
-        '#ef4444', 
-        '#3b82f6',
-        '#22c55e', 
-        '#eab308', 
-        '#a855f7', 
-    ];
+    const dotColors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" onClick={onClose}>
@@ -176,7 +190,6 @@ const UserInfoModal = ({ isOpen, onClose, user }) => {
                             <ul className="space-y-2">
                                 {user.projects.map((p, index) => (
                                     <li key={p._id} className="flex items-center text-sm text-gray-700 bg-white p-2 rounded border border-gray-100">
-                                        {/* Sử dụng style inline để đảm bảo màu luôn hiện */}
                                         <div 
                                             className="w-2 h-2 rounded-full mr-2"
                                             style={{ backgroundColor: dotColors[p.name.length % dotColors.length] }}
@@ -199,108 +212,41 @@ const Members = () => {
     const [members, setMembers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-
-    // Modal States
+    
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null); 
-
-    const [notification, setNotification] = useState({ message: '', type: '' });
-    const [currentUserRole, setCurrentUserRole] = useState('Member');
     const [assignRequests, setAssignRequests] = useState([]);  
     const [isSlidePanelOpen, setIsSlidePanelOpen] = useState(false);
 
-    const fetchAssignRequests = async () => {
-    try {
-        
-        const res = await fetch(`${API_BASE_URL}/projects/pending-requests`, {
-            headers: getHeaders(),
-        });
-        
-        const result = await res.json();
-        
-        if (result.success) {
-            setAssignRequests(result.data || []);
-        } else {
-            console.error("Failed to fetch requests:", result.message);
-        }
-    } catch (error) {
-        console.error("Error fetching requests:", error);
-    }
-};
-    
-    useEffect(() => {
-    if (currentUserRole === 'Admin') {
-        fetchAssignRequests();
-    }
-}, [currentUserRole]);
+    const [notification, setNotification] = useState({ message: '', type: '' });
+    const [currentUserRole, setCurrentUserRole] = useState('Member');
 
     const showNotification = (message, type = 'success') => {
         setNotification({ message, type });
         setTimeout(() => setNotification({ message: '', type: '' }), 3000);
     };
 
-const acceptRequest = async (item) => {
-    // item chính là 1 phần tử trong mảng pendingList trả về từ backend
-    // Cần: projectId và requestId (memberId)
-    try {
-        const url = `${API_BASE_URL}/projects/${item.projectId}/members/${item.requestId}/approve`;
-        
-        const res = await fetch(url, {
-            method: 'PATCH', // Backend quy định là PATCH
-            headers: {
-                ...getHeaders(),
-                'Content-Type': 'application/json' // Bắt buộc khi gửi body
-            },
-            body: JSON.stringify({ action: 'approve' }) // Body theo quy định backend
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-            showNotification("Approved successfully!", "success");
-            fetchAssignRequests(); // Load lại danh sách để ẩn request đã xử lý
-        } else {
-            showNotification(data.message || "Failed to approve", "error");
-        }
-    } catch (error) {
-        console.error("Approve error:", error);
-        showNotification("Something went wrong", "error");
-    }
-};
-
-const denyRequest = async (item) => {
-    try {
-        const url = `${API_BASE_URL}/projects/${item.projectId}/members/${item.requestId}/approve`;
-        
-        const res = await fetch(url, {
-            method: 'PATCH',
-            headers: {
-                ...getHeaders(),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ action: 'reject' }) // Body 'reject'
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-            showNotification("Request rejected.", "info");
-            fetchAssignRequests(); // Load lại danh sách
-        } else {
-            showNotification(data.message || "Failed to reject", "error");
-        }
-    } catch (error) {
-        console.error("Deny error:", error);
-    }
-};
-
     const getHeaders = () => ({
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('accessToken')}`
     });
+
+    const fetchAssignRequests = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/projects/pending-requests`, { headers: getHeaders() });
+            const result = await res.json();
+            if (result.success) setAssignRequests(result.data || []);
+        } catch (error) { console.error("Error fetching requests:", error); }
+    };
+        
+    useEffect(() => {
+        if (currentUserRole === 'Admin') fetchAssignRequests();
+    }, [currentUserRole]);
+    const acceptRequest = async (item) => { };
+    const denyRequest = async (item) => { };
 
     useEffect(() => {
         const userStr = localStorage.getItem('user');
@@ -339,26 +285,21 @@ const denyRequest = async (item) => {
                     email: user.email || "",
                     role: user.role || 'Member',
                     avatarUrl: user.avatar || null,
-                    createdAt: user.createdAt, // Lấy ngày tạo
+                    createdAt: user.createdAt, 
                     projects: joinedProjects
                 };
             });
 
             setMembers(mappedMembers);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setIsLoading(false);
-        }
+        } catch (error) { console.error(error); } 
+        finally { setIsLoading(false); }
     }, [projectId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // --- ACTIONS ---
     const handleChangeRole = async (userId, newRole) => {
         const oldMembers = [...members];
         setMembers(prev => prev.map(m => m.id === userId ? { ...m, role: newRole } : m));
-
         try {
             const res = await fetch(`${API_BASE_URL}/auth/${userId}/role`, {
                 method: 'PUT',
@@ -377,12 +318,10 @@ const denyRequest = async (item) => {
     const handleAssign = (user) => { setSelectedUser(user); setIsAssignModalOpen(true); };
     const handleDeleteClick = (user) => { setUserToDelete(user); };
 
-    // Hàm thực hiện xóa thật (Chạy khi bấm Delete trong Modal)
     const confirmDeleteUser = async () => {
         if (!userToDelete) return;
         setMembers(prev => prev.filter(m => m.id !== userToDelete.id));
         setUserToDelete(null); 
-
         try {
              const res = await fetch(`${API_BASE_URL}/users/${userToDelete.id}`, { method: 'DELETE', headers: getHeaders() });
              if (!res.ok) throw new Error("Delete failed");
@@ -403,79 +342,46 @@ const denyRequest = async (item) => {
     return (
         <div className="flex-1 p-6 md:p-8 bg-gray-50 min-h-screen relative">
             <NotificationBanner message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
-                {/* NÚT MỞ SLIDE PANEL CHO ADMIN */}
-    
-    {/* SLIDE PANEL */}
-    {isAdmin && isSlidePanelOpen && (
-        <div className="fixed top-0 right-0 w-96 h-full bg-white shadow-xl z-50 p-6 border-l border-gray-200">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Assign Requests</h2>
-                <button onClick={() => setIsSlidePanelOpen(false)}>
-                    <XMarkIcon className="w-6 h-6 text-gray-500" />
-                </button>
-            </div>
-
-            {assignRequests.length === 0 && (
-                <p className="text-gray-500">No pending requests.</p>
-            )}
-
-            <ul className="space-y-4">
-                {assignRequests.map(req => (
-                    <li key={req.requestId} className="p-4 border rounded-lg bg-gray-50">
-                        <p className="font-semibold">{req.user?.name}</p>
-                        <p className="text-sm text-gray-500">Wants to join: {req.projectName}</p>
-
-                        <div className="flex gap-3 mt-3">
-                            <button 
-                                onClick={() => acceptRequest(req)}
-                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm"
-                            >
-                                Accept
-                            </button>
-
-                            <button 
-                                onClick={() => denyRequest(req)}
-                                className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm"
-                            >
-                                Deny
-                            </button>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    )}
             <ConfirmModal isOpen={!!userToDelete} title="Delete User" message={`Are you sure you want to delete "${userToDelete?.name}"?`} onClose={() => setUserToDelete(null)} onConfirm={confirmDeleteUser} />
 
             <div className="max-w-7xl mx-auto">
+                {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                     <div className="relative w-full md:w-auto">
                         <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input type="text" placeholder="Search members..." className="w-full md:w-96 pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-1 shadow-sm" style={{ '--tw-ring-color': PRIMARY_COLOR }} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <input 
+                            type="text" 
+                            placeholder="Search members..." 
+                            className="w-full md:w-96 pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-1 shadow-sm"
+                            style={{ '--tw-ring-color': 'var(--color-brand)' }}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
-                    <div className="flex items-center gap-3">
                     {isAdmin && (
-                        <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-bold shadow-sm hover:opacity-90 transition-all active:scale-95" style={{ backgroundColor: 'var(--color-brand)' }}>
+                        <button 
+                            onClick={() => setIsAddModalOpen(true)} 
+                            className="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-bold shadow-sm hover:opacity-90 transition-all active:scale-95"
+                            style={{ backgroundColor: 'var(--color-brand)' }}
+                        >
                             <UserPlusIcon className="w-5 h-5" /> Add Member
                         </button>
                     )}
-                    {isAdmin && (
-                         <button
-                            onClick={() => setIsSlidePanelOpen(true)}
-                            className=" flex items-center gap-2 px-5 py-2.5 bg-brand text-white rounded-lg text-sm font-bold shadow-sm hover:opacity-90 transition-all active:scale-95"
-                         >
-                            <InboxIcon className="w-5 h-5"/><span>Assign Requests ({assignRequests.length})</span>
-                         </button>
-                    )}
-                    </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    {/* Admin Badge Header */}
                     {isAdmin && (
-                        <div className="px-6 py-3 border-b flex justify-between items-center" style={{ backgroundColor: `${PRIMARY_COLOR}08`, borderColor: `${PRIMARY_COLOR}20` }}>
+                        <div 
+                            className="px-6 py-3 border-b flex justify-between items-center"
+                            style={{ 
+                                backgroundColor: 'color-mix(in srgb, var(--color-brand) 5%, white)', 
+                                borderColor: 'color-mix(in srgb, var(--color-brand) 20%, white)' 
+                            }}
+                        >
                             <div className="flex items-center gap-2">
-                                <ShieldCheckIcon className="w-5 h-5" style={{ color: PRIMARY_COLOR }} />
-                                <span className="text-sm font-bold" style={{ color: PRIMARY_COLOR }}>Admin Management Mode</span>
+                                <ShieldCheckIcon className="w-5 h-5" style={{ color: 'var(--color-brand)' }} />
+                                <span className="text-sm font-bold" style={{ color: 'var(--color-brand)' }}>Admin Management Mode</span>
                             </div>
                         </div>
                     )}
@@ -506,14 +412,13 @@ const denyRequest = async (item) => {
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={isAdmin} />
                                             </td>
-                                            
-                                            {/* Projects Joined: Chỉ hiện số lượng */}
+                                        
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span 
                                                     className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                                                     style={{ 
-                                                        backgroundColor: `${PRIMARY_COLOR}20`, 
-                                                        color: PRIMARY_COLOR 
+                                                        backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', 
+                                                        color: 'var(--color-brand)' 
                                                     }}
                                                 >
                                                     {member.projects?.length || 0} Projects

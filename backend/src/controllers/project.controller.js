@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import ProjectMember from "../models/projectMember.model.js";
@@ -9,15 +10,6 @@ import ActivityLog from "../models/activityLog.model.js";
 export const createProject = async (req, res) => {
   try {
     const { name, description, deadline, manager } = req.body || {};
-<<<<<<< HEAD
-    if (!name) return res.status(400).json({ message: "Project name is required" });
-    const creatorId = req.user && req.user._id;
-    if (!creatorId) return res.status(401).json({ message: "Unauthorized" });
-    const initialMembers = []; 
-    // Nếu có chọn Manager từ giao diện
-    if (manager) {
-        // Logic thăng chức (nếu đang là Member -> Manager)
-=======
     if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Project name is required" });
 
     const creatorId = req.user && req.user._id;
@@ -25,22 +17,16 @@ export const createProject = async (req, res) => {
 
     // Auto-promote manager if needed
     if (manager && manager !== creatorId) {
->>>>>>> main
         const userToPromote = await User.findById(manager);
         if (userToPromote && userToPromote.role === "Member") {
             userToPromote.role = "Manager";
             await userToPromote.save();
-<<<<<<< HEAD
-        }
-        // Thêm người này vào danh sách thành viên với vai trò Manager
-=======
             console.log(`Auto-promoted user ${userToPromote.email} to Manager`);
         }
     }
 
     const initialMembers = [{ user: creatorId, role: "Admin" }];
     if (manager && manager !== creatorId) {
->>>>>>> main
         initialMembers.push({ user: manager, role: "Manager" });
     }
 
@@ -48,13 +34,8 @@ export const createProject = async (req, res) => {
       name,
       description,
       deadline: deadline || null,
-<<<<<<< HEAD
-      createdBy: creatorId, 
-      members: initialMembers, 
-=======
       createdBy: creatorId,
       members: initialMembers,
->>>>>>> main
     });
     await project.save();
     res.status(201).json({ success: true, message: "Project created successfully", data: project });
@@ -248,8 +229,6 @@ export const getProjectActivities = async (req, res) => {
     res.status(500).json({ success: false, error: "ServerError", message: error.message });
   }
 };
-<<<<<<< HEAD
-=======
 
 // GET /projects/pending-requests
 // Hàm này quét tất cả dự án, tìm thành viên có status = "PENDING"
@@ -281,4 +260,3 @@ export const getPendingRequests = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
->>>>>>> main

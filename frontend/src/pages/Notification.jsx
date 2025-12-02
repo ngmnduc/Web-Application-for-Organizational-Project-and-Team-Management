@@ -1,233 +1,248 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 import { 
-    ChevronDownIcon, 
-    BellIcon, 
     CheckIcon,
-    CalendarIcon, 
     ChatBubbleLeftIcon, 
     ClockIcon, 
     ClipboardDocumentListIcon, 
-    CheckCircleIcon, 
     UserGroupIcon,
     ExclamationTriangleIcon,
+    BellIcon
 } from '@heroicons/react/24/outline'; 
 import { CheckCircleIcon as SolidCheckCircleIcon } from '@heroicons/react/24/solid';
+
 import { EmptyState } from '../components/EmptyState';
 import { LoaderOverlay } from '../components/LoaderOverlay';
 import { ErrorState } from '../components/ErrorState';
-import { mockNotifications } from '../mocks/notifications';
+import { usePollingNotifications } from '../hooks/usePollingNotifications';
+import { markAsRead, markAllAsRead } from '../services/notificationService';
+import { useAuth } from '../services/AuthContext'; 
 
-const PRIMARY_COLOR = '#f35640'; 
 
-// ---Notification Item Component---
-const NotificationItem = ({ type, project, task, sender, time, unread = true, avatarUrl }) => {
-    let title, Icon, iconColor, content, iconBgColor; 
+// --- Helper: Xác định Base Path dựa trên Role (Phân quyền) ---
+// Nếu là Admin thì thêm prefix /admin, ngược lại để trống
+const getBasePath = (role) => {
+    return role === 'Admin' ? '/admin' : '';
+};
 
-    // Gán icon và nội dung dựa trên loại thông báo
-    switch (type) {
-        case 'assigned':
-            Icon = UserGroupIcon;
-            iconColor = 'text-purple-500';
-            iconBgColor = 'bg-purple-100'; 
-            title = `You were assigned to Task "${task}"`;
-            content = `${sender} assigned you to this task in ${project} project`;
-            break;
-        case 'mention':
-            Icon = ChatBubbleLeftIcon;
+// --- Helper: Chuẩn hóa dữ liệu từ Backend sang UI Frontend ---
+// Chuyển đổi các type của Backend (MENTION, ASSIGNED...) thành Title/Icon hiển thị
+const normalizeNotification = (beData) => {
+    let icon = BellIcon;
+    let iconColor = 'text-gray-500';
+    let iconBg = 'bg-gray-100';
+    let title = "New Notification";
+    let content = beData.payload; // Backend trả về nội dung text trong field 'payload'
+
+    switch (beData.type) {
+        case 'MENTION':
+            icon = ChatBubbleLeftIcon;
             iconColor = 'text-blue-500';
-            iconBgColor = 'bg-blue-100'; 
-            title = `${sender} mentioned you in a comment`;
-            content = `@You Great work on the API integration! Can you review the documentation?`;
+            iconBg = 'bg-blue-100';
+            title = "You were mentioned";
             break;
-        case 'due_soon':
-            Icon = ClockIcon;
+        case 'ASSIGNED':
+            icon = UserGroupIcon;
+            iconColor = 'text-purple-500';
+            iconBg = 'bg-purple-100';
+            title = "Task Assignment";
+            break;
+        case 'DUE_SOON':
+            icon = ClockIcon;
             iconColor = 'text-yellow-500';
-            iconBgColor = 'bg-yellow-100'; 
-            title = `Task "${task}" is due soon`;
-            content = `This task is due tomorrow at 5:00 PM`;
+            iconBg = 'bg-yellow-100';
+            title = "Task Due Soon";
             break;
-        case 'completed':
-            Icon = SolidCheckCircleIcon;
+        case 'COMPLETED':
+            icon = SolidCheckCircleIcon;
             iconColor = 'text-green-500';
-            iconBgColor = 'bg-green-100'; 
-            title = `${sender} completed "${task}"`;
-            content = `${sender} marked as complete in ${project} project`;
-            break;
-        case 'comment':
-            Icon = ChatBubbleLeftIcon;
-            iconColor = 'text-indigo-500';
-            iconBgColor = 'bg-indigo-100'; 
-            title = `New comment on "User Authentication"`;
-            content = `${sender}: I've updated the security requirements. Please review.`;
+            iconBg = 'bg-green-100';
+            title = "Task Completed";
             break;
         default:
-            Icon = ClipboardDocumentListIcon;
-            iconColor = 'text-gray-500';
-            iconBgColor = 'bg-gray-100'; 
-            title = "New Notification";
-            content = "This is a generic notification message.";
+            break;
     }
+
+    return {
+        ...beData,
+        ui: { icon, iconColor, iconBg, title, content }
+    };
+};
+
+// --- Component hiển thị 1 dòng thông báo ---
+const NotificationItem = ({ data, onClick }) => {
+    const { read, createdAt } = data;
+    const { icon: Icon, iconColor, iconBg, title, content } = data.ui;
+
+    // Format thời gian sang kiểu Anh-Mỹ
+    const timeString = new Date(createdAt).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
     return (
-        <div className={`flex items-start p-4 hover:bg-gray-50 transition border-b border-gray-100 ${unread ? 'bg-white' : 'bg-gray-50'}`}>
-            {/* Icon với màu nền */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgColor} ${iconColor}`}>
+        <div 
+            onClick={() => onClick(data)} 
+            className={`flex items-start p-4 hover:bg-gray-50 transition border-b border-gray-100 cursor-pointer ${!read ? 'bg-white' : 'bg-gray-50'}`}
+        >
+            {/* Icon đại diện */}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${iconBg} ${iconColor}`}>
                 <Icon className="w-5 h-5" />
             </div>
 
-            {/* Content */}
+            {/* Nội dung text */}
             <div className="flex-1 ml-4 flex flex-col">
-                <p className="text-sm font-medium text-gray-900 cursor-pointer hover:text-red-600 transition">
+                <p className={`text-sm ${!read ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}`}>
                     {title}
                 </p>
-                <p className="text-sm text-gray-600 mt-0.5 whitespace-pre-wrap">
+                <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
                     {content}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                    {time}
+                    {timeString}
                 </p>
             </div>
 
-            {/* Icon Trạng thái / Unread Dot */}
+            {/* Dấu chấm xanh (Chưa đọc) */}
             <div className="w-5 flex justify-end">
-                {unread ? (
-                    <div className="w-2 h-2 rounded-full bg-green-500 mt-2" />
-                ) : (
-                    <div className="w-2 h-2 rounded-full bg-gray-300 mt-2" />
+                {!read && (
+                    <div className="w-2 h-2 rounded-full bg-green-500 mt-2" title="Unread" />
                 )}
             </div>
         </div>
     );
 };
 
-// ---Notification List Panel---
+// --- Component Danh sách chính (Notification List) ---
 const NotificationList = () => {
-
-    const [filter, setFilter] = useState('All'); // 'All' | 'Unread'
-    const [isLoading, setIsLoading] = useState(true); // <-- Bắt đầu bằng true
-    const [isError, setIsError] = useState(false);
-    const [notifications, setNotifications] = useState([]);
-    React.useEffect(() => {
-        setIsLoading(true);
-        setIsError(false);
-        const timer = setTimeout(() => {
-            // Bản dữ liệu thành công
-            setNotifications(mockNotifications); 
-            setIsLoading(false);
-
-            // Bản lỗi
-            //setIsError(true);
-            //setIsLoading(false);
-
-            // Bản không có thông báo
-            //setNotifications([]); 
-            //setIsLoading(false);
-        }, 1500);
-        return () => clearTimeout(timer);
-    }, []);    
+    const [filter, setFilter] = useState('All'); 
+    const navigate = useNavigate();
     
-    const handleMarkAllRead = () => {
-        console.log("Marking all notifications as read...");
-        const allRead = notifications.map(n => ({ ...n, unread: false }));
-        setNotifications(allRead);
-    };
-    
-    // Lọc dựa trên state 'notifications'
-    const filteredNotifications = notifications.filter(n => 
-        filter === 'All' || (filter === 'Unread' && n.unread)
-    );
-    
-    // Đếm số lượng 'unread' từ state
-    const unreadCount = notifications.filter(n => n.unread).length;
+    // Lấy user từ Context để xác định đường dẫn redirect (Admin hay Member)
+    const { user } = useAuth(); 
+    const basePath = getBasePath(user?.role);
 
-    // Nút tab filter
-    const FilterButton = ({ label, currentFilter, onClick }) => {
-        const isActive = label === currentFilter;
-        return (
-            <button
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    isActive 
-                        ? 'text-white shadow-md' 
-                        : 'text-gray-700 hover:bg-gray-100'
-                }`}
-                style={isActive ? { backgroundColor:'var(--color-brand)' } : {}}
-                onClick={() => onClick(label)}
-            >
-                {label}
-                {label === 'Unread' && unreadCount > 0 && ( // Chỉ hiển thị count nếu > 0
-                    <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-600" style={{ color: 'var(--color-brand)', backgroundColor: '#fee2e2' }}>
-                        {unreadCount}
-                    </span>
-                )}
-            </button>
-        );
-    }
-    const renderContent = () => {
-        // Trạng thái Loading
-        if (isLoading) {
-            // LoaderOverlay sẽ che phủ toàn bộ khu vực của nó
-            return <LoaderOverlay />;
+    // Sử dụng Hook Polling thật (Gọi API mỗi 30s)
+    const { notifications, unreadCount, isLoading, isError, refresh } = usePollingNotifications(30000);
+
+    // --- XỬ LÝ CLICK VÀO THÔNG BÁO (QUAN TRỌNG) ---
+    const handleNotificationClick = async (item) => {
+        
+        if (item.taskId) {
+            // Tạo URL params để truyền "tín hiệu" sang trang My Tasks
+            const params = new URLSearchParams();
+            
+            // Tín hiệu 1: Mở Modal của Task này
+            params.set('openTask', item.taskId); 
+            
+            // Tín hiệu 2: Nếu là Comment/Mention -> Cuộn xuống phần comment trong modal
+            if (item.type === 'MENTION' || item.type === 'COMMENT') {
+                params.set('action', 'focus_comment'); 
+            }
+
+            // Chuyển trang kèm params: /tasks?openTask=...&action=...
+            navigate(`${basePath}/tasks?${params.toString()}`);
+        } 
+        else if (item.type === 'PROJECT_INVITE') {
+            // Nếu là lời mời vào dự án -> Chuyển về trang Projects
+            navigate(`${basePath}/projects`);
+        } 
+        else {
+            // Mặc định về Dashboard nếu không biết đi đâu
+            navigate(`${basePath}/home`);
         }
 
-        // Trạng thái Error
+        // 2. Gọi API đánh dấu đã đọc (Chạy ngầm - Background)
+        if (!item.read) {
+            try {
+                await markAsRead(item._id);
+                refresh(); // Cập nhật lại số trên Navbar sau khi gọi xong
+            } catch (error) {
+                console.error("Failed to mark read", error);
+            }
+        }
+    };
+
+    // Xử lý nút "Đánh dấu tất cả đã đọc"
+    const handleMarkAllRead = async () => {
+        await markAllAsRead(notifications);
+        refresh();
+    };
+    
+    // Lọc danh sách hiển thị (Tất cả / Chưa đọc)
+    const displayNotifications = notifications
+        .map(normalizeNotification)
+        .filter(n => filter === 'All' || (filter === 'Unread' && !n.read));
+
+    // Button chuyển đổi bộ lọc
+    const FilterButton = ({ label, active, onClick }) => (
+        <button
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                active ? 'text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'
+            }`}
+            style={active ? { backgroundColor: 'var(--color-brand)' } : {}}
+            onClick={() => onClick(label)}
+        >
+            {label}
+            {label === 'Unread' && unreadCount > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-white text-red-600">
+                    {unreadCount}
+                </span>
+            )}
+        </button>
+    );
+
+    // Hàm render nội dung chính
+    const renderContent = () => {
+        if (isLoading && notifications.length === 0) return <LoaderOverlay />;
+        
         if (isError) {
             return (
                 <ErrorState 
                     icon={<ExclamationTriangleIcon className="w-12 h-12 text-red-400" />}
-                    title="Could not load notifications"
-                    message="An error occurred while fetching data. Please try again later."
+                    title="Connection Error"
+                    message="Could not load notifications."
+                    onRetry={refresh}
                 />
             );
         }
 
-        // Trạng thái Rỗng (Không có thông báo nào)
-        if (filteredNotifications.length === 0) {
-            // Phân biệt lý do rỗng (do filter hay do không có data)
-            const emptyTitle = (notifications.length === 0) 
-                ? "No notifications yet" 
-                : "You are all caught up!";
-            
-            const emptyMessage = (notifications.length === 0)
-                ? "New notifications will appear here."
-                : (filter === 'Unread' ? 'No unread notifications.' : 'No new notifications.');
-
+        if (displayNotifications.length === 0) {
             return (
                 <EmptyState 
                     icon={<CheckIcon className="w-12 h-12 text-green-400" />}
-                    title={emptyTitle}
-                    message={emptyMessage}
+                    title="All caught up!"
+                    message={filter === 'Unread' ? "No unread notifications." : "You have no notifications."}
                 />
             );
         }
 
-        // 4. Trạng thái có dữ liệu
-        return (
-            filteredNotifications.map(n => (
-                <NotificationItem 
-                    key={n.id}
-                    {...n}
-                />
-            ))
-        );
-    }
+        return displayNotifications.map(n => (
+            <NotificationItem 
+                key={n._id}
+                data={n}
+                onClick={handleNotificationClick}
+            />
+        ));
+    };
 
     return (
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 flex flex-col min-h-[70vh]">
-            {/* Header: Filters and Mark All Read */}
+            {/* Header: Bộ lọc và nút Đánh dấu tất cả */}
             <div className="flex justify-between items-center p-4 border-b border-gray-100">
                 <div className="flex space-x-3">
-                    <FilterButton label="All" currentFilter={filter} onClick={setFilter} />
-                    <FilterButton label="Unread" currentFilter={filter} onClick={setFilter} />
+                    <FilterButton label="All" active={filter === 'All'} onClick={setFilter} />
+                    <FilterButton label="Unread" active={filter === 'Unread'} onClick={setFilter} />
                 </div>
                 <button 
-                    className="text-sm font-medium text-gray-500 hover:text-red-600 transition"
-                    onClick={handleMarkAllRead} 
-                    disabled={isLoading || isError} // Vô hiệu hóa nút khi đang tải/lỗi
+                    className="text-sm font-medium text-gray-500 transition hover:text-[var(--color-brand)]"
+                    onClick={handleMarkAllRead}
+                    disabled={unreadCount === 0}
                 >
                     Mark all as read
                 </button>
             </div>
 
-            {/* List (Nội dung động) */}
+            {/* Danh sách thông báo (Cuộn dọc) */}
             <div className="flex-1 overflow-y-auto">
                 {renderContent()}
             </div>
@@ -235,17 +250,15 @@ const NotificationList = () => {
     );
 };
 
-// ---Notification Page Component---
+// --- Component Trang Notification (Wrapper) ---
 const Notification = () => {
     return (
         <div className="flex-1 p-6 md:p-8 lg:p-10 bg-gray-50 min-h-screen">
-            {/* Nội dung chính: Danh sách thông báo */}
             <div className="max-w-4xl mx-auto"> 
                 <NotificationList />
             </div>
         </div>
     );
 }
-
 
 export default Notification;

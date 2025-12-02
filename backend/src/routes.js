@@ -61,10 +61,6 @@ router.patch("/projects/:id/archive", verifyToken, checkRole(ROLES.ADMIN, ROLES.
 router.get("/projects/:id/summary", verifyToken, getProjectSummary);
 router.get("/projects/:id/activities", verifyToken, getProjectActivities);
 
-<<<<<<< HEAD
-// Users (admin)
-router.get("/users", verifyToken, listUsers); // bỏ checkrole để member cũng xem được
-=======
 // Project Members
 router.get("/projects/:id/members", verifyToken, getMembers);
 router.post("/projects/:id/members", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, addMember);
@@ -81,6 +77,5 @@ router.delete("/projects/:id/labels/:labelId", verifyToken, checkRole(ROLES.ADMI
 // Users
 router.get("/users", verifyToken, listUsers); // Member cũng có thể xem danh sách users
 router.get("/users/search", verifyToken, searchUsers);
->>>>>>> main
 
 export default router;

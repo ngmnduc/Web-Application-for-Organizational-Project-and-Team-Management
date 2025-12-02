@@ -15,7 +15,6 @@ import { ErrorState } from '../components/ErrorState';
 import { EmptyState } from '../components/EmptyState';
 import NewProjectModal from '../components/NewProjectModal'; 
 
-const PRIMARY_COLOR = '#f35640'; 
 const API_BASE_URL = 'http://localhost:4000/api';
 
 // --- Sub-component: Notification Banner ---
@@ -67,7 +66,7 @@ const ProgressBar = ({ progress }) => (
             className="h-1.5 rounded-full" 
             style={{ 
                 width: `${progress}%`,
-                backgroundColor: PRIMARY_COLOR 
+                backgroundColor: progress < 50 ? '#f97316' : (progress < 80 ? '#facc15' : '#22c55e') 
             }}
         ></div>
     </div>
