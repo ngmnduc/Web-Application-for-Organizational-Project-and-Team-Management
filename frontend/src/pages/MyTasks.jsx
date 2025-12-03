@@ -51,7 +51,7 @@ const PriorityBadge = ({ level }) => {
 // ===== Kanban Card =====
 const KanbanCard = ({ task, onOpenDetail }) => {
   return (
-    <button
+    <div
       type="button"
       onClick={() => onOpenDetail(task)}
       className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition"
@@ -102,7 +102,7 @@ const KanbanCard = ({ task, onOpenDetail }) => {
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 };
 
@@ -261,8 +261,18 @@ const MyTasks = () => {
 
   // Drag & Drop
   const handleDragEnd = async ({ source, destination, draggableId }) => {
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+  // 1. Check cơ bản
+  if (!destination) return;
+  if (
+    source.droppableId === destination.droppableId &&
+    source.index === destination.index
+  ) return;
+  // 1. Check cơ bản
+  if (!destination) return;
+  if (
+    source.droppableId === destination.droppableId &&
+    source.index === destination.index
+  ) return;
 
     const destColumnId = destination.droppableId;
     const apiStatus = STATUS_API_MAP[destColumnId] || 'TODO';
