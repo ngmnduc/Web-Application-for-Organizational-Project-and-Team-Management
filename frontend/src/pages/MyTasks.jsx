@@ -1,110 +1,156 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import { getProjects } from '../services/projectService';
+import { ChevronDownIcon, PlusIcon, FunnelIcon, UserIcon, TagIcon, XMarkIcon, FolderIcon } from '@heroicons/react/24/outline'; // Thêm FolderIcon
 import { 
   ClipboardDocumentListIcon as TotalSolid, 
-  ClockIcon as ClockSolid,
+  ClockIcon as ClockSolid, 
   ArrowPathIcon as ProgressSolid, 
   CheckCircleIcon as DoneSolid,
   ExclamationTriangleIcon as WarningSolid, 
 } from '@heroicons/react/24/solid';
 
-import { useNavigate } from 'react-router-dom';
-
-// ===== Kanban drag & drop =====
+import { useNavigate, useLocation } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-// ===== end =====
 
 import TaskSummary from '../components/TaskSummary';
-import { getTasksByProject, updateTaskStatus } from '../services/taskService';
+import { getProjects } from '../services/projectService';
+import { getTasksByProject, updateTaskStatus, createTask, reorderTask, getProjectMembers } from '../services/taskService';
+import { useAuth } from '../services/AuthContext';
 
-// ======= Kanban Card  =======
+// ===== Helper: Format Date =====
+const formatDate = (dateString) => {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); 
+};
+
+// ===== Helper: Get Initials =====
+const getInitials = (name) => {
+  if (!name) return '??';
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+// ===== Badge priority  =====
 const PriorityBadge = ({ level }) => {
+  const normalizedLevel = level ? level.charAt(0).toUpperCase() + level.slice(1).toLowerCase() : 'Medium';
   const map = {
-    High:   { bg: 'bg-red-100', text: 'text-red-600' },
-    Medium: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-    Low:    { bg: 'bg-green-100', text: 'text-green-700' },
+    High:     { bg: 'bg-red-100', text: 'text-red-600' },
+    Critical: { bg: 'bg-red-200', text: 'text-red-800' },
+    Medium:   { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+    Low:      { bg: 'bg-green-100', text: 'text-green-700' },
   };
-  const c = map[level] ?? map.Medium;
+  const c = map[normalizedLevel] ?? map.Medium;
   return (
     <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${c.bg} ${c.text}`}>
-      {level}
+      {normalizedLevel}
     </span>
   );
 };
 
-const KanbanCard = ({ task }) => {
+// ===== Kanban Card =====
+const KanbanCard = ({ task, onOpenDetail }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition">
-      {/* dòng badge */}
-      <div className="flex items-center gap-2 mb-2">
+    <div
+      type="button"
+      onClick={() => onOpenDetail(task)}
+      className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition"
+    >
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
         <PriorityBadge level={task.priority} />
+        {task.labels && task.labels.map((lbl, idx) => (
+          <span key={idx} className="text-xs px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
+            {lbl}
+          </span>
+        ))}
         {task.dueSoon && (
           <span className="text-xs px-2 py-0.5 rounded-md bg-orange-100 text-orange-700">
-            1 day left
+            Due soon
           </span>
         )}
       </div>
-      {/* title */}
-      <h4 className="font-semibold text-gray-800 leading-snug">
+
+      <h4 className="font-semibold text-gray-800 leading-snug line-clamp-2">
         {task.title}
       </h4>
 
-      {/* meta */}
       <div className="mt-3 flex items-center justify-between text-sm">
         <div className="flex items-center gap-3 text-gray-500">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" title="Due Date">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <span>{task.due}</span>
           </div>
-          <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-md ${
-            task.projectColor ?? 'bg-blue-50 text-blue-700'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-current opacity-60" />
-            {task.project}
-          </span>
+          {task.project && (
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 max-w-[100px] truncate">
+                <span className="w-2 h-2 rounded-full bg-current opacity-60 flex-shrink-0" />
+                {task.project}
+            </span>
+          )}
         </div>
-        <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs font-semibold">
-          {task.assignee}
+        
+        {/* Avatar Assignee */}
+        <div 
+            className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs font-semibold overflow-hidden border border-gray-200" 
+            title={task.assignee}
+        >
+          {task.assigneeAvatar ? (
+             <img src={task.assigneeAvatar} alt={task.assignee} className="w-full h-full object-cover" />
+          ) : (
+             <span>{getInitials(task.assignee !== 'Unassigned' ? task.assignee : '?')}</span>
+          )}
         </div>
       </div>
     </div>
   );
 };
-// ======= end Kanban Card =======
 
-
-// --- MyTasks Component ---
+// ===== MyTasks =====
 const MyTasks = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // ====== FILTER UI  ======
-  const filterOptions = [
-    { label: 'All statuses', active: true },
-    { label: 'Me', active: false },
-    { label: 'All projects', active: false },
-    { label: 'All', active: false },
-  ];
+  const currentUser = {
+    id: user?._id,
+    role: user?.role || 'Member',
+    name: user?.name || user?.fullname || 'User',
+  };
+
+  const roleUpper = (currentUser.role || '').toUpperCase();
+  const isManagerOrAdmin = ['ADMIN', 'MANAGER', 'SUPER ADMIN'].includes(roleUpper);
+  const canManageTasks = isManagerOrAdmin;
+
+  const canDragTask = (task) => {
+    if (isManagerOrAdmin) return true;
+    if (!task.assigneeId || !currentUser.id ) return false;
+    return task.assigneeId === currentUser.id;
+  };
 
   const columns = [
-    { id: 'Backlog', label: 'Backlog' },
-    { id: 'Todo', label: 'Todo' },
-    { id: 'In Progress', label: 'In Progress' },
-    { id: 'Done', label: 'Done' },
+    { id: 'Backlog',      label: 'Backlog' },
+    { id: 'Todo',         label: 'Todo' },
+    { id: 'In Progress',  label: 'In Progress' },
+    { id: 'Done',         label: 'Done' },
   ];
 
-  // ====== LOCAL STATE tuần 2 ======
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEmpty, setIsEmpty] = useState(false);
   const [error, setError] = useState(null);
+  
+  // State quản lý dự án
+  const [projectsList, setProjectsList] = useState([]); // Danh sách tất cả dự án
+  const [currentProjectId, setCurrentProjectId] = useState(null); // ID dự án đang chọn
+  
+  const [filters, setFilters] = useState({ label: '', assignee: '' });
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newTaskForm, setNewTaskForm] = useState({
+    title: '', description: '', assigneeId: '', assigneeName: '',
+    priority: 'MEDIUM', status: 'TODO', dueDate: '', labels: '',
+  });
 
-  // đổi thành id thật)
-  const [currentProjectId, setCurrentProjectId] = useState(null);
-
-  // Map status backend <-> UI columns
   const STATUS_COLUMN_MAP = {
     TODO: 'Todo',
     DOING: 'In Progress',
@@ -113,39 +159,61 @@ const MyTasks = () => {
   };
 
   const STATUS_API_MAP = {
-    'Backlog': 'BACKLOG',
-    'Todo': 'TODO',
+    Backlog: 'BACKLOG',
+    Todo: 'TODO',
     'In Progress': 'DOING',
-    'Done': 'DONE',
+    Done: 'DONE',
   };
 
-  // ===== Lấy danh sách Project để tìm ID dự án =====
+  // --- LOGIC MỚI: Tự động lấy dự án đầu tiên ---
   useEffect(() => {
-    const fetchFirstProject = async () => {
+    const fetchProjects = async () => {
       try {
-        const projects = await getProjects(); // Gọi API Get Projects
+        const projects = await getProjects();
+        console.log("🔥 Danh sách Projects:", projects); 
+        
+        // Lưu danh sách dự án vào state để render dropdown
+        setProjectsList(projects || []);
+
         if (projects && projects.length > 0) {
-          // Lấy ID của dự án đầu tiên
-          console.log("Found Project ID:", projects[0]._id);
-          setCurrentProjectId(projects[0]._id);
+          // Lấy ID của dự án đầu tiên làm mặc định
+          const firstProjectId = projects[0]._id;
+          console.log("👉 Auto-select Project ID:", firstProjectId);
+          setCurrentProjectId(firstProjectId);
         } else {
-          // Không có dự án nào
-          setIsLoading(false);
+          console.warn("⚠️ Không tìm thấy dự án nào.");
+          // Có thể set null hoặc xử lý trạng thái Empty State cho toàn trang
           setIsEmpty(true);
         }
       } catch (err) {
         console.error("Failed to load projects", err);
-        setError("Could not load projects. Please try again.");
-        setIsLoading(false);
+        setError("Failed to load projects.");
       }
     };
-
-    fetchFirstProject();
+    fetchProjects();
   }, []);
-
-  // có currentProjectId -> Fetch Tasks
+  
+  // 2. Lấy Members & Fill Dropdown
   useEffect(() => {
-    // Nếu chưa có ID project, không làm gì cả
+    if (!currentProjectId) return;
+    const fetchMembers = async () => {
+        try {
+            const members = await getProjectMembers(currentProjectId);
+            // Normalize member data
+            const formattedMembers = members.map(m => ({
+                id: m.user?._id || m.user || m._id, 
+                name: m.user?.name || m.name || 'Unnamed Member'
+            }));
+            setProjectMembers(formattedMembers);
+        } catch (err) {
+            console.error("Failed to load members:", err);
+        }
+    }
+    fetchMembers();
+  }, [currentProjectId]);
+
+  // 3. FETCH TASKS THẬT
+  useEffect(() => {
     if (!currentProjectId) return;
 
     const fetchTasks = async () => {
@@ -153,240 +221,375 @@ const MyTasks = () => {
         setIsLoading(true);
         setError(null);
 
-        // Gọi API với ID động
-        const apiTasks = await getTasksByProject(currentProjectId);
+        const apiTasks = await getTasksByProject(currentProjectId, filters);
 
-        const normalized = (apiTasks || []).map((t) => ({
-          id: t.id || t._id, // tuỳ backend
-          title: t.title || t.name || 'Untitled task',
-          status: STATUS_COLUMN_MAP[t.status] || 'Todo',
-          priority: (t.priority || 'Medium')[0].toUpperCase() + (t.priority || 'Medium').slice(1).toLowerCase(),
-          due: t.dueDate || t.due || '—',
-          project: t.projectName || 'Project',
-          assignee: t.assigneeInitials || t.assignee || '??',
-          dueSoon: t.dueSoon || false,
-        }));
+        const normalized = (apiTasks || []).map((t) => {
+            const assigneeObj = t.assigneeId; 
+            const assigneeName = assigneeObj ? assigneeObj.name : 'Unassigned';
+            const assigneeId = assigneeObj ? assigneeObj._id : null;
+            const projectName = t.projectId ? t.projectId.name : 'Unknown Project';
+            const isDueSoon = t.dueDate ? (new Date(t.dueDate) - new Date() < 86400000 && new Date(t.dueDate) > new Date()) : false;
+
+            return {
+                id: t._id,
+                title: t.title || 'Untitled task',
+                description: t.description || '',
+                status: STATUS_COLUMN_MAP[t.status] || 'Todo',
+                priority: t.priority || 'Medium',
+                due: formatDate(t.dueDate),
+                project: projectName,
+                assignee: assigneeName,
+                assigneeId: assigneeId,
+                dueSoon: isDueSoon,
+                labels: t.labels || [], 
+                position: t.orderIndex || 0,
+            };
+        });
 
         setTasks(normalized);
         setIsEmpty(normalized.length === 0);
       } catch (err) {
         console.error('Failed to load tasks', err);
-
-        // Nếu backend trả 401 => logout 
-        const status = err?.status || err?.response?.status;
-        if (status === 401) {
-          // Xóa token
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          navigate('/login');
-          return;
-        }
-
-        setError(err?.response?.data?.message || err?.error?.message || 'Failed to load tasks');
-        setIsEmpty(true);
+        setError('Failed to load tasks');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchTasks();
-  }, [currentProjectId, navigate]);
+  }, [currentProjectId, navigate, filters]);
 
-  // ===== Drag & Drop + PATCH status =====
+  // Drag & Drop
   const handleDragEnd = async ({ source, destination, draggableId }) => {
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+  // 1. Check cơ bản
+  if (!destination) return;
+  if (
+    source.droppableId === destination.droppableId &&
+    source.index === destination.index
+  ) return;
+  // 1. Check cơ bản
+  if (!destination) return;
+  if (
+    source.droppableId === destination.droppableId &&
+    source.index === destination.index
+  ) return;
 
-    const newStatusColumn = destination.droppableId;
-    const apiStatus = STATUS_API_MAP[newStatusColumn] || 'TODO';
+    const destColumnId = destination.droppableId;
+    const apiStatus = STATUS_API_MAP[destColumnId] || 'TODO';
 
-    const currentTask = tasks.find(t => t.id === draggableId);
-    if (!currentTask) return;
+    const destTasks = tasks
+        .filter(t => t.status === destColumnId)
+        .filter(t => t.id !== draggableId)
+        .sort((a, b) => a.position - b.position);
 
-    // Optimistic update
-    setTasks(prev =>
-      prev.map(t => (t.id === draggableId ? { ...t, status: newStatusColumn } : t))
-    );
+    let newPosition;
+    const destIndex = destination.index;
+    const prevTask = destTasks[destIndex - 1]; 
+    const nextTask = destTasks[destIndex];
+    const BUFFER = 10000; 
+
+    if (!prevTask && !nextTask) newPosition = BUFFER; 
+    else if (!prevTask) newPosition = nextTask.position / 2;
+    else if (!nextTask) newPosition = prevTask.position + BUFFER;
+    else newPosition = (prevTask.position + nextTask.position) / 2;
+
+    const updatedTasks = tasks.map(t => {
+        if (t.id === draggableId) {
+            return { ...t, status: destColumnId, position: newPosition };
+        }
+        return t;
+    });
+    setTasks(updatedTasks);
 
     try {
-      await updateTaskStatus(draggableId, apiStatus);
+        await reorderTask(draggableId, apiStatus, newPosition);
     } catch (err) {
-      console.error('Failed to update task status', err);
-
-      const status = err?.status || err?.response?.status;
-      if (status === 401) {
-        // nếu bị hết hạn login → logout
-        navigate('/login');
-        return;
-      }
-
-      setError(err?.error?.message || 'Failed to update task status');
-
-      // rollback
-      setTasks(prev =>
-        prev.map(t => (t.id === draggableId ? { ...t, status: source.droppableId } : t))
-      );
+        console.error('Reorder failed', err);
+        setError("Failed to save new order");
     }
   };
 
-  // ===== Sort tasks by priority (High -> Medium -> Low) =====
-  const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+  const sortTasks = (a, b) => a.position - b.position;
 
-  const sortTasks = (a, b) => {
-    const pa = PRIORITY_ORDER[a.priority] ?? 99;
-    const pb = PRIORITY_ORDER[b.priority] ?? 99;
-    if (pa !== pb) return pa - pb;
-    return (a.due || '').localeCompare(b.due || '');
-  };
-  // ===== end sort =====
-
-  // ===== Dynamic summary (tính từ tasks thật) =====
+  // Summary Counts
   const totalCount = tasks.length;
-  const todoCount = tasks.filter(t => t.status === 'Todo').length;
-  const inProgressCount = tasks.filter(t => t.status === 'In Progress').length;
-  const doneCount = tasks.filter(t => t.status === 'Done').length;
-  const dueSoonCount = tasks.filter(t => t.dueSoon === true).length;
+  const todoCount = tasks.filter((t) => t.status === 'Todo').length;
+  const inProgressCount = tasks.filter((t) => t.status === 'In Progress').length;
+  const doneCount = tasks.filter((t) => t.status === 'Done').length;
+  const dueSoonCount = tasks.filter((t) => t.dueSoon === true).length;
 
   const summaryData = [
-    { 
-      number: totalCount, 
-      label: 'Total', 
-      icon: <TotalSolid />, 
-      iconColor: "text-gray-500", 
-      bgColor: "bg-gray-100", 
-      textColor: "text-gray-800" 
-    },
-    { 
-      number: todoCount, 
-      label: 'Todo', 
-      icon: <ClockSolid />, 
-      iconColor: "text-gray-500", 
-      bgColor: "bg-gray-100", 
-      textColor: "text-gray-600" 
-    },
-    { 
-      number: inProgressCount, 
-      label: 'In Progress', 
-      icon: <ProgressSolid />, 
-      iconColor: "text-blue-500", 
-      bgColor: "bg-blue-100", 
-      textColor: "text-blue-600" 
-    },
-    { 
-      number: doneCount, 
-      label: 'Done', 
-      icon: <DoneSolid />, 
-      iconColor: "text-green-500", 
-      bgColor: "bg-green-100", 
-      textColor: "text-green-600" 
-    },
-    { 
-      number: dueSoonCount, 
-      label: '1 day left', 
-      icon: <WarningSolid />, 
-      iconColor: "text-orange-500", 
-      bgColor: "bg-orange-100", 
-      textColor: "text-orange-600" 
-    },
+    { number: totalCount,     label: 'Total',      icon: <TotalSolid />,    iconColor: 'text-gray-500',   bgColor: 'bg-gray-100',   textColor: 'text-gray-800' },
+    { number: todoCount,      label: 'Todo',       icon: <ClockSolid />,    iconColor: 'text-gray-500',   bgColor: 'bg-gray-100',   textColor: 'text-gray-600' },
+    { number: inProgressCount,label: 'In Progress',icon: <ProgressSolid />, iconColor: 'text-blue-500',   bgColor: 'bg-blue-100',   textColor: 'text-blue-600' },
+    { number: doneCount,      label: 'Done',       icon: <DoneSolid />,     iconColor: 'text-green-500',  bgColor: 'bg-green-100',  textColor: 'text-green-600' },
+    { number: dueSoonCount,   label: 'Due soon', icon: <WarningSolid />,  iconColor: 'text-orange-500', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
   ];
-  
+
+  // Create Task
+  const openCreateModal = (statusColumn = 'Todo') => {
+    if (!canManageTasks) return;
+    setNewTaskForm({
+      title: '', description: '', assigneeId: currentUser.id, assigneeName: currentUser.name,
+      priority: 'MEDIUM', status: STATUS_API_MAP[statusColumn] || 'TODO', dueDate: '', labels: '',
+    });
+    setIsCreateOpen(true);
+  };
+
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        title: newTaskForm.title,
+        description: newTaskForm.description,
+        assigneeId: newTaskForm.assigneeId,
+        priority: newTaskForm.priority,
+        status: newTaskForm.status,
+        dueDate: newTaskForm.dueDate,
+      };
+
+      const created = await createTask(currentProjectId, payload);
+      
+      const uiTask = {
+        id: created._id,
+        title: created.title,
+        description: created.description,
+        status: STATUS_COLUMN_MAP[created.status],
+        priority: created.priority,
+        due: formatDate(created.dueDate),
+        project: "Current Project", 
+        assignee: projectMembers.find(m => m.id === created.assigneeId)?.name || 'Unassigned',
+        assigneeId: created.assigneeId,
+        dueSoon: false,
+        labels: [],
+        position: created.orderIndex, 
+      };
+
+      setTasks((prev) => [...prev, uiTask]);
+      setIsEmpty(false);
+      setIsCreateOpen(false);
+    } catch (err) {
+      console.error('Failed to create task', err);
+      setError('Failed to create task');
+    }
+  };
+
+  const openTaskDetail = (task) => {
+    if (!task?.id) return;
+    const role = (currentUser.role || "").toUpperCase();
+    const isAdminRole = role === "ADMIN" || role === "SUPER ADMIN"; 
+    const basePath = isAdminRole ? "/admin/tasks" : "/tasks";
+    navigate(`${basePath}/${task.id}`, { state: { task } });
+  };
+
+  const clearFilters = () => setFilters({ label: '', assignee: '' });
+  const hasActiveFilters = filters.label || filters.assignee;
 
   return (
     <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
-
-      {/* Filters Section */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        {filterOptions.map((option, index) => (
-          <button 
-            key={index}
-            className={`flex items-center space-x-1 px-3 py-1 text-sm rounded-lg border transition duration-150 shadow-sm
-              ${option.active 
-                ? 'bg-white border-blue-500 text-blue-600'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100' 
-              }`}
-          >
-            <span>{option.label}</span>
-            <ChevronDownIcon className="w-4 h-4 text-gray-500" />
-          </button>
-        ))}
-      </div>
-      <div className="border-t border-gray-200 mb-8"></div>
-
-      {/* Task Summary Section (Cards) */}
       <TaskSummary summaryData={summaryData} />
+      <div className="mb-6"></div>
 
-      {/* Thông báo lỗi nếu có */}
-      {error && (
-        <div className="mt-4 text-sm text-red-600">
-          {error}
+      {/* FILTER BAR & TOOLBAR */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          
+          {/* --- [MỚI] PROJECT SELECTOR --- */}
+          {/* Thay vì hardcode, ta cho phép user chọn dự án tại đây */}
+          <div className="relative">
+            <FolderIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <select
+                className="appearance-none pl-9 pr-8 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800  focus:ring-2  outline-none shadow-sm cursor-pointer hover:bg-gray-50 min-w-[180px]"
+                value={currentProjectId || ''}
+                onChange={(e) => setCurrentProjectId(e.target.value)}
+                disabled={projectsList.length === 0}
+            >
+                {projectsList.length === 0 ? (
+                    <option>No projects</option>
+                ) : (
+                    projectsList.map((p) => (
+                        <option key={p._id} value={p._id}>
+                            {p.name}
+                        </option>
+                    ))
+                )}
+            </select>
+            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
+          </div>
+
+          <div className="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+
+          {/* Label Filter */}
+          <div className="relative">
+            <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select
+                className="appearance-none pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none shadow-sm cursor-pointer hover:bg-gray-50 min-w-[140px]"
+                value={filters.label}
+                onChange={(e) => setFilters(prev => ({...prev, label: e.target.value}))}
+                disabled 
+                title="Feature coming soon"
+            >
+                <option value="">All Labels</option>
+                <option value="Bug">Bug</option>
+            </select>
+            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Assignee Filter */}
+          <div className="relative">
+            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select
+                className="appearance-none pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none shadow-sm cursor-pointer hover:bg-gray-50 min-w-[160px]"
+                value={filters.assignee}
+                onChange={(e) => setFilters(prev => ({...prev, assignee: e.target.value}))}
+            >
+                <option value="">All Assignees</option>
+                {projectMembers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                        {member.name}
+                    </option>
+                ))}
+            </select>
+            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+          </div>
+
+          {hasActiveFilters && (
+            <button 
+                onClick={clearFilters}
+                className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"
+            >
+                <XMarkIcon className="w-4 h-4" />
+                Clear
+            </button>
+          )}
         </div>
-      )}
 
-      {/* =================== KANBAN (data thật) =================== */}
+        {canManageTasks && (
+          <button
+            type="button"
+            onClick={() => openCreateModal('Todo')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-brand)] text-white text-sm font-medium shadow-sm whitespace-nowrap"
+          >
+            <PlusIcon className="w-4 h-4" />
+            New Task
+          </button>
+        )}
+      </div>
+
+      <div className="border-t border-gray-200 mb-8" />
+      {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
+
+      {/* KANBAN BOARD */}
       {isLoading ? (
-        <div className="mt-8 py-10 text-center text-gray-500 text-sm">
-          Loading tasks...
-        </div>
+        <div className="mt-8 py-10 text-center text-gray-500 text-sm">Loading tasks...</div>
       ) : (
         <>
-          {isEmpty && (
-            <div className="mt-4 text-center text-gray-400 text-sm">
-              No tasks yet for this project.
+          {isEmpty ? (
+            <div className="mt-4 text-center text-gray-400 text-sm py-10 bg-white rounded-xl border border-dashed border-gray-200">
+              {projectsList.length === 0 
+                ? "No projects found. Please create a project first." 
+                : hasActiveFilters 
+                    ? "No tasks match your filters." 
+                    : "No tasks yet for this project."}
             </div>
-          )}
-
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-              {columns.map((col) => {
-                const list = tasks
-                  .filter(t => t.status === col.id)
-                  .sort(sortTasks);
-
-                return (
-                  <div key={col.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                    {/* Header cột */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-gray-700">{col.label}</h3>
-                        <span className="text-xs text-gray-500">({list.length})</span>
-                      </div>
-                    </div>
-
-                    {/* Danh sách thẻ kéo thả */}
-                    <Droppable droppableId={col.id}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className="flex flex-col gap-3 min-h-[220px]"
-                        >
-                          {list.map((task, index) => (
-                            <Draggable draggableId={task.id} index={index} key={task.id}>
-                              {(provided) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                >
-                                  <KanbanCard task={task} />
-                                </div>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
+          ) : (
+            <DragDropContext onDragEnd={handleDragEnd}>
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                {columns.map((col) => {
+                    const list = tasks.filter((t) => t.status === col.id).sort(sortTasks);
+                    return (
+                    <div key={col.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-gray-700">{col.label}</h3>
+                                <span className="text-xs text-gray-500">({list.length})</span>
+                            </div>
                         </div>
-                      )}
-                    </Droppable>
-                  </div>
-                );
-              })}
-            </div>
-          </DragDropContext>
+                        <Droppable droppableId={col.id}>
+                        {(provided) => (
+                            <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-col gap-3 min-h-[220px]">
+                            {list.map((task, index) => {
+                                const disabled = !canDragTask(task);
+                                return (
+                                <Draggable key={task.id} draggableId={task.id} index={index} isDragDisabled={disabled}>
+                                    {(prov) => (
+                                    <div ref={prov.innerRef} {...prov.draggableProps} {...(!disabled ? prov.dragHandleProps : {})}>
+                                        <KanbanCard task={task} onOpenDetail={openTaskDetail} />
+                                    </div>
+                                    )}
+                                </Draggable>
+                                );
+                            })}
+                            {provided.placeholder}
+                            </div>
+                        )}
+                        </Droppable>
+                    </div>
+                    );
+                })}
+                </div>
+            </DragDropContext>
+          )}
         </>
       )}
 
-      {/* ================= end KANBAN ================= */}
-
+      {/* CREATE MODAL */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900">Create New Task</h2>
+              <button type="button" onClick={() => setIsCreateOpen(false)} className="p-2 rounded-full hover:bg-gray-100">✕</button>
+            </div>
+            <form onSubmit={handleCreateTask} className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.title} onChange={(e) => setNewTaskForm((f) => ({ ...f, title: e.target.value }))} required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.description} onChange={(e) => setNewTaskForm((f) => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
+                  <select className="w-full border appearance-none border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.assigneeId} onChange={(e) => setNewTaskForm((f) => ({ ...f, assigneeId: e.target.value }))}>
+                    <option value="">Unassigned</option>
+                    {projectMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                  <select className="w-full border appearance-none border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.priority} onChange={(e) => setNewTaskForm((f) => ({ ...f, priority: e.target.value }))}>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="LOW">Low</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select className="w-full border appearance-none border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.status} onChange={(e) => setNewTaskForm((f) => ({ ...f, status: e.target.value }))}>
+                    <option value="BACKLOG">Backlog</option>
+                    <option value="TODO">Todo</option>
+                    <option value="DOING">In Progress</option>
+                    <option value="DONE">Done</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                  <input type="date" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.dueDate} onChange={(e) => setNewTaskForm((f) => ({ ...f, dueDate: e.target.value }))} />
+                </div>
+              </div>
+              <div className="pt-3 flex justify-end gap-3 border-t border-gray-100">
+                <button type="button" onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" className="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand)] text-white">Create Task</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
