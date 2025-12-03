@@ -1,0 +1,9 @@
+/* Default theme (User, Member, Manager...) */
+:root {
+  --color-brand: #f35640;
+}
+
+/* Admin theme */
+.admin-theme {
+  --color-brand: #3b064d;
+}

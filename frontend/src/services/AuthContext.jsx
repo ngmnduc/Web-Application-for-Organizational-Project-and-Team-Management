@@ -11,6 +11,16 @@ export const AuthProvider = ({ children }) => {
     if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
 
+  //  1. Logic đổi theme mỗi khi user thay đổi
+  useEffect(() => {
+    if (user && user.role === "Admin") {
+      document.body.classList.add("admin-theme");
+    } else {
+      document.body.classList.remove("admin-theme");
+    }
+  }, [user]); //  chạy mỗi khi user login/logout
+
+
   const saveLogin = (userData, token) => {
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("token", token);
@@ -20,6 +30,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    document.body.classList.remove("admin-theme");
     setUser(null); //  Re-render toàn app
   };
 

@@ -149,12 +149,12 @@ const NotificationList = () => {
                         ? 'text-white shadow-md' 
                         : 'text-gray-700 hover:bg-gray-100'
                 }`}
-                style={isActive ? { backgroundColor: PRIMARY_COLOR } : {}}
+                style={isActive ? { backgroundColor:'var(--color-brand)' } : {}}
                 onClick={() => onClick(label)}
             >
                 {label}
                 {label === 'Unread' && unreadCount > 0 && ( // Chỉ hiển thị count nếu > 0
-                    <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-600" style={{ color: PRIMARY_COLOR, backgroundColor: '#fee2e2' }}>
+                    <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-600" style={{ color: 'var(--color-brand)', backgroundColor: '#fee2e2' }}>
                         {unreadCount}
                     </span>
                 )}

@@ -155,6 +155,7 @@ export const getProjectSummary = async (req, res) => {
 
     const project = await Project.findById(id);
     if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
 
     const tasks = await Task.find({ projectId: id, deletedAt: null });
     
@@ -183,6 +184,7 @@ export const getProjectSummary = async (req, res) => {
       }
     });
   } catch (error) {
+    res.status(500).json({ success: false, error: "ServerError", message: error.message });
     res.status(500).json({ success: false, error: "ServerError", message: error.message });
   }
 };
