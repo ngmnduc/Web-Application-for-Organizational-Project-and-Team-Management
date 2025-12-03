@@ -1,11 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-
-// --- IMPORT IMAGE ---
-import logoFull from '../assets/images/syncora.png'; 
-import logoIcon from '../assets/images/logo.png';   
-// import logoAdmin... (để dành nếu sau này có logo admin riêng)
-
+import logo from '../assets/images/syncora-official.png'; 
+import logoadmin from '../assets/images/syncora-admin.png'; 
 import { useAuth } from '../services/AuthContext'; 
 
 import { 
