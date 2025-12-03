@@ -6,9 +6,11 @@ import {
   updateTask,
   updateTaskStatus,
   deleteTask,
+  reorderTask,
   createSubtask,
   toggleSubtask, // Imported new controller
-  deleteSubtask  // Imported new controller
+  deleteSubtask,  // Imported new controller
+  getTasksById,
 } from "../controllers/task.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
 import { checkProjectActive } from "../middlewares/archive.middleware.js";
@@ -21,6 +23,14 @@ const router = express.Router();
  * @access  Private (Admin/Manager/Member)
  */
 router.get("/tasks", verifyToken, getFilteredTasks);
+
+// lấy chi tiết 1 task theo id
+/**
+ * @route   GET /tasks/:id
+ * @desc    Get task detail by ID
+ * @access  Private (Admin/Manager/Member)
+ */
+router.get("/tasks/:id", verifyToken, getTasksById); 
 
 /**
  * @route   GET /projects/:id/tasks
@@ -35,6 +45,8 @@ router.get("/projects/:id/tasks", verifyToken, getTasksByProject);
  * @access  Private (Admin/Manager)
  */
 router.post("/projects/:id/tasks", verifyToken, checkRole("Admin", "Manager"), createTask);
+
+router.patch('/tasks/reorder', reorderTask);
 
 /**
  * @route   PUT /tasks/:id
@@ -56,5 +68,8 @@ router.patch("/tasks/:id", verifyToken, updateTaskStatus);
  * @access  Private (Admin/Manager)
  */
 router.delete("/tasks/:id", verifyToken, checkRole("Admin", "Manager"), deleteTask);
+
+
+
 
 export default router;

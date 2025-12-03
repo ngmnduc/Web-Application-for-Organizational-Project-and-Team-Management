@@ -50,13 +50,15 @@ const taskSchema = new mongoose.Schema(
       type: Number, 
       default: 0 
     },
-    orderIndex: { 
-      type: Number 
+    isOverdueNotified: {
+      type: Boolean,
+      default: false // Mặc định là chưa thông báo
     },
     deletedAt: { 
       type: Date, 
       default: null 
     },
+    orderIndex: { type: Number, default: 0 },
     // New field for embedded subtasks
     subtasks: [subtaskSchema]
   },
