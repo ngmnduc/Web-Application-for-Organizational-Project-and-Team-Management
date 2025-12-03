@@ -154,7 +154,7 @@ export const getProjectSummary = async (req, res) => {
     const {id} = req.params;
 
     const project = await Project.findById(id);
-    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    if(!project) return res.status(404).json({success:false,error:"NotFoundError", message: "Project not found"});
 
     const now = new Date();
 
@@ -192,8 +192,8 @@ export const getProjectSummary = async (req, res) => {
         daysLeft
       }
     });
-  } catch (error) {
-    res.status(500).json({ success: false, error: "ServerError", message: error.message });
+  } catch (error){
+    res.status(500).json({success:false, error: "ServerError", message: error.message});
   }
 };
 /**
@@ -226,5 +226,36 @@ export const getProjectActivities = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: "ServerError", message: error.message });
+  }
+};
+
+// GET /projects/pending-requests
+// Hàm này quét tất cả dự án, tìm thành viên có status = "PENDING"
+export const getPendingRequests = async (req, res) => {
+  try {
+    // Tìm các dự án có chứa thành viên PENDING
+    const projects = await Project.find({ "members.status": "PENDING" })
+      .select("name members") 
+      .populate("members.user", "name email avatarUrl");
+
+    let pendingList = [];
+
+    // Tách mảng để lấy ra từng request cụ thể
+    projects.forEach(proj => {
+      const pendingMembers = proj.members.filter(m => m.status === "PENDING");
+      
+      pendingMembers.forEach(member => {
+        pendingList.push({
+          requestId: member._id,      // ID của request (quan trọng để duyệt)
+          projectId: proj._id,        // ID dự án (quan trọng để duyệt)
+          projectName: proj.name,     // Tên dự án để hiển thị
+          user: member.user           // Thông tin user
+        });
+      });
+    });
+
+    res.json({ success: true, data: pendingList });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
