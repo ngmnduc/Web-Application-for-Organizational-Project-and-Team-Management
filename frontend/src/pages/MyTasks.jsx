@@ -37,7 +37,7 @@ const PriorityBadge = ({ level }) => {
 // ===== Kanban Card: click => TaskDetail page =====
 const KanbanCard = ({ task, onOpenDetail }) => {
   return (
-    <button
+    <div
       type="button"
       onClick={() => onOpenDetail(task)}
       className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition"
@@ -79,7 +79,7 @@ const KanbanCard = ({ task, onOpenDetail }) => {
           {task.assignee?.[0] ?? '??'}
         </div>
       </div>
-    </button>
+    </div>
   );
 };
 
@@ -331,66 +331,7 @@ const MyTasks = () => {
     return t;
   });
   setTasks(updatedTasks);
-  const destColumnId = destination.droppableId;
-  const apiStatus = STATUS_API_MAP[destColumnId] || 'TODO';
 
-  // 2. Lấy danh sách task trong cột ĐÍCH (Destination Column)
-  // Phải sort đúng thứ tự hiện tại để tính toán vị trí kề
-  const destTasks = tasks
-    .filter(t => t.status === destColumnId) // Lấy cột đích
-    .filter(t => t.id !== draggableId)      // Loại bỏ chính nó (để giả lập danh sách tĩnh)
-    .sort((a, b) => a.position - b.position);
-
-  // 3. Tính toán Position mới (Fractional Indexing)
-  let newPosition;
-  const destIndex = destination.index;
-  
-  // Task đứng TRƯỚC và SAU vị trí thả
-  const prevTask = destTasks[destIndex - 1]; 
-  const nextTask = destTasks[destIndex];
-
-  // HẰNG SỐ KHOẢNG CÁCH (Dùng khi chèn vào đầu/cuối list rỗng)
-  const BUFFER = 10000; 
-
-  if (!prevTask && !nextTask) {
-    // Trường hợp A: Cột rỗng
-    newPosition = BUFFER; 
-  } else if (!prevTask) {
-    // Trường hợp B: Thả vào ĐẦU cột
-    // Lấy vị trí thằng đầu tiên chia đôi (hoặc trừ buffer)
-    newPosition = nextTask.position / 2;
-  } else if (!nextTask) {
-    // Trường hợp C: Thả vào CUỐI cột
-    // Lấy thằng cuối cùng cộng thêm buffer
-    newPosition = prevTask.position + BUFFER;
-  } else {
-    // Trường hợp D: Chèn vào GIỮA 2 task (QUAN TRỌNG)
-    // Công thức trung bình cộng
-    newPosition = (prevTask.position + nextTask.position) / 2;
-  }
-
-  // 4. Optimistic Update (Cập nhật UI ngay lập tức)
-  const updatedTasks = tasks.map(t => {
-    if (t.id === draggableId) {
-      return { ...t, status: destColumnId, position: newPosition };
-    }
-    return t;
-  });
-  setTasks(updatedTasks);
-
-  // 5. Gọi API Sync Backend
-  try {
-    // Gọi API Reorder thay vì updateTaskStatus cũ
-    // API này cần Backend (Mduc) triển khai patch cả status và orderIndex
-    await reorderTask(draggableId, apiStatus, newPosition);
-  } catch (err) {
-    console.error('Reorder failed', err);
-    // Rollback logic (nếu cần thiết, fetch lại data cũ)
-    setError("Failed to save new order");
-  }
-};
-
-  // ===== end sort =====
   // 5. Gọi API Sync Backend
   try {
     // Gọi API Reorder thay vì updateTaskStatus cũ
@@ -406,11 +347,9 @@ const MyTasks = () => {
   // ===== end sort =====
   const sortTasks = (a, b) => {
     return a.position - b.position; // Sắp xếp tăng dần theo position (Task số nhỏ nằm trên)
-    return a.position - b.position; // Sắp xếp tăng dần theo position (Task số nhỏ nằm trên)
   };
 
   // ===== SUMMARY từ tasks thật (giữ shape cũ cho TaskSummary) =====
-  // ===== Dynamic summary (tính từ tasks thật) =====
   const totalCount = tasks.length;
   const todoCount = tasks.filter((t) => t.status === 'Todo').length;
   const inProgressCount = tasks.filter((t) => t.status === 'In Progress').length;
