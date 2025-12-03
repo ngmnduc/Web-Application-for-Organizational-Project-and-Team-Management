@@ -1,6 +1,9 @@
 import React, { useMemo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 
+import TaskDetail from "../pages/TaskDetail";   
+
+
 const AppRouter = ({ children, requiredRole }) => {
   const location = useLocation();
   

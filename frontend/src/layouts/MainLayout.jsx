@@ -21,54 +21,66 @@ const MainLayout = () => {
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    // Xác định title và subtitle dựa trên pathname
-    switch (location.pathname) {
-      case '/tasks':
-        setHeaderData({
-          title: 'My Tasks',
-          subtitle: 'Manage and track your assigned tasks across all projects'
-        });
-        break;
-      case '/calendar':
-        setHeaderData({
-          title: 'Calendar',
-          subtitle: 'View meetings and events by day'
-        });
-        break;
-        case '/members':
-        setHeaderData({
-          title: 'Team members',
-          subtitle: 'Mange your projects team members and their roles'
-        });
-        break;
-        case '/projects':
-        setHeaderData({
-          title: 'Test Workspace',
-          subtitle: 'Manage all projects and their collaboration'
-        });
-        break;
-      case '/notifications':
-        setHeaderData({
-          title: 'Notifications',
-          subtitle: 'View recent updates and mentions across your projects'
-        });
-        break;
-      case '/settings':
-        setHeaderData({
-          title: 'Profile Settings',
-          subtitle: 'Manage your account information and preferences'
-        });
-        break;
-      case '/home':
-      default:
-        setHeaderData({
-          title: 'Dashboard',
-          subtitle: 'Welcome to your dashboard'
-        });
-        break;
+    const path = location.pathname;
+  
+    // ----- My Tasks -----
+    if (path === '/tasks') {
+      setHeaderData({
+        title: 'My Tasks',
+        subtitle: 'Manage and track your assigned tasks across all projects',
+      });
     }
-  }, [location.pathname]); 
-
+    // ----- Task Detail (user) -----
+    else if (path.startsWith('/tasks/')) {
+      setHeaderData({
+        title: 'Task detail',
+        subtitle: 'View and manage the details of this task',
+      });
+    }
+    // ----- Calendar -----
+    else if (path === '/calendar') {
+      setHeaderData({
+        title: 'Calendar',
+        subtitle: 'View meetings and events by day',
+      });
+    }
+    // ----- Members -----
+    else if (path === '/members') {
+      setHeaderData({
+        title: 'Team members',
+        subtitle: 'Mange your projects team members and their roles',
+      });
+    }
+    // ----- Projects -----
+    else if (path === '/projects') {
+      setHeaderData({
+        title: 'Test Workspace',
+        subtitle: 'Manage all projects and their collaboration',
+      });
+    }
+    // ----- Notifications -----
+    else if (path === '/notifications') {
+      setHeaderData({
+        title: 'Notifications',
+        subtitle: 'View recent updates and mentions across your projects',
+      });
+    }
+    // ----- Settings -----
+    else if (path === '/settings') {
+      setHeaderData({
+        title: 'Profile Settings',
+        subtitle: 'Manage your account information and preferences',
+      });
+    }
+    // ----- Dashboard (home & mọi path khác) -----
+    else {
+      setHeaderData({
+        title: 'Dashboard',
+        subtitle: 'Welcome to your dashboard',
+      });
+    }
+  }, [location.pathname]);
+  
   const [tasks, setTasks] = useState(mockKanbanTasks);
 
   // -- Summary cho MyTasks --
