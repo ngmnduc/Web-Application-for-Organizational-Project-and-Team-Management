@@ -103,7 +103,7 @@ const KanbanCard = ({ task, onOpenDetail }) => {
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 };
 
