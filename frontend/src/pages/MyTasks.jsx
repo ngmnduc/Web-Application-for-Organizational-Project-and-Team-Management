@@ -267,12 +267,7 @@ const MyTasks = () => {
     source.droppableId === destination.droppableId &&
     source.index === destination.index
   ) return;
-  // 1. Check cơ bản
-  if (!destination) return;
-  if (
-    source.droppableId === destination.droppableId &&
-    source.index === destination.index
-  ) return;
+  
 
     const destColumnId = destination.droppableId;
     const apiStatus = STATUS_API_MAP[destColumnId] || 'TODO';
