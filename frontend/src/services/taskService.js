@@ -65,6 +65,20 @@ export const updateTaskStatus = async (taskId, newStatus) => {
   }
 };
 
+/**
+ * Lấy chi tiết 1 task theo id
+ */
+export const getTaskById = async (taskId) => {
+  try {
+    const response = await axiosInstance.get(`/tasks/${taskId}`);
+    return response.data.data;        // chuẩn format { success, data }
+  } catch (error) {
+    console.error("Lỗi khi lấy chi tiết công việc:", error);
+    throw error.response?.data || { error: { message: "Failed to load task detail" } };
+  }
+};
+
+
 export const reorderTask = async (taskId, newStatus, newPosition) => {
   // Gọi PATCH /tasks/reorder
   // Endpoint này BE phải implement logic nhận position kiểu Float
@@ -77,5 +91,6 @@ export default {
   updateTask,
   deleteTask,
   updateTaskStatus,
+  getTaskById, 
   reorderTask,
 };

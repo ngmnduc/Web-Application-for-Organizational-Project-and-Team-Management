@@ -65,6 +65,39 @@ export const getFilteredTasks = async (req, res) => {
 };
 
 /**
+ * @desc    Get single task by ID
+ * @route   GET /tasks/:id
+ * @access  Private
+ */
+export const getTasksById = async (req, res) => {
+  try {
+    const taskId = req.params.id;
+
+    const task = await Task.findById(taskId)
+      .populate("assigneeId", "name email role")
+      .populate("projectId", "name");
+
+    if (!task || task.deletedAt) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: task,
+    });
+  } catch (error) {
+    console.error("Error getTasksById:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
  * @desc    Create a new task inside a project
  * @route   POST /projects/:id/tasks
  * @access  Private (Admin/Manager)
