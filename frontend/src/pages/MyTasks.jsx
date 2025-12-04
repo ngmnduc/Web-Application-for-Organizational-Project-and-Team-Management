@@ -12,7 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 import TaskSummary from '../components/TaskSummary';
-import { getProjects, getProjectLabels } from '../services/projectService';
+import { getProjects } from '../services/projectService';
 import { getTasksByProject, updateTaskStatus, createTask, reorderTask, getProjectMembers } from '../services/taskService';
 import { useAuth } from '../services/AuthContext';
 
@@ -203,7 +203,6 @@ const MyTasks = () => {
             // Gọi song song Members và Labels
             const [members, labels] = await Promise.all([
                 getProjectMembers(currentProjectId),
-                getProjectLabels(currentProjectId) // Gọi API lấy label
             ]);
 
             const formattedMembers = members.map(m => ({
