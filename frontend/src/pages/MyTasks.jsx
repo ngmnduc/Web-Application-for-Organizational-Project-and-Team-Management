@@ -122,6 +122,7 @@ const MyTasks = () => {
   const canManageTasks = isManagerOrAdmin;
 
   const canDragTask = (task) => {
+    //Manager/Admin có thể kéo thả tất cả
     if (isManagerOrAdmin) return true;
     if (!task.assigneeId || !currentUser.id ) return false;
     return task.assigneeId === currentUser.id;
@@ -347,7 +348,7 @@ const MyTasks = () => {
     { number: todoCount,      label: 'Todo',       icon: <ClockSolid />,    iconColor: 'text-gray-500',   bgColor: 'bg-gray-100',   textColor: 'text-gray-600' },
     { number: inProgressCount,label: 'In Progress',icon: <ProgressSolid />, iconColor: 'text-blue-500',   bgColor: 'bg-blue-100',   textColor: 'text-blue-600' },
     { number: doneCount,      label: 'Done',       icon: <DoneSolid />,     iconColor: 'text-green-500',  bgColor: 'bg-green-100',  textColor: 'text-green-600' },
-    { number: dueSoonCount,   label: 'Due soon', icon: <WarningSolid />,  iconColor: 'text-orange-500', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
+    { number: dueSoonCount,   label: 'Due soon',   icon: <WarningSolid />,  iconColor: 'text-orange-500', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
   ];
 
   // Create Task
