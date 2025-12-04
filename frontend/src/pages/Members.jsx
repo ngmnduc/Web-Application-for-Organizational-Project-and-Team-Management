@@ -43,13 +43,12 @@ const NotificationBanner = ({ message, type, onClose }) => {
     );
 };
 
-// Modal Xác Nhận (Confirm)
+// Modal Xác Nhận 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = "Delete", isDanger = true }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-                {/* Icon Header */}
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 <div className={`flex items-center gap-3 mb-4 ${isDanger ? 'text-red-600' : 'text-gray-800'}`}>
                     <div className={`p-2 rounded-full ${isDanger ? 'bg-red-100' : 'bg-orange-50'}`}>
                         {isDanger ? (
@@ -64,7 +63,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText 
                 <p className="text-sm text-gray-600 mb-6 leading-relaxed">{message}</p>
                 
                 <div className="flex justify-end gap-3">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
                     <button 
                         onClick={onConfirm} 
                         className={`px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm transition-all hover:opacity-90 ${isDanger ? 'bg-red-600' : ''}`}
@@ -78,7 +77,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText 
     );
 };
 
-// Modal Chọn Project (Select Project)
+// Modal Chọn Project
 const SelectProjectModal = ({ isOpen, onClose, user, onSelectProject }) => {
     if (!isOpen || !user) return null;
     return (
@@ -91,7 +90,7 @@ const SelectProjectModal = ({ isOpen, onClose, user, onSelectProject }) => {
                 <p className="text-sm text-gray-600 mb-4">
                     User <strong>{user.name}</strong> is in multiple projects. Select one to remove:
                 </p>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
                     {user.projects.map(proj => (
                         <button
                             key={proj._id}
@@ -119,7 +118,7 @@ const Avatar = ({ name, avatarUrl }) => {
     );
 };
 
-// Role Select 
+// Role Select
 const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
     const getRoleStyle = (role) => {
         switch (role) {
@@ -173,7 +172,7 @@ const UserInfoModal = ({ isOpen, onClose, user }) => {
                         <div className="bg-gray-50 p-3 rounded-lg"><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Role</p><span className="font-medium text-sm text-gray-900">{user.role}</span></div>
                         <div className="bg-gray-50 p-3 rounded-lg"><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Joined</p><span className="font-medium text-sm text-gray-900">{new Date(user.createdAt).toLocaleDateString()}</span></div>
                     </div>
-                    <div className="bg-gray-50 p-3 rounded-lg max-h-48 overflow-y-auto">
+                    <div className="bg-gray-50 p-3 rounded-lg max-h-48 overflow-y-auto custom-scrollbar">
                         <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Projects</p>
                         <ul className="space-y-2">
                             {user.projects?.map(p => <li key={p._id} className="text-sm text-gray-700 bg-white p-2 rounded border border-gray-100">{p.name}</li>)}
@@ -201,7 +200,7 @@ const Members = () => {
     const [currentUserRole, setCurrentUserRole] = useState('Member');
 
     // States cho chức năng xóa
-    const [deleteUserModal, setDeleteUserModal] = useState(null); 
+    const [deleteUserModal, setDeleteUserModal] = useState(null); // Lưu user để xóa vĩnh viễn
     const [removeProjectConfirm, setRemoveProjectConfirm] = useState(null); 
     const [selectProjectModal, setSelectProjectModal] = useState(null); 
 
@@ -245,8 +244,7 @@ const Members = () => {
     }, [projectId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
-
-    // --- Action Handlers ---
+// --- Action Handlers ---
 
     // Change Role
     const handleChangeRole = async (userId, newRole) => {
@@ -334,16 +332,31 @@ const Members = () => {
         }
     };
 
-    // Logic Xóa User Hệ Thống
+    // --- Logic Xóa User Hệ Thống + Pop-up ---
     const handleDeleteUser = async () => {
         if (!deleteUserModal) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/users/${deleteUserModal.id}`, { method: 'DELETE', headers: getHeaders() });
-            if (!res.ok) throw new Error("Failed");
-            showNotification("User deleted", "success");
+            const res = await fetch(`${API_BASE_URL}/users/${deleteUserModal.id}`, { 
+                method: 'DELETE', 
+                headers: getHeaders() 
+            });
+            
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || "Failed to delete user");
+            }
+
+            showNotification("User deleted permanently", "success");
+            
+            // Xóa ngay lập tức khỏi giao diện
             setMembers(prev => prev.filter(m => m.id !== deleteUserModal.id));
+            
+            // Đóng Modal
             setDeleteUserModal(null);
-        } catch (error) { showNotification("Failed to delete user", "error"); }
+        } catch (error) { 
+            console.error(error);
+            showNotification(error.message, "error"); 
+        }
     };
 
     const handleInfo = (user) => { setSelectedUser(user); setIsInfoModalOpen(true); };
@@ -360,23 +373,26 @@ const Members = () => {
         <div className="flex-1 p-6 md:p-8 bg-gray-50 min-h-screen relative">
             <NotificationBanner message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
 
+            {/* Modal Xóa User Hệ Thống */}
             <ConfirmModal 
                 isOpen={!!deleteUserModal}
-                title="Delete User"
-                message={`Permanently delete "${deleteUserModal?.name}"?`}
+                title="Delete User Permanently"
+                message={`Warning: This action cannot be undone. Are you sure you want to permanently delete user "${deleteUserModal?.name}" from the system?`}
                 onClose={() => setDeleteUserModal(null)}
                 onConfirm={handleDeleteUser}
+                confirmText="Delete User"
                 isDanger={true}
             />
 
+            {/* Modal Xóa khỏi Project */}
             <ConfirmModal 
                 isOpen={!!removeProjectConfirm}
                 title="Remove from Project"
-                message={`Remove "${removeProjectConfirm?.user?.name}" from project "${removeProjectConfirm?.projectName}"?`}
+                message={`Are you sure you want to remove "${removeProjectConfirm?.user?.name}" from project "${removeProjectConfirm?.projectName}"?`}
                 onClose={() => setRemoveProjectConfirm(null)}
                 onConfirm={executeRemoveMember}
                 confirmText="Remove"
-                isDanger={false}
+                isDanger={false} 
             />
 
             <SelectProjectModal 
@@ -403,7 +419,7 @@ const Members = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    {/* NÚT ADD MEMBER */}
+                    {/* Nút ADD MEMBER */}
                     {isAdmin && (
                         <button 
                             onClick={() => setIsAddModalOpen(true)}
@@ -471,7 +487,13 @@ const Members = () => {
                                                         <button onClick={() => handleAssign(member)} className="text-gray-400 hover:text-purple-600 p-1 rounded-full hover:bg-purple-50">
                                                             <FolderPlusIcon className="w-5 h-5" />
                                                         </button>
-                                                        <button onClick={() => setDeleteUserModal(member)} className="text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50">
+                                                        
+                                                        {/* Nút THÙNG RÁC - Mở modal Delete System User */}
+                                                        <button 
+                                                            onClick={() => setDeleteUserModal(member)} 
+                                                            className="text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-colors" 
+                                                            title="Delete User Permanently"
+                                                        >
                                                             <TrashIcon className="w-5 h-5" />
                                                         </button>
                                                     </div>
