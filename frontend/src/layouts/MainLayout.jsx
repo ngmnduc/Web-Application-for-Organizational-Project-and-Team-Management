@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SideBar from '../components/SideBar';
 import Navbar from '../components/NavBar'; 
-import { mockKanbanTasks } from '../mocks/tasks.jsx';
+import { getProjects } from '../services/projectService';
+import { getTasksByProject } from '../services/taskService';
 import { usePollingNotifications } from '../hooks/usePollingNotifications';
 import { 
     ClipboardDocumentListIcon as TotalSolid, 
@@ -81,21 +82,47 @@ const MainLayout = () => {
     }
   }, [location.pathname]);
   
-  const [tasks, setTasks] = useState(mockKanbanTasks);
+  const [tasks, setTasks] = useState([]);
+  // Thêm useEffect để lấy dữ liệu thật
+  useEffect(() => {
+    const fetchDefaultData = async () => {
+      try {
+        const projects = await getProjects();
+        if (projects && projects.length > 0) {
+          // Lấy tasks của dự án đầu tiên để hiển thị Global Summary
+          const defaultProjectId = projects[0]._id;
+          const apiTasks = await getTasksByProject(defaultProjectId);
+          setTasks(apiTasks || []);
+        }
+      } catch (err) {
+        console.error("Failed to load global data:", err);
+      }
+    };
+    fetchDefaultData();
+  }, []);
+  
 
   // -- Summary cho MyTasks --
+  // thêm kiểm tra status viết hoa/thường từ API
   const totalCount = tasks.length;
-  const todoCount = tasks.filter(t => t.status === 'Todo').length;
-  const inProgressCount = tasks.filter(t => t.status === 'In Progress').length;
-  const doneCount = tasks.filter(t => t.status === 'Done').length;
-  const dueSoonCount = tasks.filter(t => t.dueSoon === true).length;
+  const todoCount = tasks.filter(t => t.status === 'Todo' || t.status === 'TODO').length;
+  const inProgressCount = tasks.filter(t => t.status === 'In Progress' || t.status === 'DOING').length;
+  const doneCount = tasks.filter(t => t.status === 'Done' || t.status === 'DONE').length;
+  
+  // Logic tính 'Due Soon' (1 ngày) dựa trên ngày hiện tại
+  const dueSoonCount = tasks.filter(t => {
+      if (!t.dueDate) return false;
+      const due = new Date(t.dueDate);
+      const now = new Date();
+      return (due - now > 0) && (due - now < 86400000); // 24h
+  }).length;
 
   const dynamicTasksSummary = [
     { number: totalCount, label: 'Total', icon: <TotalSolid />, iconColor: "text-gray-500", bgColor: "bg-gray-100", textColor: "text-gray-800" },
     { number: todoCount, label: 'Todo', icon: <ClockSolid />, iconColor: "text-gray-500", bgColor: "bg-gray-100", textColor: "text-gray-600" },
     { number: inProgressCount, label: 'In Progress', icon: <ProgressSolid />, iconColor: "text-blue-500", bgColor: "bg-blue-100", textColor: "text-blue-600" },
     { number: doneCount, label: 'Done', icon: <DoneSolid />, iconColor: "text-green-500", bgColor: "bg-green-100", textColor: "text-green-600" },
-    { number: dueSoonCount, label: '1 day left', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
+    { number: dueSoonCount, label: 'Due soon', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
   ];
 
   
