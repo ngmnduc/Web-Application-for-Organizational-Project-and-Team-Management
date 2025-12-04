@@ -241,7 +241,11 @@ const MyTasks = () => {
                 assignee: assigneeName,
                 assigneeId: assigneeId,
                 dueSoon: isDueSoon,
+<<<<<<< HEAD
                 labels: [], 
+=======
+                labels: t.labels || [], 
+>>>>>>> fa8dcc48b33adfac5aec7e500f09cb6d163674ff
                 position: t.orderIndex || 0,
             };
         });
@@ -267,6 +271,7 @@ const MyTasks = () => {
     source.droppableId === destination.droppableId &&
     source.index === destination.index
   ) return;
+<<<<<<< HEAD
   
 
     const destColumnId = destination.droppableId;
@@ -296,6 +301,42 @@ const MyTasks = () => {
     });
     setTasks(updatedTasks);
 
+=======
+  // 1. Check cơ bản
+  if (!destination) return;
+  if (
+    source.droppableId === destination.droppableId &&
+    source.index === destination.index
+  ) return;
+
+    const destColumnId = destination.droppableId;
+    const apiStatus = STATUS_API_MAP[destColumnId] || 'TODO';
+
+    const destTasks = tasks
+        .filter(t => t.status === destColumnId)
+        .filter(t => t.id !== draggableId)
+        .sort((a, b) => a.position - b.position);
+
+    let newPosition;
+    const destIndex = destination.index;
+    const prevTask = destTasks[destIndex - 1]; 
+    const nextTask = destTasks[destIndex];
+    const BUFFER = 10000; 
+
+    if (!prevTask && !nextTask) newPosition = BUFFER; 
+    else if (!prevTask) newPosition = nextTask.position / 2;
+    else if (!nextTask) newPosition = prevTask.position + BUFFER;
+    else newPosition = (prevTask.position + nextTask.position) / 2;
+
+    const updatedTasks = tasks.map(t => {
+        if (t.id === draggableId) {
+            return { ...t, status: destColumnId, position: newPosition };
+        }
+        return t;
+    });
+    setTasks(updatedTasks);
+
+>>>>>>> fa8dcc48b33adfac5aec7e500f09cb6d163674ff
     try {
         await reorderTask(draggableId, apiStatus, newPosition);
     } catch (err) {
