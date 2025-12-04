@@ -157,11 +157,7 @@ const TaskDetail = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             <div className="flex justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>
-              {canManage && (
-                <button className="text-xs text-blue-600 font-medium hover:underline">
-                  + Add Item
-                </button>
-              )}
+              
             </div>
 
             {subtasks.length === 0 ? (
