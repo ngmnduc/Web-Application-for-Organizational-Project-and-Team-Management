@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ChevronDownIcon, PlusIcon, FunnelIcon, UserIcon, TagIcon, XMarkIcon, FolderIcon } from '@heroicons/react/24/outline'; // Thêm FolderIcon
 import { 
   ClipboardDocumentListIcon as TotalSolid, 
@@ -12,7 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 import TaskSummary from '../components/TaskSummary';
-import { getProjects } from '../services/projectService';
+import { getProjects, getProjectLabels } from '../services/projectService';
 import { getTasksByProject, updateTaskStatus, createTask, reorderTask, getProjectMembers } from '../services/taskService';
 import { useAuth } from '../services/AuthContext';
 
@@ -145,6 +145,7 @@ const MyTasks = () => {
   
   const [filters, setFilters] = useState({ label: '', assignee: '' });
   const [projectMembers, setProjectMembers] = useState([]);
+  const [projectLabels, setProjectLabels] = useState([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newTaskForm, setNewTaskForm] = useState({
     title: '', description: '', assigneeId: '', assigneeName: '',
@@ -193,23 +194,28 @@ const MyTasks = () => {
     fetchProjects();
   }, []);
   
-  // 2. Lấy Members & Fill Dropdown
+  // 2. Lấy Members, Labels & Fill Dropdown
   useEffect(() => {
-    if (!currentProjectId) return;
-    const fetchMembers = async () => {
+     if (!currentProjectId) return;
+    const fetchMeta = async () => {
         try {
-            const members = await getProjectMembers(currentProjectId);
-            // Normalize member data
+            // Gọi song song Members và Labels
+            const [members, labels] = await Promise.all([
+                getProjectMembers(currentProjectId),
+                getProjectLabels(currentProjectId) // Gọi API lấy label
+            ]);
+
             const formattedMembers = members.map(m => ({
                 id: m.user?._id || m.user || m._id, 
                 name: m.user?.name || m.name || 'Unnamed Member'
             }));
             setProjectMembers(formattedMembers);
+            setProjectLabels(labels); // Lưu labels vào state
         } catch (err) {
-            console.error("Failed to load members:", err);
+            console.error("Failed to load project meta:", err);
         }
     }
-    fetchMembers();
+    fetchMeta();
   }, [currentProjectId]);
 
   // 3. FETCH TASKS THẬT
@@ -221,9 +227,33 @@ const MyTasks = () => {
         setIsLoading(true);
         setError(null);
 
+        // Gọi API lấy dữ liệu (có thể API trả về tất cả task mà chưa lọc kỹ)
         const apiTasks = await getTasksByProject(currentProjectId, filters);
 
-        const normalized = (apiTasks || []).map((t) => {
+        // === THÊM ĐOẠN CODE LỌC TẠI ĐÂY (CLIENT-SIDE FILTER) ===
+        // Ta tạo một biến trung gian để lọc dữ liệu thô trước khi normalize
+        let filteredRawTasks = apiTasks || [];
+
+        // 1. Logic lọc theo Label
+        if (filters.label) {
+          filteredRawTasks = filteredRawTasks.filter((t) => 
+            // Kiểm tra xem task có labels không và labels có chứa giá trị đang chọn không
+            t.labels && t.labels.includes(filters.label)
+          );
+        }
+
+        // 2. Logic lọc theo Assignee (nếu API chưa xử lý thì lọc luôn ở đây cho chắc)
+        if (filters.assignee) {
+           filteredRawTasks = filteredRawTasks.filter((t) => {
+             // Tùy vào cấu trúc object assignee trả về là ID string hay Object
+             const aId = t.assigneeId?._id || t.assigneeId || ''; 
+             return aId === filters.assignee;
+           });
+        }
+        // =======================================================
+
+        // Sau đó mới map dữ liệu đã lọc (dùng filteredRawTasks thay vì apiTasks)
+        const normalized = filteredRawTasks.map((t) => {
             const assigneeObj = t.assigneeId; 
             const assigneeName = assigneeObj ? assigneeObj.name : 'Unassigned';
             const assigneeId = assigneeObj ? assigneeObj._id : null;
@@ -241,11 +271,7 @@ const MyTasks = () => {
                 assignee: assigneeName,
                 assigneeId: assigneeId,
                 dueSoon: isDueSoon,
-<<<<<<< HEAD
-                labels: [], 
-=======
                 labels: t.labels || [], 
->>>>>>> fa8dcc48b33adfac5aec7e500f09cb6d163674ff
                 position: t.orderIndex || 0,
             };
         });
@@ -261,7 +287,7 @@ const MyTasks = () => {
     };
 
     fetchTasks();
-  }, [currentProjectId, navigate, filters]);
+  }, [currentProjectId, navigate, filters]); // Giữ nguyên dependency filters để useEffect chạy lại khi chọn dropdown
 
   // Drag & Drop
   const handleDragEnd = async ({ source, destination, draggableId }) => {
@@ -271,8 +297,6 @@ const MyTasks = () => {
     source.droppableId === destination.droppableId &&
     source.index === destination.index
   ) return;
-<<<<<<< HEAD
-  
 
     const destColumnId = destination.droppableId;
     const apiStatus = STATUS_API_MAP[destColumnId] || 'TODO';
@@ -301,42 +325,6 @@ const MyTasks = () => {
     });
     setTasks(updatedTasks);
 
-=======
-  // 1. Check cơ bản
-  if (!destination) return;
-  if (
-    source.droppableId === destination.droppableId &&
-    source.index === destination.index
-  ) return;
-
-    const destColumnId = destination.droppableId;
-    const apiStatus = STATUS_API_MAP[destColumnId] || 'TODO';
-
-    const destTasks = tasks
-        .filter(t => t.status === destColumnId)
-        .filter(t => t.id !== draggableId)
-        .sort((a, b) => a.position - b.position);
-
-    let newPosition;
-    const destIndex = destination.index;
-    const prevTask = destTasks[destIndex - 1]; 
-    const nextTask = destTasks[destIndex];
-    const BUFFER = 10000; 
-
-    if (!prevTask && !nextTask) newPosition = BUFFER; 
-    else if (!prevTask) newPosition = nextTask.position / 2;
-    else if (!nextTask) newPosition = prevTask.position + BUFFER;
-    else newPosition = (prevTask.position + nextTask.position) / 2;
-
-    const updatedTasks = tasks.map(t => {
-        if (t.id === draggableId) {
-            return { ...t, status: destColumnId, position: newPosition };
-        }
-        return t;
-    });
-    setTasks(updatedTasks);
-
->>>>>>> fa8dcc48b33adfac5aec7e500f09cb6d163674ff
     try {
         await reorderTask(draggableId, apiStatus, newPosition);
     } catch (err) {
@@ -382,6 +370,8 @@ const MyTasks = () => {
         priority: newTaskForm.priority,
         status: newTaskForm.status,
         dueDate: newTaskForm.dueDate,
+        // Gửi Labels nếu có (tạm thời mockup nếu BE chưa nhận)
+        labels: newTaskForm.labels ? newTaskForm.labels.split(',').map(s => s.trim()) : [],
       };
 
       const created = await createTask(currentProjectId, payload);
@@ -397,7 +387,7 @@ const MyTasks = () => {
         assignee: projectMembers.find(m => m.id === created.assigneeId)?.name || 'Unassigned',
         assigneeId: created.assigneeId,
         dueSoon: false,
-        labels: [],
+        labels: payload.labels || [],
         position: created.orderIndex, 
       };
 
@@ -421,6 +411,14 @@ const MyTasks = () => {
   const clearFilters = () => setFilters({ label: '', assignee: '' });
   const hasActiveFilters = filters.label || filters.assignee;
 
+  // === LOGIC MỚI: Lấy unique labels từ danh sách tasks hiện tại ===
+  const derivedLabels = useMemo(() => {
+    // 1. Lấy tất cả label từ các task (kết quả là mảng các mảng)
+    const allLabels = tasks.flatMap(t => t.labels || []);
+    // 2. Dùng Set để loại bỏ trùng lặp và convert về mảng
+    return [...new Set(allLabels)].sort();
+  }, [tasks]);
+
   return (
     <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
       <TaskSummary summaryData={summaryData} />
@@ -432,6 +430,7 @@ const MyTasks = () => {
           
           {/* --- [MỚI] PROJECT SELECTOR --- */}
           {/* Thay vì hardcode, ta cho phép user chọn dự án tại đây */}
+          {canManageTasks &&(
           <div className="relative">
             <FolderIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <select
@@ -452,21 +451,31 @@ const MyTasks = () => {
             </select>
             <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
           </div>
+          )}
 
-          <div className="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+          
 
           {/* Label Filter */}
           <div className="relative">
             <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <select
                 className="appearance-none pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none shadow-sm cursor-pointer hover:bg-gray-50 min-w-[140px]"
-                value={filters.label}
+                 value={filters.label}
                 onChange={(e) => setFilters(prev => ({...prev, label: e.target.value}))}
-                disabled 
-                title="Feature coming soon"
             >
                 <option value="">All Labels</option>
-                <option value="Bug">Bug</option>
+                
+                {/* Render labels lấy từ tasks */}
+                {derivedLabels.length > 0 ? (
+                    derivedLabels.map((lbl, index) => (
+                        <option key={index} value={lbl}>
+                            {lbl}
+                        </option>
+                    ))
+                ) : (
+                    // Fallback nếu không tìm thấy label nào trong task
+                    <option disabled>No labels found</option>
+                )}
             </select>
             <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
           </div>
