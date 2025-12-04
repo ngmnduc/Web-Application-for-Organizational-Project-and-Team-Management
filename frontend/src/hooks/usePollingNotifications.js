@@ -1,50 +1,75 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getNotifications } from '../services/notificationService';
 
-export const usePollingNotifications = (interval = 30000) => {
+// Cấu hình URL backend (Bạn kiểm tra xem port 4000 hay 5000 nhé)
+const API_URL = 'http://localhost:4000/api'; 
+
+export const usePollingNotifications = (intervalMs = 30000) => {
     const [notifications, setNotifications] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
-    const [isError, setIsError] = useState(false);
 
-    // Hàm lấy dữ liệu từ Server
-    const fetchNotifications = useCallback(async () => {
+    // --- Lấy Token từ LocalStorage (Sửa 'accessToken' nếu bạn lưu tên khác) ---
+    const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken');
+
+    // --- 1. Gọi API Lấy danh sách ---
+    const fetchData = useCallback(async () => {
         try {
-            const data = await getNotifications();
-            setNotifications(data);
-            
-            // Đếm số lượng chưa đọc (field 'read' của backend là false)
-            const count = data.filter(n => !n.read).length; 
-            setUnreadCount(count);
-            
-            setIsError(false);
-        } catch (error) {
-            // console.error("Lỗi Polling Notification:", error); 
-            // (Có thể comment log lỗi để đỡ rác console nếu user chưa login)
-            setIsError(true);
+            const token = getToken();
+            if (!token) return; 
+
+            const response = await fetch(`${API_URL}/notifications`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) return; // Nếu lỗi mạng thì bỏ qua, đợi lần poll sau
+
+            const json = await response.json();
+            // Backend trả về { success: true, data: [...] }
+            // Luôn đảm bảo data là mảng để không bị lỗi .filter
+            setNotifications(Array.isArray(json.data) ? json.data : []);
+        } catch (err) {
+            console.error("Polling error:", err);
         } finally {
             setIsLoading(false);
         }
     }, []);
 
-    // Gọi ngay khi component mount
+    // --- 2. Cơ chế Polling (30s gọi 1 lần) ---
     useEffect(() => {
-        fetchNotifications();
-    }, [fetchNotifications]);
+        fetchData(); // Gọi ngay khi mới vào web
+        const interval = setInterval(fetchData, intervalMs); // Hẹn giờ lặp lại
+        return () => clearInterval(interval); // Dọn dẹp khi tắt component
+    }, [fetchData, intervalMs]);
 
-    // Thiết lập Polling: Gọi lại sau mỗi khoảng interval (30s)
-    useEffect(() => {
-        if (!interval) return;
-        
-        const timer = setInterval(() => {
-            getNotifications().then(data => {
-                setNotifications(data);
-                setUnreadCount(data.filter(n => !n.read).length);
+    // --- 3. Đánh dấu đã đọc ---
+    const markAsRead = async (notificationId) => {
+        // Cập nhật giao diện ngay lập tức (Optimistic UI)
+        setNotifications(prev => prev.map(n => 
+            n._id === notificationId ? { ...n, read: true } : n
+        ));
+
+        // Gọi API ngầm
+        try {
+            const token = getToken();
+            await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
             });
-        }, interval);
-        
-        return () => clearInterval(timer);
-    }, [interval]);
+        } catch (error) {
+            console.error("Mark read failed", error);
+        }
+    };
 
-    return { notifications, unreadCount, isLoading, isError, refresh: fetchNotifications };
+    // Tính số lượng chưa đọc an toàn
+    const unreadCount = Array.isArray(notifications) 
+        ? notifications.filter(n => !n.read).length 
+        : 0;
+
+    return { notifications, unreadCount, markAsRead, isLoading };
 };

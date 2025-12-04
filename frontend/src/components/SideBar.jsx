@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import logo from '../assets/images/syncora-official.png'; 
-import logoadmin from '../assets/images/syncora-admin.png'; 
+
+import logoUserFull from '../assets/images/syncora-official.png'; 
+import logoAdminFull from '../assets/images/syncora-admin.png';  
+import logoIcon from '../assets/images/logo.png';              
+
 import { useAuth } from '../services/AuthContext'; 
 
 import { 
@@ -79,13 +82,13 @@ const SideBar = ({ unreadCount, basePath="" }) => {
     const isAdmin = user?.role === 'Admin';
     const homeLink = isAdmin ? '/admin/home' : '/home';
 
-    // --- LOGIC CHỌN LOGO ---
-    // Xác định logo base dựa trên role ( sau này Admin có logo riêng)
-    const baseLogoFull = logoFull; 
-    const baseLogoIcon = logoIcon;
+    // --- LOGIC CHỌN LOGO  ---
+    
+    // Xác định xem nếu mở rộng thì dùng logo nào (Admin hay User)
+    const currentFullLogo = isAdmin ? logoAdminFull : logoUserFull;
 
-    // Quyết định hiển thị logo nào dựa trên trạng thái Hover
-    const displaySrc = isHovered ? baseLogoFull : baseLogoIcon;
+    // Xác định hiển thị logo Full hay logo Icon dựa trên trạng thái Hover
+    const displaySrc = isHovered ? currentFullLogo : logoIcon;
 
     const visibleMenuItems = menuItems.filter(item => {
         if (item.adminOnly && !isAdmin) return false;
