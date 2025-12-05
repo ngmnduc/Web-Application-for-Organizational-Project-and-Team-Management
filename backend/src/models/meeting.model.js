@@ -26,7 +26,8 @@ const meetingSchema = new mongoose.Schema(
     },
     location: {
       type: String,
-      default: "",
+      required: true,
+      trim: true,
     },
     attendees: [
       {

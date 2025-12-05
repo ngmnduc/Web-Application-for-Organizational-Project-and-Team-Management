@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { me, promoteRole, signup, login, handleGoogleLogin, changePassword } from "./controllers/auth.controller.js";
+import { me, promoteRole, signup, login, handleGoogleLogin, changePassword, updateProfile } from "./controllers/auth.controller.js";
 import { verifyToken, checkRole } from "./middlewares/auth.js";
 import { ROLES } from "./models/user.model.js";
 import {
@@ -29,6 +29,7 @@ router.post("/auth/signup", signup);
 router.post("/auth/login", login);
 router.post("/auth/google", handleGoogleLogin);
 router.post("/auth/change-password", verifyToken, changePassword);
+router.patch("/auth/profile", verifyToken, updateProfile);
 
 // Admin-only: promote a user to a role (default: Manager)
 router.put("/auth/:id/role", verifyToken, checkRole(ROLES.ADMIN), promoteRole);
