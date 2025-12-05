@@ -3,7 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 
 import logoUserFull from '../assets/images/syncora-official.png'; 
 import logoAdminFull from '../assets/images/syncora-admin.png';  
-import logoIcon from '../assets/images/logo.png';              
+import logoAdmin from '../assets/images/logoadmin.png'; 
+import logoUser from '../assets/images/logo.png';               
+
 
 import { useAuth } from '../services/AuthContext'; 
 
@@ -88,7 +90,7 @@ const SideBar = ({ unreadCount, basePath="" }) => {
     const currentFullLogo = isAdmin ? logoAdminFull : logoUserFull;
 
     // Xác định hiển thị logo Full hay logo Icon dựa trên trạng thái Hover
-    const displaySrc = isHovered ? currentFullLogo : logoIcon;
+    const displaySrc = isHovered ? currentFullLogo : (isAdmin ? logoAdmin : logoUser);
 
     const visibleMenuItems = menuItems.filter(item => {
         if (item.adminOnly && !isAdmin) return false;
@@ -122,7 +124,7 @@ const SideBar = ({ unreadCount, basePath="" }) => {
                 > 
                     <img
                         className={`transition-all duration-300 object-contain 
-                            ${isHovered ? 'h-9 w-auto' : 'h-12 w-12'}
+                            ${isHovered ? 'h-9 w-auto' : 'h-14 w-14'}
                         `}
                         src={displaySrc} 
                         alt="Syncora Logo" 
