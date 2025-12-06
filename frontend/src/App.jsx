@@ -13,6 +13,7 @@ import Projects from "./pages/Projects.jsx";
 import AdminLayout from "./layouts/AdminLayout";
 import AppRouter from "./routes/AppRouter.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
+import PricingPage from "./pages/PricingPage.jsx";
 
 // sau này thêm Dashboard, NotFound,...
 
@@ -28,6 +29,8 @@ function App() {
       <Route path="/signup" element={<SignUpPage />} />
       {/* payment success */}
       <Route path="/payment/success" element={<PaymentSuccess />} />
+      {/* pricing */}
+      <Route path="/pricing" element={<PricingPage />} />
 
       {/* user */}
       <Route path="" element={<AppRouter requiredRole={["Member", "Manager"]}> <MainLayout /> </AppRouter> }>

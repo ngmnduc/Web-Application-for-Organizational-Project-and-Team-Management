@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signup } from '../services/authService';
+import { signup, login } from '../services/authService'; 
+import { useAuth } from '../services/AuthContext';
 import tag from '../assets/images/logo.png';
 import { Mail, Lock, User } from "lucide-react";
 import { GoogleLogin } from '@react-oauth/google';
@@ -15,6 +16,7 @@ const SignUpPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { saveLogin } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,20 +27,21 @@ const SignUpPage = () => {
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
-  try {
-    const { credential } = credentialResponse;
-    // Gọi hàm service (đã thống nhất) để gửi token lên BE
-    const data = await loginWithGoogle(credential); 
-    
-    // TODO: Đợi FE1 làm AuthContext
-    // auth.login(data.user, data.token); // Cập nhật state toàn app
-    
-    navigate('/home'); // Chuyển trang
-  } catch (err) {
-    console.error("Google login failed", err);
-    setError("Google login failed. Please try again.");
-  }
-};
+    try {
+      const { credential } = credentialResponse;
+      const data = await loginWithGoogle(credential); 
+      
+      // Login xong
+      saveLogin(data.user, data.token);
+      
+      // Google Login cũng chuyển sang Pricing (nếu là user mới) 
+      navigate('/pricing'); 
+
+    } catch (err) {
+      console.error("Google login failed", err);
+      setError("Google login failed.");
+    }
+  };
 
 const handleGoogleError = () => {
   console.error('Google Login Failed');
@@ -63,10 +66,26 @@ const handleGoogleError = () => {
       const name = `${formData.firstName} ${formData.lastName}`.trim();
       await signup(name, formData.email, formData.password);
       // Đăng ký thành công, chuyển hướng về trang đăng nhập
-      navigate('/login');
+      // Gọi API Đăng nhập để lấy token (Auto Login)
+      const res = await login(formData.email, formData.password);
+      
+      const user = res.data?.user || res.user; 
+      const token = res.data?.token || res.token;
+
+      if (user && token) {
+          // Lưu trạng thái đăng nhập
+          saveLogin(user, token);
+          
+          // Chuyển hướng sang trang Pricing để chọn gói
+          navigate('/pricing'); 
+      } else {
+          // Fallback nếu login fail: Về trang login thủ công
+          navigate('/login');
+      }
+
     } catch (err) {
-      console.error('Signup error:', err);
-      setError(err.error?.message || 'Signup failed. Please try again!');
+      console.error('Signup/Login error:', err);
+      setError(err.error?.message || err.message || 'Signup failed. Please try again!');
     } finally {
       setIsLoading(false);
     }
