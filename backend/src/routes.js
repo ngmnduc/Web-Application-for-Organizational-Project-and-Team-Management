@@ -51,7 +51,7 @@ router.get("/protected/manager",
 
 router.use("/", taskRoutes);
 router.use("/", meetingRoutes);
-router.use("/", attendanceRoutes);
+router.use("/attendance", attendanceRoutes);
 
 // Projects
 router.post("/projects", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), createProject);
