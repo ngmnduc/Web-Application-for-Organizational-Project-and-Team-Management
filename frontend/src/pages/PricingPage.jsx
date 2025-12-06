@@ -1,24 +1,33 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom'; 
-import { ArrowLeft, Check, Crown } from 'lucide-react';
+import { ArrowLeft, Check, Crown, ArrowRight, AlertCircle } from 'lucide-react';
 
 import logoIcon from '../assets/images/logo.png'; 
 import logoText from '../assets/images/syncora-official.png'; 
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const [selectedPlan, setSelectedPlan] = useState('Free'); // Mặc định chọn Free 
+  const [selectedPlan, setSelectedPlan] = useState('Free');
+  
+  // --- STATE CHO PHẦN JOIN PROJECT ---
+  const [showJoinInput, setShowJoinInput] = useState(false);
+  const [joinLink, setJoinLink] = useState('');
+  const [joinError, setJoinError] = useState(''); // State lỗi riêng cho phần Join
+
+  // --- STATE QUẢN LÝ LỖI THANH TOÁN ---
+  const [paymentError, setPaymentError] = useState(''); 
 
   const handleSelectPlan = (plan) => {
     setSelectedPlan(plan);
+    setPaymentError('');
   };
 
   // --- LOGIC CHỌN GÓI ADMIN ---
   const handleAdminUpgrade = async () => {
+    setPaymentError('');
     const token = localStorage.getItem('token');
     
     if (!token) {
-        // Trường hợp hy hữu mất token -> về login
         navigate('/login'); 
         return;
     }
@@ -37,19 +46,35 @@ export default function PricingPage() {
       if (response.ok && data.url) {
         window.location.href = data.url; 
       } else {
-        alert(data.message || 'Payment initiation failed');
+        setPaymentError(data.message || 'Payment initiation failed. Please try again.');
       }
     } catch (error) {
       console.error('Payment Error:', error);
-      alert('Connection error');
+      setPaymentError('Connection error. Please check your internet.');
     }
   };
 
-  // --- LOGIC CHỌN GÓI FREE ---
   const handleFreePlan = () => {
-      // Người dùng đã login từ bước Sign Up rồi
-      // Chuyển hướng thẳng vào Dashboard của Member
       navigate('/home'); 
+  };
+
+  // --- LOGIC THAM GIA DỰ ÁN ---
+  const handleJoinProject = () => {
+      // Kiểm tra nếu để trống
+      if (!joinLink.trim()) {
+          setJoinError('Please enter a project invite link.');
+          return;
+      }
+
+      // Kiểm tra format link nếu cần
+      if (!joinLink.includes('http')) {
+          setJoinError('Invalid link format.');
+          return;
+      }
+
+      setJoinError(''); // Xóa lỗi nếu hợp lệ
+      console.log("Joining project:", joinLink);
+      alert(`Simulating join: ${joinLink}`); // Tạm thời alert để biết logic chạy (sau này thay bằng API)
   };
 
   return (
@@ -70,22 +95,19 @@ export default function PricingPage() {
               alt="Logo Icon" 
               className="w-14 h-14 object-contain transition-transform group-hover:scale-105" 
             />
-  
-          {/* Logo Chữ */}
+            {/* Logo Chữ */}
             <img 
               src={logoText} 
               alt="Syncora Text" 
               className="h-8 object-contain transition-transform group-hover:scale-105" 
             />
-          </div>
-
+        </div>
       </nav>
 
       {/* Pricing Content */}
       <div className="relative z-10 container mx-auto px-6 py-10">
         <div className="max-w-5xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <h1 className="text-5xl md:text-6xl mb-6 bg-gradient-to-r from-white via-orange-100 to-orange-500 bg-clip-text text-transparent font-extrabold">
               Select Your Workspace Plan
             </h1>
@@ -94,14 +116,12 @@ export default function PricingPage() {
             </p>
           </div>
 
-          {/* Pricing Cards */}
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            
-            {/* --- FREE PLAN --- */}
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16">
+            {/* FREE PLAN */}
             <div 
               onClick={() => handleSelectPlan('Free')}
               className={`
-                bg-zinc-900 rounded-2xl border-2 p-8 transition-all duration-300 cursor-pointer
+                bg-zinc-900 rounded-2xl border-2 p-8 transition-all duration-300 cursor-pointer flex flex-col
                 ${selectedPlan === 'Free' 
                   ? 'border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.3)] scale-[1.02]' 
                   : 'border-zinc-800 hover:border-orange-500/50'}
@@ -113,12 +133,9 @@ export default function PricingPage() {
                   <span className="text-5xl text-orange-500 font-bold">$0</span>
                   <span className="text-gray-400">/forever</span>
                 </div>
-                <p className="text-gray-400">
-                  Perfect for individuals getting started.
-                </p>
+                <p className="text-gray-400">Perfect for individuals getting started.</p>
               </div>
-
-              <div className="space-y-4 mb-8">
+              <div className="space-y-4 mb-8 flex-grow">
                 {['Create 1 project', 'Basic task management', 'Up to 3 team members', 'Community support'].map((feature, idx) => (
                   <div key={idx} className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -128,21 +145,16 @@ export default function PricingPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Nút Start Free -> Vào thẳng Home */}
-              <button 
-                onClick={handleFreePlan}
-                className="block w-full py-3 px-6 bg-zinc-800 text-white text-center rounded-lg hover:bg-zinc-700 transition-all duration-300 border border-zinc-700 font-bold"
-              >
+              <button onClick={handleFreePlan} className="block w-full py-3 px-6 bg-zinc-800 text-white text-center rounded-lg hover:bg-zinc-700 transition-all duration-300 border border-zinc-700 font-bold">
                 Continue with Free
               </button>
             </div>
 
-            {/* --- ADMIN PLAN --- */}
+            {/* ADMIN PLAN */}
             <div 
               onClick={() => handleSelectPlan('Admin')}
               className={`
-                bg-gradient-to-b from-orange-500/10 to-zinc-900 rounded-2xl border-2 p-8 relative transition-all duration-300 cursor-pointer
+                bg-gradient-to-b from-orange-500/10 to-zinc-900 rounded-2xl border-2 p-8 relative transition-all duration-300 cursor-pointer flex flex-col
                 ${selectedPlan === 'Admin' 
                   ? 'border-orange-500 shadow-[0_0_40px_rgba(249,115,22,0.4)] scale-[1.02]' 
                   : 'border-orange-500/50 hover:shadow-2xl hover:shadow-orange-500/20'}
@@ -154,19 +166,16 @@ export default function PricingPage() {
                   Most Popular
                 </div>
               </div>
-
+              
               <div className="mb-6">
                 <h3 className="text-2xl mb-2 font-bold">Admin Plan</h3>
                 <div className="flex items-baseline gap-2 mb-4">
                   <span className="text-5xl text-orange-500 font-bold">$20</span>
                   <span className="text-gray-400">/month</span>
                 </div>
-                <p className="text-gray-400">
-                  Unlock full power for your team.
-                </p>
+                <p className="text-gray-400">Unlock full power for your team.</p>
               </div>
-
-              <div className="space-y-4 mb-8">
+              <div className="space-y-4 mb-8 flex-grow">
                 {['Unlimited projects', 'Full admin control panel', 'Unlimited team members', 'Advanced analytics'].map((feature, idx) => (
                   <div key={idx} className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -176,13 +185,70 @@ export default function PricingPage() {
                   </div>
                 ))}
               </div>
-
-              <button 
-                onClick={handleAdminUpgrade}
-                className="w-full py-3 px-6 bg-orange-500 text-black rounded-lg hover:bg-orange-600 transition-all duration-300 shadow-lg shadow-orange-500/50 font-bold"
-              >
+              <button onClick={handleAdminUpgrade} className="w-full py-3 px-6 bg-orange-500 text-black rounded-lg hover:bg-orange-600 transition-all duration-300 shadow-lg shadow-orange-500/50 font-bold">
                 Get Admin Access
               </button>
+
+              {/* Hiển thị lỗi Thanh toán */}
+              {paymentError && (
+                <div className="mt-3 flex items-center gap-2 text-red-500 text-sm justify-center animate-pulse">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{paymentError}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* --- SECTION JOIN EXISTING PROJECT --- */}
+          <div className="max-w-2xl mx-auto mb-16 pt-8 border-t border-zinc-800">
+             <div className="text-center">
+                <p className="text-gray-300 text-lg mb-4">
+                  Already have a project?{' '}
+                  <button 
+                    onClick={() => setShowJoinInput(!showJoinInput)}
+                    className="text-orange-500 font-bold hover:text-orange-400 hover:underline transition-colors focus:outline-none"
+                  >
+                    Join here
+                  </button>
+                </p>
+
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showJoinInput ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="flex flex-col gap-2">
+                        <div className={`flex gap-2 p-2 bg-zinc-900 border rounded-xl ${joinError ? 'border-red-500' : 'border-zinc-700'}`}>
+                            <input 
+                                type="text" 
+                                placeholder="Paste your invite link here..." 
+                                className="flex-1 bg-transparent border-none text-white px-4 focus:ring-0 placeholder-gray-500 outline-none"
+                                value={joinLink}
+                                onChange={(e) => {
+                                    setJoinLink(e.target.value);
+                                    if (joinError) setJoinError(''); // Xóa lỗi khi gõ
+                                }}
+                            />
+                            <button 
+                                onClick={handleJoinProject}
+                                className="bg-orange-500 text-black font-bold px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
+                            >
+                                Join <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                        {/* Hiển thị lỗi Join Project */}
+                        {joinError && (
+                            <p className="text-red-500 text-sm text-left pl-2 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" /> {joinError}
+                            </p>
+                        )}
+                    </div>
+                </div>
+             </div>
+          </div>
+
+          <div className="text-center pb-8">
+            <p className="text-gray-400 mb-4">All plans include 14-day money-back guarantee</p>
+            <div className="flex items-center justify-center gap-8 text-sm text-gray-500">
+              <span>✓ Secure payments</span>
+              <span>✓ Cancel anytime</span>
+              <span>✓ No hidden fees</span>
             </div>
           </div>
         </div>
