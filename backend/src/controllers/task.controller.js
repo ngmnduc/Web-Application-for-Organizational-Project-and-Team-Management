@@ -505,21 +505,25 @@ export const magicSubtasks = async (req, res) => {
 
     const subtaskTitles = await AIService.generateSubtasks(
         task.title, 
-        task.description || "" 
+        task.description || ""
     );
 
     if (!subtaskTitles || subtaskTitles.length === 0) {
         return res.status(200).json({ success: true, message: "AI did not generate any steps.", data: [] });
     }
 
-    const newSubtasks = subtaskTitles.map(title => ({ title, isCompleted: false }));
+    const newSubtasks = subtaskTitles.map(title => ({
+        _id: new mongoose.Types.ObjectId(), 
+        title: title,
+        isCompleted: false
+    }));
     
-    const updatedTask = await Task.findByIdAndUpdate(
+    await Task.findByIdAndUpdate(
       taskId,
       { 
         $push: { subtasks: { $each: newSubtasks } } 
       },
-      { new: true }
+      { new: true } 
     );
 
     try {
@@ -528,7 +532,7 @@ export const magicSubtasks = async (req, res) => {
             userId: userId,
             taskId: taskId,
             action: "AI_SUGGESTION",
-            content: `generated ${newSubtasks.length} subtasks using AI for task "${task.title}"`
+            content: `generated ${newSubtasks.length} subtasks using AI`
         });
     } catch (logError) {
         console.error("AI Log Error:", logError.message);
@@ -537,7 +541,7 @@ export const magicSubtasks = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "AI subtasks added successfully",
-      data: updatedTask.subtasks 
+      data: newSubtasks 
     });
 
   } catch (error) {

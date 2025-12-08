@@ -277,28 +277,34 @@ export const getPendingRequests = async (req, res) => {
 export const getInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
-    let project = await Project.findById(id).select('inviteCode'); // Lấy riêng trường inviteCode
+    let project = await Project.findById(id).select('+inviteCode');
     
     if (!project) return res.status(404).json({ success: false, message: "Project not found" });
 
-    if (!project.inviteCode) {
-      let newCode;
-      let isUnique = false;
-      
-      while (!isUnique) {
-        newCode = generateRandomCode(6); 
-        const existingProject = await Project.findOne({ inviteCode: newCode });
-        if (!existingProject) {
-          isUnique = true;
-        }
-      }
-
-      project.inviteCode = newCode;
-      await project.save();
-      project = await Project.findById(id).select('inviteCode');
+    if (project.inviteCode) {
+      return res.json({ success: true, code: project.inviteCode });
     }
 
-    res.json({ success: true, code: project.inviteCode });
+    for (let i = 0; i < 5; i++) {
+        try {
+            let newCode;
+            do {
+                newCode = generateRandomCode(6); 
+            } while (await Project.findOne({ inviteCode: newCode }));
+            project.inviteCode = newCode;
+            await project.save();
+            return res.json({ success: true, code: newCode });
+
+        } catch (err) {
+            if (err.code === 11000) {
+                console.warn(`Invite Code Race Condition detected for project ${id}. Retrying... Attempt ${i + 1}`);
+                continue; 
+            }
+            throw err;
+        }
+    }
+    return res.status(500).json({ success: false, message: "Failed to generate unique invite code after multiple retries." });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -310,32 +316,33 @@ export const getInviteCode = async (req, res) => {
  * @access  Private (Admin/Manager)
  */
 export const resetInviteCode = async (req, res) => {
-  try {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    let newCode;
-    let isUnique = false;
-    
-    while (!isUnique) {
-      newCode = generateRandomCode(6);
-      const existingProject = await Project.findOne({ inviteCode: newCode });
-      if (!existingProject) {
-        isUnique = true;
+  for (let i = 0; i < 5; i++) {
+      try {
+          let newCode;
+          do {
+              newCode = generateRandomCode(6);
+          } while (await Project.findOne({ inviteCode: newCode }));
+
+          const project = await Project.findByIdAndUpdate(
+              id,
+              { inviteCode: newCode },
+              { new: true, select: '+inviteCode' }
+          );
+
+          if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+          return res.json({ success: true, message: "Invite code reset successfully", code: project.inviteCode });
+
+      } catch (err) {
+          if (err.code === 11000) {
+              console.warn(`Reset Code Race Condition detected for project ${id}. Retrying... Attempt ${i + 1}`);
+              continue; 
+          }
+          return res.status(500).json({ success: false, message: err.message });
       }
-    }
-
-    const project = await Project.findByIdAndUpdate(
-      id,
-      { inviteCode: newCode },
-      { new: true, select: 'inviteCode' }
-    );
-
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
-
-    res.json({ success: true, message: "Invite code reset successfully", code: project.inviteCode });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
   }
+  return res.status(500).json({ success: false, message: "Failed to reset invite code after multiple retries." });
 };
 
 /**
@@ -350,23 +357,46 @@ export const joinProjectByCode = async (req, res) => {
 
     if (!inviteCode) return res.status(400).json({ success: false, message: "Invite code is required" });
 
-    const project = await Project.findOne({ inviteCode });
+    const normalizedCode = inviteCode.toUpperCase().trim();
 
+    const project = await Project.findOne({ inviteCode: normalizedCode, deletedAt: null });
+    
     if (!project) {
       return res.status(404).json({ success: false, message: "Invalid or expired invite code." });
     }
 
-    const isMember = project.members.some(member => String(member.user) === String(userId));
+    const updatedProject = await Project.findOneAndUpdate(
+        { 
+            _id: project._id, 
+            "members.user": { $ne: userId }
+        },
+        { 
+            $push: { 
+                members: { 
+                    user: userId, 
+                    role: "Member", 
+                    status: "ACTIVE"
+                } 
+            } 
+        },
+        { new: true }
+    );
 
-    if (isMember) {
-      return res.status(400).json({ success: false, message: "You are already a member of this project." });
+    if (!updatedProject) {
+        return res.status(400).json({ success: false, message: "You are already a member of this project." });
     }
 
-    project.members.push({ user: userId, role: "Member" });
+    try {
+        await ActivityLog.create({
+            projectId: updatedProject._id,
+            userId: userId,
+            action: "JOIN_PROJECT",
+            content: `joined project "${updatedProject.name}" using invite code.`
+        });
+    } catch (e) { console.error("Logging failed:", e.message); }
     
-    await project.save();
+    res.json({ success: true, message: "Successfully joined project", projectId: updatedProject._id });
 
-    res.json({ success: true, message: "Successfully joined project", projectId: project._id });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
