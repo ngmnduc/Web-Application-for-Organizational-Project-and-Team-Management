@@ -167,11 +167,15 @@ export const getProjectSummary = async (req, res) => {
 
     const now = new Date();
 
-    const [totalTasks, todo , doing , done , overdue] = await Promise.all([
+    const [totalTasks, todo , doing , done , overdue, high, medium, low] = await Promise.all([
       Task.countDocuments({projectId: id, deletedAt: null}),
       Task.countDocuments({projectId: id, status: "TODO", deletedAt: null}),
       Task.countDocuments({projectId: id, status: "DOING", deletedAt: null}),
       Task.countDocuments({projectId: id, status: "DONE", deletedAt: null}),
+      // Thêm 3 dòng này để lấy Priority
+      Task.countDocuments({ projectId: id, priority: "HIGH", deletedAt: null }),
+      Task.countDocuments({ projectId: id, priority: "MEDIUM", deletedAt: null }),
+      Task.countDocuments({ projectId: id, priority: "LOW", deletedAt: null }),
       Task.countDocuments({
         projectId : id,
         deletedAt: null,
@@ -198,7 +202,13 @@ export const getProjectSummary = async (req, res) => {
         doing,
         done,
         overdue,
-        daysLeft
+        daysLeft,
+        // Trả thêm Priority về Frontend
+        priority: {
+            high,
+            medium,
+            low
+        }
       }
     });
   } catch (error){
