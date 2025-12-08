@@ -227,3 +227,57 @@ export async function changePassword(req, res, next) {
     next(err);
   }
 }
+
+/**
+ * @desc    Update user profile
+ * @route   PATCH /auth/profile
+ * @access  Private
+ */
+export async function updateProfile(req, res, next) {
+  try {
+    const { avatar, fullName, phoneNumber } = req.body;
+
+    const user = await User.findOne({ _id: req.user.sub, deletedAt: null });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "NotFoundError",
+        message: "User not found",
+      });
+    }
+
+    // Update fields if provided
+    if (avatar !== undefined) user.avatar = avatar;
+    if (fullName !== undefined) {
+      if (fullName.trim().length < 2 || fullName.trim().length > 100) {
+        return res.status(400).json({
+          success: false,
+          error: "ValidationError",
+          message: "Full name must be between 2 and 100 characters",
+        });
+      }
+      user.name = fullName.trim();
+    }
+    if (phoneNumber !== undefined) {
+      if (phoneNumber && !/^[0-9+\-() ]*$/.test(phoneNumber)) {
+        return res.status(400).json({
+          success: false,
+          error: "ValidationError",
+          message: "Invalid phone number format",
+        });
+      }
+      user.phoneNumber = phoneNumber;
+    }
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: toPublicUser(user),
+    });
+  } catch (err) {
+    next(err);
+  }
+}

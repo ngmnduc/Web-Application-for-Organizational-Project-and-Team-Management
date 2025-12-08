@@ -24,28 +24,37 @@ limiter.on("failed", async (error, jobInfo)=> {
 
 class AIService{
     //Task 1 subtask >.<
-    static async generateSubtasks(taskTitle) {
+    static async generateSubtasks(taskTitle, taskDescription) {
     // Bọc hàm gọi API vào limiter
     return limiter.schedule(async () => {
       try {
         console.log(`AI Generating subtasks for: "${taskTitle}"...`);
 
+        const cleanDesc = taskDescription ? taskDescription.trim() : "No additional details provided.";
         // Prompt Template 
         const prompt = `
           You are a strict task management assistant.
-          Action: Break down the task "${taskTitle}" into 3 to 5 small actionable steps.
+          Objective: Break down the following task into 3 to 5 small, concrete, actionable subtasks.
+
+          --- INPUT DATA ---
+          MAIN GOAL (Title): "${taskTitle}"
+          CONTEXT & DETAILS (Description): "${cleanDesc}"
+          ------------------
+
+          INSTRUCTIONS:
+          1. Analyze the 'MAIN GOAL' combined with 'CONTEXT'.
+          2. If the description provides specific tools, formats, or deadlines, include them in the steps.
+          3. If the description is empty, infer standard best practices based on the title.
           
           OUTPUT RULES (Strictly Follow):
           1. Language: English.
           2. Format: A raw JSON Array of strings.
-          3. Content style: "Step 1: [Action]", "Step 2: [Action]".
-          4. NO Markdown, NO explanations, NO code blocks (like \`\`\`json).
+          3. Content style: "Step 1: [Action verb] [Specific detail]", "Step 2: ..."
+          4. NO Markdown, NO explanations, NO code blocks.
           5. Return ONLY the Array.
 
           Example Output:
-          ["Step 1: Research competitor apps",
-            "Step 2: Sketch initial UI wireframes", 
-            "Step 3: Define database schema"]
+          ["Step 1: Draft the initial outline based on Q3 data", "Step 2: Review specific KPIs mentioned in email", "Step 3: Export final report to PDF"]
         `;
 
         // Gọi API
