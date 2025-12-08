@@ -156,6 +156,14 @@ export const createMeeting = async (req, res) => {
       });
     }
 
+    if (!location || !location.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "ValidationError",
+        message: "Meeting location is required",
+      });
+    }
+
     // Validate time logic
     const start = new Date(startTime);
     const end = new Date(endTime);
@@ -195,7 +203,7 @@ export const createMeeting = async (req, res) => {
       description: description || "",
       startTime: start,
       endTime: end,
-      location: location || "",
+      location: location.trim(),
       attendees: attendees || [],
       createdBy: req.user._id,
     });
@@ -289,7 +297,16 @@ export const updateMeeting = async (req, res) => {
     // Update fields
     if (title) meeting.title = title;
     if (description !== undefined) meeting.description = description;
-    if (location !== undefined) meeting.location = location;
+    if (location !== undefined) {
+      if (!location || !location.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: "ValidationError",
+          message: "Meeting location is required",
+        });
+      }
+      meeting.location = location.trim();
+    }
     if (attendees) meeting.attendees = attendees;
 
     await meeting.save();

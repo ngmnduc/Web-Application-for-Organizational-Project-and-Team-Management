@@ -6,6 +6,15 @@ import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 
+const generateRandomCode = (length = 6) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
 // POST /projects
 export const createProject = async (req, res) => {
   try {
@@ -159,11 +168,15 @@ export const getProjectSummary = async (req, res) => {
 
     const now = new Date();
 
-    const [totalTasks, todo , doing , done , overdue] = await Promise.all([
+    const [totalTasks, todo , doing , done , overdue, high, medium, low] = await Promise.all([
       Task.countDocuments({projectId: id, deletedAt: null}),
       Task.countDocuments({projectId: id, status: "TODO", deletedAt: null}),
       Task.countDocuments({projectId: id, status: "DOING", deletedAt: null}),
       Task.countDocuments({projectId: id, status: "DONE", deletedAt: null}),
+      // Thêm 3 dòng này để lấy Priority
+      Task.countDocuments({ projectId: id, priority: "HIGH", deletedAt: null }),
+      Task.countDocuments({ projectId: id, priority: "MEDIUM", deletedAt: null }),
+      Task.countDocuments({ projectId: id, priority: "LOW", deletedAt: null }),
       Task.countDocuments({
         projectId : id,
         deletedAt: null,
@@ -190,7 +203,13 @@ export const getProjectSummary = async (req, res) => {
         doing,
         done,
         overdue,
-        daysLeft
+        daysLeft,
+        // Trả thêm Priority về Frontend
+        priority: {
+            high,
+            medium,
+            low
+        }
       }
     });
   } catch (error){
@@ -256,6 +275,139 @@ export const getPendingRequests = async (req, res) => {
     });
 
     res.json({ success: true, data: pendingList });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * @desc    Get current invite code, generate if null
+ * @route   GET /projects/:id/invite-code
+ * @access  Private (Admin/Manager)
+ */
+export const getInviteCode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let project = await Project.findById(id).select('+inviteCode');
+    
+    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+
+    if (project.inviteCode) {
+      return res.json({ success: true, code: project.inviteCode });
+    }
+
+    for (let i = 0; i < 5; i++) {
+        try {
+            let newCode;
+            do {
+                newCode = generateRandomCode(6); 
+            } while (await Project.findOne({ inviteCode: newCode }));
+            project.inviteCode = newCode;
+            await project.save();
+            return res.json({ success: true, code: newCode });
+
+        } catch (err) {
+            if (err.code === 11000) {
+                console.warn(`Invite Code Race Condition detected for project ${id}. Retrying... Attempt ${i + 1}`);
+                continue; 
+            }
+            throw err;
+        }
+    }
+    return res.status(500).json({ success: false, message: "Failed to generate unique invite code after multiple retries." });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * @desc    Generate a new random invite code
+ * @route   PATCH /projects/:id/invite-code
+ * @access  Private (Admin/Manager)
+ */
+export const resetInviteCode = async (req, res) => {
+  const { id } = req.params;
+
+  for (let i = 0; i < 5; i++) {
+      try {
+          let newCode;
+          do {
+              newCode = generateRandomCode(6);
+          } while (await Project.findOne({ inviteCode: newCode }));
+
+          const project = await Project.findByIdAndUpdate(
+              id,
+              { inviteCode: newCode },
+              { new: true, select: '+inviteCode' }
+          );
+
+          if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+          return res.json({ success: true, message: "Invite code reset successfully", code: project.inviteCode });
+
+      } catch (err) {
+          if (err.code === 11000) {
+              console.warn(`Reset Code Race Condition detected for project ${id}. Retrying... Attempt ${i + 1}`);
+              continue; 
+          }
+          return res.status(500).json({ success: false, message: err.message });
+      }
+  }
+  return res.status(500).json({ success: false, message: "Failed to reset invite code after multiple retries." });
+};
+
+/**
+ * @desc    Allow user to join a project using an invite code
+ * @route   POST /projects/join
+ * @access  Private (Member)
+ */
+export const joinProjectByCode = async (req, res) => {
+  try {
+    const { inviteCode } = req.body;
+    const userId = req.user._id;
+
+    if (!inviteCode) return res.status(400).json({ success: false, message: "Invite code is required" });
+
+    const normalizedCode = inviteCode.toUpperCase().trim();
+
+    const project = await Project.findOne({ inviteCode: normalizedCode, deletedAt: null });
+    
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Invalid or expired invite code." });
+    }
+
+    const updatedProject = await Project.findOneAndUpdate(
+        { 
+            _id: project._id, 
+            "members.user": { $ne: userId }
+        },
+        { 
+            $push: { 
+                members: { 
+                    user: userId, 
+                    role: "Member", 
+                    status: "ACTIVE"
+                } 
+            } 
+        },
+        { new: true }
+    );
+
+    if (!updatedProject) {
+        return res.status(400).json({ success: false, message: "You are already a member of this project." });
+    }
+
+    try {
+        await ActivityLog.create({
+            projectId: updatedProject._id,
+            userId: userId,
+            action: "JOIN_PROJECT",
+            content: `joined project "${updatedProject.name}" using invite code.`
+        });
+    } catch (e) { console.error("Logging failed:", e.message); }
+    
+    res.json({ success: true, message: "Successfully joined project", projectId: updatedProject._id });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

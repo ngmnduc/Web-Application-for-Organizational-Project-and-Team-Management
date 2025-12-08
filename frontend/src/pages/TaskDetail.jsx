@@ -1,6 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { getTaskById } from "../services/taskService";
+import {
+   getTaskById,
+   getTaskComments,
+   createComment,
+   createSubtask,
+   toggleSubtask,
+   deleteSubtask,
+} from "../services/taskService";
 import { useAuth } from "../services/AuthContext"; // Import useAuth
 import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon } from "@heroicons/react/24/outline";
 
@@ -12,59 +19,152 @@ const TaskDetail = () => {
 
   // Lấy role của user để phân quyền
   const currentUserRole = (user?.role || "Member");
-  const canManage = ["Manager", "Admin", "Super Admin"].includes(currentUserRole);
+  const canManage = ["Manager", "Admin"].includes(currentUserRole);
 
   // Data có thể được truyền qua navigate state (từ màn hình danh sách)
   const taskFromState = location.state?.task || null;
 
   const [task, setTask] = useState(taskFromState);
+
+  const [commentsList, setCommentsList] = useState([]);
   const [isLoading, setIsLoading] = useState(!taskFromState);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchTask = async () => {
-      try {
-        setIsLoading(true);
-        // Gọi API lấy chi tiết task
-        const data = await getTaskById(taskId);
-        
-        // Merge data từ server (ưu tiên) vào state
-        // Xử lý chuẩn hóa dữ liệu ngay khi nhận về
-        setTask(prev => ({ 
-            ...prev, 
-            ...data,
-            // Map assignee từ object sang name nếu cần hiển thị đơn giản
-            assigneeName: data.assigneeId?.name || "Unassigned",
-            // Map project name
-            projectName: data.projectId?.name || "Unknown Project"
-        }));
-      } catch (err) {
-        console.error("Load detail error:", err);
-        setError("Failed to load task detail");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  //State cho comment vs subtask mới
+  const [newComment, setNewComment] = useState("");
+  const [isPostingComment, setIsPostingComment] = useState(false);
 
-    // Luôn fetch lại để đảm bảo dữ liệu mới nhất (comments, updates...)
-    fetchTask();
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
+
+  // tách fetchTask ra để reuse
+  const fetchTask = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Gọi song song cả 2 API: Lấy Task info và Lấy Comments
+      const [taskData, commentsData] = await Promise.all([
+        getTaskById(taskId),
+        getTaskComments(taskId).catch(() => []) // Nếu lỗi load comment thì trả về mảng rỗng, không chặn load task
+      ]);
+
+      setTask(prev => ({
+        ...prev,
+        ...taskData,
+        assigneeName: taskData.assigneeId?.name || "Unassigned",
+        projectName: taskData.projectId?.name || "Unknown Project",
+        subtasks: taskData.subtasks || [],
+        attachments: taskData.attachments || []
+      }));
+
+      // Set comments riêng
+      setCommentsList(commentsData);
+
+    } catch (err) {
+      console.error("Load detail error:", err);
+      setError("Failed to load task detail");
+    } finally {
+      setIsLoading(false);
+    }
   }, [taskId]);
 
-  if (isLoading && !task) {
-    return <div className="p-8 text-sm text-gray-500 flex justify-center">Loading task details...</div>;
-  }
+  useEffect(() => {
+    fetchTask();
+  }, [fetchTask]);
 
-  if (error) {
-    return <div className="p-8 text-sm text-red-600 flex justify-center">{error}</div>;
-  }
+  // ====== HANDLERS: COMMENTS ======
+  const handlePostComment = async () => {
+    if (!newComment.trim()) return;
+    try {
+      setIsPostingComment(true);
+      await createComment(taskId, newComment.trim());
+      setNewComment("");
+      //Sau khi post, gọi lại API lấy comment mới nhất
+      const updatedComments = await getTaskComments(taskId);
+      setCommentsList(updatedComments);
 
-  if (!task) {
-    return <div className="p-8 text-sm text-gray-500 flex justify-center">Task not found.</div>;
-  }
+    } catch (err) {
+      console.error("Post comment error:", err);
+      setError("Failed to post comment");
+    } finally {
+      setIsPostingComment(false);
+    }
+  };  
+
+  // ====== HANDLERS: SUBTASKS ======
+  const handleCreateSubtask = async () => {
+    if (!newSubtaskTitle.trim()) return;
+    try {
+      setIsCreatingSubtask(true);
+      await createSubtask(taskId, { title: newSubtaskTitle.trim() });
+      setNewSubtaskTitle("");
+
+      //Reload task để lấy subtask mới
+      const updatedTask = await getTaskById(taskId);
+      setTask(prev => ({ ...prev, subtasks: updatedTask.subtasks }));
+     
+    } catch (err) {
+      console.error("Create subtask error:", err);
+      setError("Failed to create sub-task");
+    } finally {
+      setIsCreatingSubtask(false);
+    }
+  };
+
+  const handleToggleSubtask = async (subtaskId) => {
+    try {
+      await toggleSubtask(taskId, subtaskId);
+      //reload logic
+      const updatedTask = await getTaskById(taskId);
+      setTask(prev => ({ ...prev, subtasks: updatedTask.subtasks }));
+    } catch (err) {
+      console.error("Toggle subtask error:", err);
+      setError("Failed to update sub-task");
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId) => {
+    if (!window.confirm("Delete this sub-task?")) return;
+    try {
+      await deleteSubtask(taskId, subtaskId);
+      const updatedTask = await getTaskById(taskId);
+      setTask(prev => ({ ...prev, subtasks: updatedTask.subtasks }));
+    } catch (err) {
+      console.error("Delete subtask error:", err);
+      setError("Failed to delete sub-task");
+    }
+  };
+
+ // ========== RENDER GUARDS ==========
+ if (isLoading && !task) {
+  return (
+    <div className="p-8 text-sm text-gray-500 flex justify-center">
+      Loading task details...
+    </div>
+  );
+}
+
+if (error && !task) {
+  return (
+    <div className="p-8 text-sm text-red-600 flex justify-center">
+      {error}
+    </div>
+  );
+}
+
+if (!task) {
+  return (
+    <div className="p-8 text-sm text-gray-500 flex justify-center">
+      Task not found.
+    </div>
+  );
+}
+ 
 
   const subtasks = task.subtasks || [];
   const attachments = task.attachments || []; // Model hiện tại chưa có, giữ để UI không lỗi
-  const comments = task.comments || []; // Model hiện tại chưa có, giữ để UI không lỗi
+  const comments = commentsList || [];
 
   // Xử lý hiển thị Priority (Backend trả về chữ hoa: HIGH, MEDIUM...)
   const displayPriority = task.priority 
@@ -156,13 +256,28 @@ const TaskDetail = () => {
           {/* Subtasks */}
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             <div className="flex justify-between mb-4">
-              <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>
-              {canManage && (
-                <button className="text-xs text-blue-600 font-medium hover:underline">
-                  + Add Item
-                </button>
-              )}
+              <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>  
             </div>
+
+            {/* input tạo subtask mới */}
+            {canManage && (
+                  <div className="flex items-center gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    placeholder="New sub-task title..."
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+                  />
+                  <button
+                    onClick={handleCreateSubtask}
+                    disabled={isCreatingSubtask || !newSubtaskTitle.trim()}
+                    className="px-3 py-2 rounded-lg bg-[var(--color-brand)] text-white text-xs font-medium disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}    
 
             {subtasks.length === 0 ? (
               <p className="text-sm text-gray-400 italic">No subtasks yet.</p>
@@ -174,16 +289,20 @@ const TaskDetail = () => {
                       {/* Dùng isCompleted theo Schema Backend */}
                       <input 
                         type="checkbox" 
-                        checked={st.isCompleted} 
-                        readOnly 
-                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={!!st.isCompleted} 
+                        onChange={() => handleToggleSubtask(st.id || st._id)}
+                        disabled={!canManage}
+                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                       />
                       <span className={`text-sm ${st.isCompleted ? 'line-through text-gray-400' : 'text-gray-700'}`}>
                         {st.title}
                       </span>
                     </div>
                     {canManage && (
-                        <button className="text-xs text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:underline">
+                        <button
+                         className="text-xs text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
+                         onClick={() => handleDeleteSubtask(st.id || st._id)}
+                         >
                             Delete
                         </button>
                     )}
@@ -209,10 +328,17 @@ const TaskDetail = () => {
                         rows={2}
                         className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition"
                         placeholder="Write a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        disabled={isPostingComment}
                     />
                     <div className="mt-2 flex justify-end">
-                        <button className="px-4 py-1.5 rounded-lg bg-[var(--color-brand)] text-white text-xs font-bold hover:bg-blue-700 transition">
-                        Post Comment
+                        <button
+                         className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                         onClick={handlePostComment}
+                          disabled={isPostingComment || !newComment.trim()}
+                         >
+                        {isPostingComment ? "Posting..." : "Post Comment"}
                         </button>
                     </div>
                 </div>
@@ -226,12 +352,20 @@ const TaskDetail = () => {
                   <li key={c.id || c._id} className="text-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-6 h-6 rounded-full bg-gray-200 text-[10px] flex items-center justify-center font-bold text-gray-600">
-                        {c.authorInitials || "??"}
+                        {c.authorInitials || (c.userID?.name ? c.userID.name[0] : "?")}
                       </div>
-                      <span className="font-semibold text-gray-900">{c.authorName}</span>
-                      <span className="text-xs text-gray-400">
-                        • {new Date(c.createdAt).toLocaleDateString()}
+                      <span className="font-semibold text-gray-900">
+                        {c.authorName || c.userID?.name || "Unknown User"}
                       </span>
+                      
+                      {c.createdAt && (
+                        <span className="text-xs text-gray-400">
+                          •{" "}
+                          {new Date(c.createdAt).toLocaleDateString("en-GB", {
+                           day: "numeric", month: "short", hour: "2-digit", minute:"2-digit"
+                          })}
+                        </span>
+                      )}
                     </div>
                     <div className="pl-8">
                         <p className="text-gray-700 bg-gray-50 p-3 rounded-lg rounded-tl-none inline-block">

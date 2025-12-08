@@ -14,14 +14,16 @@ import AdminLayout from "./layouts/AdminLayout";
 import AppRouter from "./routes/AppRouter.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import PricingPage from "./pages/PricingPage.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
 
 // sau này thêm Dashboard, NotFound,...
 
 function App() {
   return (
     <Routes>
-
-      <Route path="/" element={<Navigate to="/login" />} />
+      
+      {/* trang mặc định */}
+      <Route path="/" element={<LandingPage />} />
 
       {/* login */}
       <Route path="/login" element={<LoginPage />} />
@@ -43,6 +45,8 @@ function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/members" element={<Members />} />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:projectId" element={<Projects />} />
+        <Route path="/projects/:projectId/home" element={<HomePage />} />
 
       </Route>
       {/* admin */}
@@ -56,6 +60,8 @@ function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="members" element={<Members />} />
         <Route path="projects" element={<Projects />} />
+        <Route path="projects/:projectId" element={<Projects />} />
+        <Route path="projects/:projectId/home" element={<HomePage />} />
 
       </Route>
 
