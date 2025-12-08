@@ -89,7 +89,7 @@ const TaskDetail = () => {
             <button className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
                Edit Task
             </button>
-            <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+            <button className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium  transition-colors">
               + Sub-task
             </button>
           </div>
@@ -211,7 +211,7 @@ const TaskDetail = () => {
                         placeholder="Write a comment..."
                     />
                     <div className="mt-2 flex justify-end">
-                        <button className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition">
+                        <button className="px-4 py-1.5 rounded-lg bg-[var(--color-brand)] text-white text-xs font-bold hover:bg-blue-700 transition">
                         Post Comment
                         </button>
                     </div>

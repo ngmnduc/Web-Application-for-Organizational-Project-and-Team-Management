@@ -18,18 +18,14 @@ router.post("/projects/:projectId/attendance/checkin", verifyToken, checkIn);
 
 /**
  * @route   GET /projects/:projectId/attendance/me
- * @desc    Get my attendance status for today
+ * @desc    Get my attendance today for a project
  * @access  Private
  */
-router.get(
-  "/projects/:projectId/attendance/me",
-  verifyToken,
-  getMyAttendanceToday
-);
+router.get("/projects/:projectId/attendance/me", verifyToken, getMyAttendanceToday);
 
 /**
  * @route   GET /projects/:projectId/attendance
- * @desc    Get attendance history for a project (Admin/Manager only)
+ * @desc    Get all attendance for a project (Admin/Manager only)
  * @access  Private (Admin/Manager)
  */
 router.get(

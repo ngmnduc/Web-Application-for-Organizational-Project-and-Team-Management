@@ -20,7 +20,9 @@ import { getMembers, addMember, removeMember, joinRequest, approveMember } from 
 import { checkProjectActive } from "./middlewares/archive.middleware.js";
 import taskRoutes from "./routes/task.routes.js";
 import meetingRoutes from "./routes/meeting.routes.js";
-import attendanceRoutes from "./routes/attendance.routes.js";const router = Router();
+import attendanceRoutes from "./routes/attendance.routes.js";
+
+const router = Router();
 
 router.get("/healthz", (req, res) => res.json({ ok: true }));
 router.get("/auth/me", verifyToken, me);
