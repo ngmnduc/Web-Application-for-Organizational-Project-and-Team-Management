@@ -27,7 +27,7 @@ export const getDailyBrief = async (req, res) => {
             { dueDate: { $lt: startOfDay } } 
         ],
         deletedAt: null
-    }).select("title status priority dueDate");
+    }).select("title status priority dueDate labels");
 
     const meetings = await Meeting.find({
         attendees: userId, 
@@ -50,7 +50,8 @@ export const getDailyBrief = async (req, res) => {
     const simplifiedTasks = tasks.map(t => ({
         title: t.title,
         status: t.status,
-        priority: t.priority
+        priority: t.priority,
+        labels: t.labels
     }));
 
     const simplifiedMeetings = meetings.map(m => ({
