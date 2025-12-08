@@ -1,5 +1,5 @@
 import Task from "../models/task.model.js";
-import Meeting from "../models/meeting.model.js"; // Import Meeting Model
+import Meeting from "../models/meeting.model.js";
 import AIService from "../services/ai.service.js";
 import mongoose from "mongoose";
 
@@ -11,7 +11,7 @@ import mongoose from "mongoose";
 export const getDailyBrief = async (req, res) => {
   try {
     const userId = req.user._id;
-    
+
     const now = new Date();
     const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
@@ -20,20 +20,32 @@ export const getDailyBrief = async (req, res) => {
     endOfDay.setHours(23, 59, 59, 999);
 
     const tasks = await Task.find({
-        assigneeId: new mongoose.Types.ObjectId(userId),
+        assigneeId: userId,
         status: { $nin: ["DONE", "BACKLOG"] }, 
         $or: [
-            { dueDate: { $gte: startOfDay, $lte: endOfDay } }, // Due today
-            { dueDate: { $lt: startOfDay } }
+            { dueDate: { $gte: startOfDay, $lte: endOfDay } }, 
+            { dueDate: { $lt: startOfDay } } 
         ],
         deletedAt: null
     }).select("title status priority dueDate labels");
 
     const meetings = await Meeting.find({
-        attendees: new mongoose.Types.ObjectId(userId), // User phải là người tham dự
+        attendees: userId, 
         startTime: { $gte: startOfDay, $lte: endOfDay },
         deletedAt: null
     }).select("title startTime endTime location");
+
+    if (tasks.length === 0 && meetings.length === 0) {
+        return res.status(200).json({
+            success: true,
+            data: {
+                greeting: "Hello! You have a completely free schedule today.",
+                task_highlights: [],
+                upcoming_meetings: [],
+                encouragement: "Enjoy your free time!"
+            }
+        });
+    }
 
     const simplifiedTasks = tasks.map(t => ({
         title: t.title,
@@ -44,8 +56,13 @@ export const getDailyBrief = async (req, res) => {
 
     const simplifiedMeetings = meetings.map(m => ({
         title: m.title,
-        time: new Date(m.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        location: m.location
+        time: new Date(m.startTime).toLocaleTimeString('vi-VN', { 
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+        }),
+        location: m.location || "Online"
     }));
 
     const brief = await AIService.summarizeDay(simplifiedTasks, simplifiedMeetings);
