@@ -1,6 +1,8 @@
 import User from "../models/user.model.js";
 import { signToken } from "../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
+import crypto from "crypto";
+import { sendPasswordResetEmail, sendWelcomeEmail } from "../services/email.service.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -99,6 +101,7 @@ export async function handleGoogleLogin(req, res, next) {
 
 
     let user = await User.findOne({ email });
+    let isNewUser = false;
 
     if (!user) {
       const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
@@ -107,8 +110,19 @@ export async function handleGoogleLogin(req, res, next) {
         name,
         email,
         password: randomPassword, 
+        avatar: picture,
         role: "Member",
       });
+
+      isNewUser = true;
+
+      // Send welcome email to new user
+      try {
+        await sendWelcomeEmail(user.email, user.name);
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+        // Don't fail the registration if email fails
+      }
     }
 
     // Tạo JWT Token (Token hệ thống)
@@ -276,6 +290,113 @@ export async function updateProfile(req, res, next) {
       success: true,
       message: "Profile updated successfully",
       data: toPublicUser(user),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * @desc    Forgot Password - Send reset email
+ * @route   POST /auth/forgot-password
+ * @access  Public
+ */
+export async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: "ValidationError",
+        message: "Email is required",
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase(), deletedAt: null });
+
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      return res.json({
+        success: true,
+        message: "If your email exists in our system, you will receive a password reset link shortly",
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    // Save token to user
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    // Send email
+    await sendPasswordResetEmail(user.email, user.name, resetToken);
+
+    return res.json({
+      success: true,
+      message: "If your email exists in our system, you will receive a password reset link shortly",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * @desc    Reset Password with token
+ * @route   POST /auth/reset-password
+ * @access  Public
+ */
+export async function resetPassword(req, res, next) {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "ValidationError",
+        message: "Token and new password are required",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "ValidationError",
+        message: "New password must be at least 6 characters",
+      });
+    }
+
+    // Hash the token from URL
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // Find user with valid token
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+      deletedAt: null,
+    }).select("+resetPasswordToken +resetPasswordExpires");
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: "ValidationError",
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Password reset successfully. You can now login with your new password",
     });
   } catch (err) {
     next(err);
