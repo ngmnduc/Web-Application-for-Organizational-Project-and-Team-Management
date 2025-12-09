@@ -11,7 +11,7 @@ import {
    getProjectMembers,
 } from "../services/taskService";
 import { useAuth } from "../services/AuthContext"; // Import useAuth
-import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon,  } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
 
 const TaskDetail = () => {
   const { taskId } = useParams();
@@ -359,31 +359,67 @@ const TaskDetail = () => {
               <p className="text-sm text-gray-400 italic">No subtasks yet.</p>
             ) : (
               <ul className="space-y-3">
-                {subtasks.map((st) => (
-                  <li key={st.id || st._id} className="flex justify-between items-start group">
-                    <div className="flex items-start gap-3">
-                      {/* Dùng isCompleted theo Schema Backend */}
-                      <input 
-                        type="checkbox" 
-                        checked={!!st.isCompleted} 
-                        onChange={() => handleToggleSubtask(st.id || st._id)}
-                        disabled={!canManage}
-                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-                      />
-                      <span className={`text-sm ${st.isCompleted ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                        {st.title}
-                      </span>
-                    </div>
-                    {canManage && (
+                {subtasks.map((st) => {
+                  const subtaskId = st.id || st._id;
+                  return (
+                    <li
+                      key={subtaskId}
+                      className="flex items-center justify-between border border-gray-200 bg-white rounded-lg p-4 transition-all hover:shadow-sm group relative"
+                    >
+                      {/* === LEFT SIDE: Title & Description === */}
+                      <div className="flex flex-col gap-1 mr-4">
+                        {/* Title - Không gạch ngang chữ nữa, nhìn hiện đại hơn */}
+                        <span className={`font-medium ${st.isCompleted ? 'text-gray-600' : 'text-gray-900'}`}>
+                          {st.title}
+                        </span>
+                        {/* Nếu sau này thêm field description cho subtask thì hiện nó ở đây */}
+                        {/* {st.description && <span className="text-xs text-gray-500">{st.description}</span>} */}
+                      </div>
+            
+                      {/* === RIGHT SIDE: Status Badge & Actions === */}
+                      <div className="flex items-center gap-4 shrink-0">
+                        {/* Status Badge - Click vào đây để toggle trạng thái */}
                         <button
-                         className="text-xs text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
-                         onClick={() => handleDeleteSubtask(st.id || st._id)}
-                         >
-                            Delete
+                          onClick={() => handleToggleSubtask(subtaskId)}
+                          disabled={!canManage}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            !canManage ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-opacity-80'
+                          } ${
+                            st.isCompleted
+                              ? 'bg-green-50 text-green-700' // Style cho trạng thái DONE
+                              : 'bg-red-50 text-red-700'     // Style cho trạng thái NOT STARTED
+                          }`}
+                        >
+                          {st.isCompleted ? (
+                            <>
+                              <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                              <span>Done</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircleIcon className="w-5 h-5 text-red-600" />
+                              <span>Not Started</span>
+                            </>
+                          )}
                         </button>
-                    )}
-                  </li>
-                ))}
+                        
+                        {/* Delete Button - Hiện khi hover */}
+                        {canManage && (
+                          <button
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Ngăn việc click nút delete kích hoạt toggle
+                              handleDeleteSubtask(subtaskId);
+                            }}
+                            title="Delete subtask"
+                          >
+                            <XMarkIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
