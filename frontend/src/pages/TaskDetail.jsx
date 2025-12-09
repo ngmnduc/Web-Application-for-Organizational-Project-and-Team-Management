@@ -9,9 +9,10 @@ import {
    deleteSubtask,
    updateTask,
    getProjectMembers,
+   generateAiSubtasks
 } from "../services/taskService";
 import { useAuth } from "../services/AuthContext"; // Import useAuth
-import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
+import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon, SparklesIcon } from "@heroicons/react/24/solid";
 
 const TaskDetail = () => {
   const { taskId } = useParams();
@@ -39,6 +40,9 @@ const TaskDetail = () => {
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
+
+  //state cho AI subtask
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // state cho edit modal
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -169,6 +173,29 @@ const TaskDetail = () => {
     }
   };
 
+  // --- AI HANDLER ---
+  const handleMagicSubtasks = async () => {
+    try {
+        setIsGenerating(true); // Bật loading
+        
+        // Gọi API AI
+        const newSubtasks = await generateAiSubtasks(taskId);
+        
+        // Cập nhật state ngay lập tức (thêm các subtask mới vào list cũ)
+        setTask(prev => ({
+            ...prev,
+            subtasks: [...prev.subtasks, ...newSubtasks]
+        }));
+        
+        alert(`AI has created ${newSubtasks.length} subtasks for you!`);
+    } catch (err) {
+        console.error(err);
+        alert("AI Error: " + (err.message || "Cannot create subtasks"));
+    } finally {
+        setIsGenerating(false); // Tắt loading
+    }
+  };
+
   // --- HANDLERS: EDIT TASK ---
   const openEditModal = () => {
     if (!task) return;
@@ -227,7 +254,6 @@ const TaskDetail = () => {
   const subtasks = task.subtasks || [];
   const attachments = task.attachments || []; 
   const comments = commentsList || [];
-
   // Xử lý hiển thị Priority (Backend trả về chữ hoa: HIGH, MEDIUM...)
   const displayPriority = task.priority 
     ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1).toLowerCase() 
@@ -303,7 +329,7 @@ const TaskDetail = () => {
         </div>
       </div>
 
-      {/* --- FIX: THÊM ĐOẠN NÀY ĐỂ HIỆN LỖI --- */}
+      {/* --- THÊM ĐOẠN NÀY ĐỂ HIỆN LỖI --- */}
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg relative">
             <strong className="font-bold">Error: </strong>
@@ -330,8 +356,32 @@ const TaskDetail = () => {
 
           {/* Subtasks */}
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-            <div className="flex justify-between mb-4">
-              <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>  
+            {/* --- HEADER CÓ NÚT AI --- */}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>
+              {canManage && (
+                 <button 
+                   onClick={handleMagicSubtasks}
+                   disabled={isGenerating}
+                   className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                   title="Generate subtasks using AI"
+                 >
+                   {isGenerating ? (
+                     <>
+                        <svg className="animate-spin h-4 w-4 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Thinking...</span>
+                     </>
+                   ) : (
+                     <>
+                       <SparklesIcon className="w-4 h-4" />
+                       <span>AI Suggest</span>
+                     </>
+                   )}
+                 </button>
+              )} 
             </div>
 
             {/* input tạo subtask mới */}
@@ -359,67 +409,23 @@ const TaskDetail = () => {
               <p className="text-sm text-gray-400 italic">No subtasks yet.</p>
             ) : (
               <ul className="space-y-3">
-                {subtasks.map((st) => {
-                  const subtaskId = st.id || st._id;
-                  return (
-                    <li
-                      key={subtaskId}
-                      className="flex items-center justify-between border border-gray-200 bg-white rounded-lg p-4 transition-all hover:shadow-sm group relative"
-                    >
-                      {/* === LEFT SIDE: Title & Description === */}
-                      <div className="flex flex-col gap-1 mr-4">
-                        {/* Title - Không gạch ngang chữ nữa, nhìn hiện đại hơn */}
-                        <span className={`font-medium ${st.isCompleted ? 'text-gray-600' : 'text-gray-900'}`}>
-                          {st.title}
-                        </span>
-                        {/* Nếu sau này thêm field description cho subtask thì hiện nó ở đây */}
-                        {/* {st.description && <span className="text-xs text-gray-500">{st.description}</span>} */}
-                      </div>
-            
-                      {/* === RIGHT SIDE: Status Badge & Actions === */}
-                      <div className="flex items-center gap-4 shrink-0">
-                        {/* Status Badge - Click vào đây để toggle trạng thái */}
-                        <button
-                          onClick={() => handleToggleSubtask(subtaskId)}
-                          disabled={!canManage}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                            !canManage ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-opacity-80'
-                          } ${
-                            st.isCompleted
-                              ? 'bg-green-50 text-green-700' // Style cho trạng thái DONE
-                              : 'bg-red-50 text-red-700'     // Style cho trạng thái NOT STARTED
-                          }`}
-                        >
-                          {st.isCompleted ? (
-                            <>
-                              <CheckCircleIcon className="w-5 h-5 text-green-600" />
-                              <span>Done</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircleIcon className="w-5 h-5 text-red-600" />
-                              <span>Not Started</span>
-                            </>
-                          )}
+                {subtasks.map((st) => (
+                  <li key={st.id || st._id} className="flex items-center justify-between border border-gray-200 bg-white rounded-lg p-3 sm:p-4 hover:shadow-sm group transition-all">
+                    <div className="flex flex-col gap-1 mr-4">
+                      <span className={`font-medium text-sm ${st.isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{st.title}</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button onClick={() => handleToggleSubtask(st.id || st._id)} disabled={!canManage} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-colors ${!canManage ? 'cursor-default' : 'hover:opacity-80'} ${st.isCompleted ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {st.isCompleted ? <><CheckCircleIcon className="w-4 h-4" />Done</> : <><XCircleIcon className="w-4 h-4" />Todo</>}
+                      </button>
+                      {canManage && (
+                        <button className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all" onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(st.id || st._id); }} title="Delete">
+                          <XMarkIcon className="w-4 h-4" />
                         </button>
-                        
-                        {/* Delete Button - Hiện khi hover */}
-                        {canManage && (
-                          <button
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Ngăn việc click nút delete kích hoạt toggle
-                              handleDeleteSubtask(subtaskId);
-                            }}
-                            title="Delete subtask"
-                          >
-                            <XMarkIcon className="w-5 h-5" />
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+                      )}
+                    </div>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
