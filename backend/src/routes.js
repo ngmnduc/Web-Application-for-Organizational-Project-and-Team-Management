@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { me, promoteRole, signup, login, handleGoogleLogin, changePassword, updateProfile } from "./controllers/auth.controller.js";
+git import { me, promoteRole, signup, login, handleGoogleLogin, changePassword, updateProfile } from "./controllers/auth.controller.js";
 import { verifyToken, checkRole } from "./middlewares/auth.js";
 import { ROLES } from "./models/user.model.js";
 import {
