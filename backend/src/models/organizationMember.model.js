@@ -19,12 +19,9 @@ const OrganizationMemberSchema = new mongoose.Schema(
             required: true
         },
     },
-    { 
-        timestamps: true,
-        indexes: [
-            { fields: ['organizationId', 'userId'], unique: true }
-        ]
-    }
+    { timestamps: true}
 );
+OrganizationMemberSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
 
-export default mongoose.model("OrganizationMember", OrganizationMemberSchema);
+const OrganizationMember = mongoose.model("OrganizationMember", OrganizationMemberSchema);
+export default OrganizationMember;
