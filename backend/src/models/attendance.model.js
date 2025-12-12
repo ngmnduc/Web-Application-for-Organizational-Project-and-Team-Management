@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 
 const attendanceSchema = new mongoose.Schema(
   {
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
