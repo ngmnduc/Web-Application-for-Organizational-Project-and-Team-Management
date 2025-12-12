@@ -204,12 +204,20 @@ export const getProjectSummary = async (req, res) => {
         done,
         overdue,
         daysLeft,
-        // Trả thêm Priority về Frontend
+        
+        // 1. Priority: BỎ critical đi để khớp với giao diện FE hiện tại
         priority: {
             high,
             medium,
             low
-        }
+        },
+
+        // 2. QUAN TRỌNG: Phải có mảng này thì FE mới vẽ được biểu đồ Status
+        tasksByStatus: [
+            { _id: 'TODO', count: todo },
+            { _id: 'DOING', count: doing },
+            { _id: 'DONE', count: done }
+        ]
       }
     });
   } catch (error){

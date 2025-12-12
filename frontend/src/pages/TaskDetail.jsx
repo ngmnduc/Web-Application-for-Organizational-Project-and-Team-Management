@@ -22,6 +22,9 @@ const TaskDetail = () => {
 
   //Ref cho ô imput Subtask
   const subtaskInputRef = useRef(null);
+  const isGeneratingRef = useRef(false);
+  const lastGenerateTime = useRef(0); //  Track thời gian lần cuối gọi AI
+  const COOLDOWN_MS = 5000; //5 giây cooldown
 
   // Lấy role của user để phân quyền
   const currentUserRole = (user?.role || "Member");
@@ -174,25 +177,65 @@ const TaskDetail = () => {
   };
 
   // --- AI HANDLER ---
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      const timer = setTimeout(() => {
+        setCooldownSeconds(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownSeconds]);
+
   const handleMagicSubtasks = async () => {
+    if (isGeneratingRef.current) return;
+
+    const now = Date.now();
+    const timeSinceLastGenerate = now - lastGenerateTime.current;
+    
+    if (timeSinceLastGenerate < COOLDOWN_MS) {
+      const remaining = Math.ceil((COOLDOWN_MS - timeSinceLastGenerate) / 1000);
+      setCooldownSeconds(remaining);
+      return;
+    }
+
     try {
-        setIsGenerating(true); // Bật loading
-        
-        // Gọi API AI
-        const newSubtasks = await generateAiSubtasks(taskId);
-        
-        // Cập nhật state ngay lập tức (thêm các subtask mới vào list cũ)
-        setTask(prev => ({
-            ...prev,
-            subtasks: [...prev.subtasks, ...newSubtasks]
-        }));
-        
-        alert(`AI has created ${newSubtasks.length} subtasks for you!`);
+      isGeneratingRef.current = true;
+      lastGenerateTime.current = now;
+      setIsGenerating(true);
+      
+      const newSubtasks = await generateAiSubtasks(taskId);
+      
+      if (!newSubtasks || newSubtasks.length === 0) {
+        alert("AI returned no subtasks.");
+        return;
+      }
+      
+      setTask(prev => ({
+        ...prev,
+        subtasks: [...prev.subtasks, ...newSubtasks]
+      }));
+      
+      //  Set cooldown sau khi thành công
+      setCooldownSeconds(5);
+      alert(` AI created ${newSubtasks.length} subtasks!`);
+      
     } catch (err) {
-        console.error(err);
-        alert("AI Error: " + (err.message || "Cannot create subtasks"));
+      console.error("❌ AI Error:", err);
+      
+      //  Xử lý lỗi cụ thể
+      if (err.response?.status === 429 || err.message?.includes("quota")) {
+        alert("⚠️ AI quota exceeded. Please try again later (quota resets daily).");
+      } else if (err.message?.includes("timeout")) {
+        alert("⏱️ AI request timed out. Please try again.");
+      } else {
+        alert("❌ AI Error: " + (err.message || "Cannot create subtasks"));
+      }
+      
     } finally {
-        setIsGenerating(false); // Tắt loading
+      isGeneratingRef.current = false;
+      setIsGenerating(false);
     }
   };
 
@@ -362,17 +405,22 @@ const TaskDetail = () => {
               {canManage && (
                  <button 
                    onClick={handleMagicSubtasks}
-                   disabled={isGenerating}
+                   disabled={isGenerating || cooldownSeconds > 0}
                    className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                   title="Generate subtasks using AI"
+                   title={cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : "Generate subtasks using AI"}
                  >
                    {isGenerating ? (
                      <>
-                        <svg className="animate-spin h-4 w-4 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         <span>Thinking...</span>
+                     </>
+                   ) : cooldownSeconds > 0 ? (
+                     <>
+                       <SparklesIcon className="w-4 h-4" />
+                       <span>Wait {cooldownSeconds}s</span>
                      </>
                    ) : (
                      <>
