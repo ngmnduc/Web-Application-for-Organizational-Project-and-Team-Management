@@ -9,6 +9,16 @@ const labelSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// Member Schema for project members
+const memberSchema = new mongoose.Schema(
+	{
+		user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+		role: { type: String, enum: ["Admin", "Manager", "Member"], default: "Member" },
+		status: { type: String, enum: ["PENDING", "ACTIVE", "REJECTED"], default: "ACTIVE" },
+	},
+	{ timestamps: true }
+);
+
 const projectSchema = new mongoose.Schema(
 	{
 		name: { type: String, required: true, trim: true },
