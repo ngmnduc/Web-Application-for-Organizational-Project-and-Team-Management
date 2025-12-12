@@ -33,7 +33,11 @@ export const createProject = async (req, res) => {
     if (!organization) return res.status(404).json({ message: "Organization not found" });
 
     if (organization.plan === "FREE") {
-      const projectCount = await Project.countDocuments({ organizationId: currentOrgId });
+      const projectCount = await Project.countDocuments({ 
+          organizationId: currentOrgId,
+          deletedAt: null 
+      });
+      
       if (projectCount >= 1) {
         await session.abortTransaction();
         return res.status(403).json({
@@ -103,11 +107,17 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
+
     if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, message: "Invalid id" });
     
-    const project = await Project.findOne({ _id: id, deletedAt: null });
+    const project = await Project.findOne({ 
+        _id: id, 
+        organizationId: currentOrgId, 
+        deletedAt: null 
+    });
     
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+    if (!project) return res.status(404).json({ success: false, message: "Project not found or access denied" });
     res.json({ success: true, data: project });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
@@ -118,9 +128,16 @@ export const getProject = async (req, res) => {
 export const updateProject = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
     const data = req.body || {};
-    const project = await Project.findByIdAndUpdate(id, data, { new: true });
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+
+    const project = await Project.findOneAndUpdate(
+        { _id: id, organizationId: currentOrgId, deletedAt: null },
+        data, 
+        { new: true }
+    );
+
+    if (!project) return res.status(404).json({ success: false, message: "Project not found or access denied" });
     res.json({ success: true, message: "Project updated successfully", data: project });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
@@ -131,8 +148,15 @@ export const updateProject = async (req, res) => {
 export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const project = await Project.findByIdAndUpdate(id, { deletedAt: new Date() }, { new: true });
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+    const currentOrgId = req.user.currentOrganizationId;
+
+    const project = await Project.findOneAndUpdate(
+        { _id: id, organizationId: currentOrgId, deletedAt: null },
+        { deletedAt: new Date() }, 
+        { new: true }
+    );
+
+    if (!project) return res.status(404).json({ success: false, message: "Project not found or access denied" });
     res.json({ success: true, message: "Project deleted", data: project });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
@@ -142,9 +166,16 @@ export const deleteProject = async (req, res) => {
 // GET /projects/:id/members
 export const getProjectMembers = async (req, res) => {
   try {
-    const { id } = req.params; // projectId
+    const { id } = req.params; 
+    const currentOrgId = req.user.currentOrganizationId;
 
-    // Query bảng riêng ProjectMember
+    const project = await Project.findOne({ 
+        _id: id, 
+        organizationId: currentOrgId, 
+        deletedAt: null 
+    });
+    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+
     const members = await ProjectMember.find({ projectId: id })
       .populate("userId", "name email avatar");
 
@@ -173,9 +204,15 @@ export const toggleArchive = async (req, res) => {
   try {
     const { id } = req.params;
     const { archive } = req.body || {}; 
+    const currentOrgId = req.user.currentOrganizationId;
 
-    const project = await Project.findById(id);
-    if (!project || project.deletedAt) {
+    const project = await Project.findOne({ 
+        _id: id, 
+        organizationId: currentOrgId, 
+        deletedAt: null 
+    });
+
+    if (!project) {
       return res.status(404).json({ success: false, message: "Project not found" });
     }
 
@@ -192,7 +229,14 @@ export const toggleArchive = async (req, res) => {
 export const getProjectSummary = async (req, res) => {
   try {
     const {id} = req.params;
-    const project = await Project.findById(id);
+    const currentOrgId = req.user.currentOrganizationId;
+
+    const project = await Project.findOne({ 
+        _id: id, 
+        organizationId: currentOrgId, 
+        deletedAt: null 
+    });
+
     if(!project) return res.status(404).json({success:false, message: "Project not found"});
 
     const now = new Date();
@@ -244,6 +288,15 @@ export const getProjectSummary = async (req, res) => {
 export const getProjectActivities = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
+
+    const project = await Project.findOne({ 
+        _id: id, 
+        organizationId: currentOrgId, 
+        deletedAt: null 
+    });
+    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -307,7 +360,13 @@ export const getPendingRequests = async (req, res) => {
 export const getInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
-    let project = await Project.findById(id).select('+inviteCode');
+    const currentOrgId = req.user.currentOrganizationId;
+
+    let project = await Project.findOne({ 
+        _id: id, 
+        organizationId: currentOrgId, 
+        deletedAt: null 
+    }).select('+inviteCode');
     
     if (!project) return res.status(404).json({ success: false, message: "Project not found" });
 
@@ -337,23 +396,28 @@ export const getInviteCode = async (req, res) => {
 // PATCH /projects/:id/invite-code (Reset)
 export const resetInviteCode = async (req, res) => {
   const { id } = req.params;
+  const currentOrgId = req.user.currentOrganizationId;
+
   for (let i = 0; i < 5; i++) {
       try {
           let newCode;
           do { newCode = generateRandomCode(6); } while (await Project.findOne({ inviteCode: newCode }));
 
-          const project = await Project.findByIdAndUpdate(
-              id,
+          const project = await Project.findOneAndUpdate(
+              { _id: id, organizationId: currentOrgId, deletedAt: null },
               { inviteCode: newCode },
               { new: true, select: '+inviteCode' }
           );
+
           if (!project) return res.status(404).json({ success: false, message: "Project not found" });
           return res.json({ success: true, message: "Invite code reset successfully", code: project.inviteCode });
+
       } catch (err) {
           if (err.code === 11000) continue;
           return res.status(500).json({ success: false, message: err.message });
       }
   }
+  return res.status(500).json({ success: false, message: "Failed to reset invite code." });
 };
 
 // POST /projects/join
@@ -367,30 +431,35 @@ export const joinProjectByCode = async (req, res) => {
     const project = await Project.findOne({ inviteCode: inviteCode.toUpperCase().trim(), deletedAt: null });
     if (!project) return res.status(404).json({ success: false, message: "Invalid or expired invite code." });
 
-    const existingMember = await ProjectMember.findOne({ projectId: project._id, userId: userId });
-    
-    if (existingMember) {
-        if (existingMember.status === 'PENDING') return res.status(400).json({ message: "You already requested to join." });
-        return res.status(400).json({ message: "You are already a member of this project." });
-    }
-
-    await ProjectMember.create({
-        projectId: project._id,
-        userId: userId,
-        roleInProject: "Member",
-        status: "ACTIVE" 
-    });
-
     try {
-        await ActivityLog.create({
+        await ProjectMember.create({
             projectId: project._id,
             userId: userId,
-            action: "JOIN_PROJECT",
-            content: `joined project "${project.name}" via invite code.`
+            roleInProject: "Member",
+            status: "ACTIVE" 
         });
-    } catch (e) { }
-    
-    res.json({ success: true, message: "Successfully joined project", projectId: project._id });
+
+        try {
+            await ActivityLog.create({
+                projectId: project._id,
+                userId: userId,
+                action: "JOIN_PROJECT",
+                content: `joined project "${project.name}" via invite code.`
+            });
+        } catch (e) { }
+        
+        res.json({ success: true, message: "Successfully joined project", projectId: project._id });
+
+    } catch (err) {
+        if (err.code === 11000) {
+            const existing = await ProjectMember.findOne({ projectId: project._id, userId: userId });
+            if (existing && existing.status === 'PENDING') {
+                return res.status(400).json({ message: "You already requested to join." });
+            }
+            return res.status(400).json({ message: "You are already a member of this project." });
+        }
+        throw err;
+    }
 
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
