@@ -5,50 +5,55 @@ import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
-
-const generateRandomCode = (length = 6) => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-};
+import * as projectValidator from "../validators/project.validator.js";
+import * as projectService from "../services/project.service.js";
 
 // POST /projects
 export const createProject = async (req, res) => {
   try {
-    const { name, description, deadline, manager } = req.body || {};
-    if (!name) return res.status(400).json({ success: false, error: "ValidationError", message: "Project name is required" });
+    // 1. Validate input
+    const validation = projectValidator.validateCreateProject(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError",
+        errors: validation.errors 
+      });
+    }
 
     const creatorId = req.user && req.user._id;
-    if (!creatorId) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
-
-    // Auto-promote manager if needed
-    if (manager && manager !== creatorId) {
-        const userToPromote = await User.findById(manager);
-        if (userToPromote && userToPromote.role === "Member") {
-            userToPromote.role = "Manager";
-            await userToPromote.save();
-            console.log(`Auto-promoted user ${userToPromote.email} to Manager`);
-        }
+    if (!creatorId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "AuthenticationError", 
+        message: "Unauthorized" 
+      });
     }
 
-    const initialMembers = [{ user: creatorId, role: "Admin" }];
-    if (manager && manager !== creatorId) {
-        initialMembers.push({ user: manager, role: "Manager" });
+    // Get current organization from user 
+    const currentOrganizationId = req.user.currentOrganizationId;
+    if (!currentOrganizationId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "No active organization. Please switch to an organization first." 
+      });
     }
 
-    const project = new Project({
-      name,
-      description,
-      deadline: deadline || null,
-      createdBy: creatorId,
-      members: initialMembers,
+    // 2. Call service with organizationId
+    const project = await projectService.createProject(req.body, creatorId, currentOrganizationId);
+
+    // 3. Return response
+    res.status(201).json({ 
+      success: true, 
+      message: "Project created successfully", 
+      data: project 
     });
-    await project.save();
-    res.status(201).json({ success: true, message: "Project created successfully", data: project });
   } catch (err) {
+    // 4. Handle service errors
+    if (err.message === 'USER_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
@@ -56,8 +61,26 @@ export const createProject = async (req, res) => {
 // GET /projects
 export const listProjects = async (req, res) => {
   try {
-    const projects = await Project.find({ deletedAt: null });
-    res.json({ success: true, count: projects.length, data: projects });
+    // 1. Validate query
+    const validation = projectValidator.validateProjectQuery(req.query);
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError",
+        errors: validation.errors 
+      });
+    }
+
+    // 2. Call service
+    const result = await projectService.listProjects(req.query);
+
+    // 3. Return response
+    res.json({ 
+      success: true, 
+      count: result.projects.length,
+      pagination: result.pagination,
+      data: result.projects 
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
@@ -67,11 +90,19 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid id" });
-    const project = await Project.findById(id).populate("members.user", "name email role");
-    if (!project || project.deletedAt) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+
+    // Call service
+    const project = await projectService.getProjectById(id);
+
     res.json({ success: true, data: project });
   } catch (err) {
+    // Handle service errors
+    if (err.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+    }
+    if (err.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    }
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
@@ -80,11 +111,34 @@ export const getProject = async (req, res) => {
 export const updateProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const data = req.body || {};
-    const project = await Project.findByIdAndUpdate(id, data, { new: true });
-    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
-    res.json({ success: true, message: "Project updated successfully", data: project });
+
+    // 1. Validate input
+    const validation = projectValidator.validateUpdateProject(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError",
+        errors: validation.errors 
+      });
+    }
+
+    // 2. Call service
+    const project = await projectService.updateProject(id, req.body, req.user._id);
+
+    // 3. Return response
+    res.json({ 
+      success: true, 
+      message: "Project updated successfully", 
+      data: project 
+    });
   } catch (err) {
+    // Handle service errors
+    if (err.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+    }
+    if (err.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    }
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
@@ -93,10 +147,19 @@ export const updateProject = async (req, res) => {
 export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const project = await Project.findByIdAndUpdate(id, { deletedAt: new Date() }, { new: true });
-    if (!project) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+
+    // Call service
+    const project = await projectService.deleteProject(id, req.user._id);
+
     res.json({ success: true, message: "Project deleted", data: project });
   } catch (err) {
+    // Handle service errors
+    if (err.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+    }
+    if (err.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    }
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
@@ -104,33 +167,20 @@ export const deleteProject = async (req, res) => {
 // GET /projects/:id/members
 export const getProjectMembers = async (req, res) => {
   try {
-    const { id } = req.params; //  projectId
+    const { id } = req.params;
 
-    // Query bảng riêng ProjectMember
-    const members = await ProjectMember.find({ projectId: id })
-      .populate("userId", "name email"); // Chỉ lấy name, email từ bảng User
-
-    //  Chuẩn hóa dữ liệu trả về FE
-    const formattedData = members.map((m) => {
-        // Guard clause: Đề phòng user bị xóa khỏi DB
-        if (!m.userId) return null;
-
-        return {
-            userId: m.userId._id,        // ID của User
-            name: m.userId.name,         // Tên từ bảng User
-            email: m.userId.email,       // Email từ bảng User
-            projectRole: m.roleInProject,// Role trong dự án (Manager/Member)
-            status: m.status,            // Trạng thái (ACTIVE/PENDING)
-            joinedAt: m.createdAt
-        };
-    }).filter(m => m !== null); // Lọc bỏ null
+    // Call service
+    const members = await projectService.getProjectMembers(id);
 
     res.status(200).json({ 
-        success: true, 
-        data: formattedData 
+      success: true, 
+      data: members 
     });
-
   } catch (err) {
+    // Handle service errors
+    if (err.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+    }
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
@@ -139,18 +189,23 @@ export const getProjectMembers = async (req, res) => {
 export const toggleArchive = async (req, res) => {
   try {
     const { id } = req.params;
-    const { archive } = req.body || {}; // true to archive, false to unarchive
 
-    const project = await Project.findById(id);
-    if (!project || project.deletedAt) {
+    // Call service
+    const project = await projectService.toggleArchive(id, req.user._id);
+
+    res.json({ 
+      success: true, 
+      message: `Project ${project.isArchived ? "archived" : "unarchived"}`, 
+      data: project 
+    });
+  } catch (err) {
+    // Handle service errors
+    if (err.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+    }
+    if (err.message === 'PROJECT_NOT_FOUND') {
       return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
-
-    project.status = archive ? "archived" : "active";
-    await project.save();
-
-    res.json({ success: true, message: `Project ${archive ? "archived" : "unarchived"}`, data: project });
-  } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
@@ -161,26 +216,27 @@ export const toggleArchive = async (req, res) => {
  */
 export const getProjectSummary = async (req, res) => {
   try {
-    const {id} = req.params;
+    const { id } = req.params;
 
-    const project = await Project.findById(id);
-    if(!project) return res.status(404).json({success:false,error:"NotFoundError", message: "Project not found"});
+    // Get base summary from service
+    const result = await projectService.getProjectSummary(id);
+    const project = result.project;
 
     const now = new Date();
 
-    const [totalTasks, todo , doing , done , overdue, high, medium, low] = await Promise.all([
-      Task.countDocuments({projectId: id, deletedAt: null}),
-      Task.countDocuments({projectId: id, status: "TODO", deletedAt: null}),
-      Task.countDocuments({projectId: id, status: "DOING", deletedAt: null}),
-      Task.countDocuments({projectId: id, status: "DONE", deletedAt: null}),
-      // Thêm 3 dòng này để lấy Priority
+    // Get detailed task statistics
+    const [totalTasks, todo, doing, done, overdue, high, medium, low] = await Promise.all([
+      Task.countDocuments({ projectId: id, deletedAt: null }),
+      Task.countDocuments({ projectId: id, status: "TODO", deletedAt: null }),
+      Task.countDocuments({ projectId: id, status: "DOING", deletedAt: null }),
+      Task.countDocuments({ projectId: id, status: "DONE", deletedAt: null }),
       Task.countDocuments({ projectId: id, priority: "HIGH", deletedAt: null }),
       Task.countDocuments({ projectId: id, priority: "MEDIUM", deletedAt: null }),
       Task.countDocuments({ projectId: id, priority: "LOW", deletedAt: null }),
       Task.countDocuments({
-        projectId : id,
+        projectId: id,
         deletedAt: null,
-        dueDate: { $lt: now},
+        dueDate: { $lt: now },
         status: { $ne: "DONE" }
       })
     ]);
@@ -195,6 +251,7 @@ export const getProjectSummary = async (req, res) => {
         if (daysLeft < 0) daysLeft = 0;
       }
     }
+
     res.status(200).json({
       success: true,
       data: {
@@ -204,24 +261,27 @@ export const getProjectSummary = async (req, res) => {
         done,
         overdue,
         daysLeft,
-        
-        // 1. Priority: BỎ critical đi để khớp với giao diện FE hiện tại
         priority: {
-            high,
-            medium,
-            low
+          high,
+          medium,
+          low
         },
-
-        // 2. QUAN TRỌNG: Phải có mảng này thì FE mới vẽ được biểu đồ Status
         tasksByStatus: [
-            { _id: 'TODO', count: todo },
-            { _id: 'DOING', count: doing },
-            { _id: 'DONE', count: done }
+          { _id: 'TODO', count: todo },
+          { _id: 'DOING', count: doing },
+          { _id: 'DONE', count: done }
         ]
       }
     });
-  } catch (error){
-    res.status(500).json({success:false, error: "ServerError", message: error.message});
+  } catch (error) {
+    // Handle service errors
+    if (error.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+    }
+    if (error.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+    }
+    res.status(500).json({ success: false, error: "ServerError", message: error.message });
   }
 };
 /**
@@ -231,18 +291,14 @@ export const getProjectSummary = async (req, res) => {
 export const getProjectActivities = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    const total = await ActivityLog.countDocuments({projectId: id});
 
-    const activities = await ActivityLog.find({ projectId: id })
-      .populate("userId", "name email")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    // Call service
+    const activities = await projectService.getProjectActivities(id, limit);
+
+    // Pagination for backward compatibility
+    const page = parseInt(req.query.page) || 1;
+    const total = activities.length;
 
     res.status(200).json({
       success: true,
@@ -253,34 +309,19 @@ export const getProjectActivities = async (req, res) => {
       data: activities
     });
   } catch (error) {
+    // Handle service errors
+    if (error.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+    }
     res.status(500).json({ success: false, error: "ServerError", message: error.message });
   }
 };
 
 // GET /projects/pending-requests
-// Hàm này quét tất cả dự án, tìm thành viên có status = "PENDING"
 export const getPendingRequests = async (req, res) => {
   try {
-    // Tìm các dự án có chứa thành viên PENDING
-    const projects = await Project.find({ "members.status": "PENDING" })
-      .select("name members") 
-      .populate("members.user", "name email avatarUrl");
-
-    let pendingList = [];
-
-    // Tách mảng để lấy ra từng request cụ thể
-    projects.forEach(proj => {
-      const pendingMembers = proj.members.filter(m => m.status === "PENDING");
-      
-      pendingMembers.forEach(member => {
-        pendingList.push({
-          requestId: member._id,      // ID của request (quan trọng để duyệt)
-          projectId: proj._id,        // ID dự án (quan trọng để duyệt)
-          projectName: proj.name,     // Tên dự án để hiển thị
-          user: member.user           // Thông tin user
-        });
-      });
-    });
+    // Call service
+    const pendingList = await projectService.getPendingRequests();
 
     res.json({ success: true, data: pendingList });
   } catch (err) {
@@ -296,35 +337,22 @@ export const getPendingRequests = async (req, res) => {
 export const getInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
-    let project = await Project.findById(id).select('+inviteCode');
-    
-    if (!project) return res.status(404).json({ success: false, message: "Project not found" });
 
-    if (project.inviteCode) {
-      return res.json({ success: true, code: project.inviteCode });
-    }
+    // Call service
+    const code = await projectService.getOrCreateInviteCode(id);
 
-    for (let i = 0; i < 5; i++) {
-        try {
-            let newCode;
-            do {
-                newCode = generateRandomCode(6); 
-            } while (await Project.findOne({ inviteCode: newCode }));
-            project.inviteCode = newCode;
-            await project.save();
-            return res.json({ success: true, code: newCode });
-
-        } catch (err) {
-            if (err.code === 11000) {
-                console.warn(`Invite Code Race Condition detected for project ${id}. Retrying... Attempt ${i + 1}`);
-                continue; 
-            }
-            throw err;
-        }
-    }
-    return res.status(500).json({ success: false, message: "Failed to generate unique invite code after multiple retries." });
-
+    res.json({ success: true, code });
   } catch (err) {
+    // Handle service errors
+    if (err.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, message: "Invalid project ID" });
+    }
+    if (err.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+    if (err.message === 'FAILED_TO_GENERATE_CODE') {
+      return res.status(500).json({ success: false, message: "Failed to generate unique invite code after multiple retries." });
+    }
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -335,33 +363,30 @@ export const getInviteCode = async (req, res) => {
  * @access  Private (Admin/Manager)
  */
 export const resetInviteCode = async (req, res) => {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-  for (let i = 0; i < 5; i++) {
-      try {
-          let newCode;
-          do {
-              newCode = generateRandomCode(6);
-          } while (await Project.findOne({ inviteCode: newCode }));
+    // Call service
+    const newCode = await projectService.resetInviteCode(id);
 
-          const project = await Project.findByIdAndUpdate(
-              id,
-              { inviteCode: newCode },
-              { new: true, select: '+inviteCode' }
-          );
-
-          if (!project) return res.status(404).json({ success: false, message: "Project not found" });
-          return res.json({ success: true, message: "Invite code reset successfully", code: project.inviteCode });
-
-      } catch (err) {
-          if (err.code === 11000) {
-              console.warn(`Reset Code Race Condition detected for project ${id}. Retrying... Attempt ${i + 1}`);
-              continue; 
-          }
-          return res.status(500).json({ success: false, message: err.message });
-      }
+    res.json({ 
+      success: true, 
+      message: "Invite code reset successfully", 
+      code: newCode 
+    });
+  } catch (err) {
+    // Handle service errors
+    if (err.message === 'INVALID_PROJECT_ID') {
+      return res.status(400).json({ success: false, message: "Invalid project ID" });
+    }
+    if (err.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+    if (err.message === 'FAILED_TO_RESET_CODE') {
+      return res.status(500).json({ success: false, message: "Failed to reset invite code after multiple retries." });
+    }
+    res.status(500).json({ success: false, message: err.message });
   }
-  return res.status(500).json({ success: false, message: "Failed to reset invite code after multiple retries." });
 };
 
 /**
@@ -371,52 +396,39 @@ export const resetInviteCode = async (req, res) => {
  */
 export const joinProjectByCode = async (req, res) => {
   try {
+    // 1. Validate input
+    const validation = projectValidator.validateJoinByCode(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError",
+        errors: validation.errors 
+      });
+    }
+
     const { inviteCode } = req.body;
     const userId = req.user._id;
 
-    if (!inviteCode) return res.status(400).json({ success: false, message: "Invite code is required" });
+    // 2. Call service
+    const projectId = await projectService.joinProjectByCode(inviteCode, userId);
 
-    const normalizedCode = inviteCode.toUpperCase().trim();
-
-    const project = await Project.findOne({ inviteCode: normalizedCode, deletedAt: null });
-    
-    if (!project) {
+    // 3. Return response
+    res.json({ 
+      success: true, 
+      message: "Successfully joined project", 
+      projectId 
+    });
+  } catch (err) {
+    // 4. Handle service errors
+    if (err.message === 'INVALID_INVITE_CODE') {
+      return res.status(400).json({ success: false, message: "Invalid invite code format" });
+    }
+    if (err.message === 'INVALID_OR_EXPIRED_CODE') {
       return res.status(404).json({ success: false, message: "Invalid or expired invite code." });
     }
-
-    const updatedProject = await Project.findOneAndUpdate(
-        { 
-            _id: project._id, 
-            "members.user": { $ne: userId }
-        },
-        { 
-            $push: { 
-                members: { 
-                    user: userId, 
-                    role: "Member", 
-                    status: "ACTIVE"
-                } 
-            } 
-        },
-        { new: true }
-    );
-
-    if (!updatedProject) {
-        return res.status(400).json({ success: false, message: "You are already a member of this project." });
+    if (err.message === 'ALREADY_MEMBER') {
+      return res.status(400).json({ success: false, message: "You are already a member of this project." });
     }
-
-    try {
-        await ActivityLog.create({
-            projectId: updatedProject._id,
-            userId: userId,
-            action: "JOIN_PROJECT",
-            content: `joined project "${updatedProject.name}" using invite code.`
-        });
-    } catch (e) { console.error("Logging failed:", e.message); }
-    
-    res.json({ success: true, message: "Successfully joined project", projectId: updatedProject._id });
-
-  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };

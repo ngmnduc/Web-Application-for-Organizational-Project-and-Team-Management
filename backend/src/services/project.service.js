@@ -24,7 +24,7 @@ const generateRandomCode = (length = 6) => {
 /**
  * Create new project
  */
-export const createProject = async (projectData, creatorId) => {
+export const createProject = async (projectData, creatorId, currentOrganizationId) => {
   const { name, description, deadline, manager, startDate, endDate } = projectData;
 
   // Auto-promote manager if specified
@@ -47,6 +47,7 @@ export const createProject = async (projectData, creatorId) => {
   const project = new Project({
     name: name.trim(),
     description: description?.trim() || "",
+    organizationId: currentOrganizationId,
     startDate: startDate || null,
     endDate: endDate || null,
     deadline: deadline || null,
@@ -403,4 +404,192 @@ export const getUserRoleInProject = async (projectId, userId) => {
   );
 
   return member ? member.role : null;
+};
+
+/**
+ * Get project members from ProjectMember table
+ */
+export const getProjectMembers = async (projectId) => {
+  if (!mongoose.isValidObjectId(projectId)) {
+    throw new Error('INVALID_PROJECT_ID');
+  }
+
+  const ProjectMember = mongoose.model('ProjectMember');
+  
+  const members = await ProjectMember.find({ projectId })
+    .populate('userId', 'name email avatar');
+
+  const formattedData = members.map((m) => {
+    if (!m.userId) return null;
+
+    return {
+      userId: m.userId._id,
+      name: m.userId.name,
+      email: m.userId.email,
+      projectRole: m.roleInProject,
+      status: m.status,
+      joinedAt: m.createdAt
+    };
+  }).filter(m => m !== null);
+
+  return formattedData;
+};
+
+/**
+ * Get pending join requests across all projects
+ */
+export const getPendingRequests = async () => {
+  const projects = await Project.find({ "members.status": "PENDING" })
+    .select("name members")
+    .populate("members.user", "name email avatar");
+
+  let pendingList = [];
+
+  projects.forEach(proj => {
+    const pendingMembers = proj.members.filter(m => m.status === "PENDING");
+    
+    pendingMembers.forEach(member => {
+      pendingList.push({
+        requestId: member._id,
+        projectId: proj._id,
+        projectName: proj.name,
+        user: member.user
+      });
+    });
+  });
+
+  return pendingList;
+};
+
+/**
+ * Get or generate invite code for project
+ */
+export const getOrCreateInviteCode = async (projectId) => {
+  if (!mongoose.isValidObjectId(projectId)) {
+    throw new Error('INVALID_PROJECT_ID');
+  }
+
+  let project = await Project.findById(projectId).select('+inviteCode');
+  
+  if (!project || project.deletedAt) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+
+  if (project.inviteCode) {
+    return project.inviteCode;
+  }
+
+  // Generate new code with retry logic
+  for (let i = 0; i < 5; i++) {
+    try {
+      let newCode;
+      do {
+        newCode = generateRandomCode(6);
+      } while (await Project.findOne({ inviteCode: newCode }));
+      
+      project.inviteCode = newCode;
+      await project.save();
+      return newCode;
+
+    } catch (err) {
+      if (err.code === 11000) {
+        console.warn(`Invite Code Race Condition for project ${projectId}. Retry ${i + 1}`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  
+  throw new Error('FAILED_TO_GENERATE_CODE');
+};
+
+/**
+ * Reset invite code for project
+ */
+export const resetInviteCode = async (projectId) => {
+  if (!mongoose.isValidObjectId(projectId)) {
+    throw new Error('INVALID_PROJECT_ID');
+  }
+
+  for (let i = 0; i < 5; i++) {
+    try {
+      let newCode;
+      do {
+        newCode = generateRandomCode(6);
+      } while (await Project.findOne({ inviteCode: newCode }));
+
+      const project = await Project.findByIdAndUpdate(
+        projectId,
+        { inviteCode: newCode },
+        { new: true, select: '+inviteCode' }
+      );
+
+      if (!project || project.deletedAt) {
+        throw new Error('PROJECT_NOT_FOUND');
+      }
+
+      return newCode;
+
+    } catch (err) {
+      if (err.code === 11000) {
+        console.warn(`Reset Code Race Condition for project ${projectId}. Retry ${i + 1}`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  
+  throw new Error('FAILED_TO_RESET_CODE');
+};
+
+/**
+ * Join project using invite code
+ */
+export const joinProjectByCode = async (inviteCode, userId) => {
+  if (!inviteCode || typeof inviteCode !== 'string') {
+    throw new Error('INVALID_INVITE_CODE');
+  }
+
+  const normalizedCode = inviteCode.toUpperCase().trim();
+
+  const project = await Project.findOne({ 
+    inviteCode: normalizedCode, 
+    deletedAt: null 
+  });
+  
+  if (!project) {
+    throw new Error('INVALID_OR_EXPIRED_CODE');
+  }
+
+  // Check if already a member
+  const existingMember = project.members.find(
+    m => m.user.toString() === userId.toString()
+  );
+
+  if (existingMember) {
+    throw new Error('ALREADY_MEMBER');
+  }
+
+  // Add user as member
+  project.members.push({
+    user: userId,
+    role: "Member",
+    status: "ACTIVE"
+  });
+
+  await project.save();
+
+  // Log activity
+  try {
+    await ActivityLog.create({
+      projectId: project._id,
+      userId: userId,
+      action: "JOIN_PROJECT",
+      content: `joined project "${project.name}" using invite code.`
+    });
+  } catch (e) {
+    console.error("Logging failed:", e.message);
+  }
+  
+  return project._id;
 };
