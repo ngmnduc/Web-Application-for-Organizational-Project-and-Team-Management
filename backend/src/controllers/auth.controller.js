@@ -84,6 +84,7 @@ export async function login(req, res, next) {
         token: result.token,
         tokenType: "Bearer",
         user: result.user,
+        organization: result.organization,
       },
     });
   } catch (err) {
@@ -332,3 +333,53 @@ export async function resetPassword(req, res, next) {
     next(err);
   }
 }
+/**
+ * @desc    Switch user's current organization
+ * @route   POST /auth/switch-org
+ * @access  Private
+ */
+export async function switchOrg(req, res, next) {
+  try {
+    const { organizationId } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "ValidationError",
+        message: "Organization ID is required",
+      });
+    }
+
+    // Switch organization using service
+    const result = await authService.switchOrganization(
+      req.user._id,
+      organizationId
+    );
+
+    return res.json({
+      success: true,
+      message: "Organization switched successfully",
+      data: {
+        user: result.user,
+        organization: result.organization,
+      },
+    });
+  } catch (err) {
+    if (err.message === "NOT_ORGANIZATION_MEMBER") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "You are not a member of this organization",
+      });
+    }
+    if (err.message === "USER_NOT_FOUND") {
+      return res.status(404).json({
+        success: false,
+        error: "NotFoundError",
+        message: "User not found",
+      });
+    }
+    next(err);
+  }
+}
+

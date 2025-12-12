@@ -4,6 +4,7 @@
  */
 
 import User from "../models/user.model.js";
+import OrganizationMember from "../models/organizationMember.model.js";
 import { signToken } from "../utils/jwt.js";
 import crypto from "crypto";
 import { sendPasswordResetEmail, sendWelcomeEmail } from "./email.service.js";
@@ -59,12 +60,40 @@ export const loginUser = async (email, password) => {
     throw new Error("INVALID_CREDENTIALS");
   }
 
+  // Find user's organizations
+  const orgMembers = await OrganizationMember.find({
+    userId: user._id,
+    deletedAt: null,
+    status: "ACTIVE",
+  })
+    .populate("organizationId")
+    .sort({ createdAt: -1 })
+    .limit(1);
+
+  let currentOrganization = null;
+
+  // If user has organizations, set current to most recent
+  if (orgMembers.length > 0 && orgMembers[0].organizationId) {
+    currentOrganization = orgMembers[0].organizationId;
+
+    // Update user's currentOrganizationId
+    user.currentOrganizationId = currentOrganization._id;
+    await user.save();
+  }
+
   // Generate token
   const token = signToken({ sub: user._id.toString(), role: user.role });
 
   return {
     token,
     user: toPublicUser(user),
+    organization: currentOrganization
+      ? {
+          _id: currentOrganization._id,
+          name: currentOrganization.name,
+          logo: currentOrganization.logo,
+        }
+      : null,
   };
 };
 
@@ -210,6 +239,43 @@ export const resetUserPassword = async (token, newPassword) => {
   await user.save();
 
   return { success: true };
+};
+
+/**
+ * Switch user's current organization
+ */
+export const switchOrganization = async (userId, organizationId) => {
+  // Check if user is member of this organization
+  const membership = await OrganizationMember.findOne({
+    userId,
+    organizationId,
+    deletedAt: null,
+    status: "ACTIVE",
+  }).populate("organizationId");
+
+  if (!membership) {
+    throw new Error("NOT_ORGANIZATION_MEMBER");
+  }
+
+  // Update user's current organization
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { currentOrganizationId: organizationId },
+    { new: true }
+  );
+
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  return {
+    user: toPublicUser(user),
+    organization: {
+      _id: membership.organizationId._id,
+      name: membership.organizationId.name,
+      logo: membership.organizationId.logo,
+    },
+  };
 };
 
 /**
