@@ -45,3 +45,4 @@ attendanceSchema.index({ userId: 1, checkInTime: 1 });
 //attendanceSchema.index({ projectId: 1, checkInTime: 1 });
 
 export default mongoose.model("Attendance", attendanceSchema);
+
