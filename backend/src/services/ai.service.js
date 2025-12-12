@@ -1,37 +1,44 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import Bottleneck from "bottleneck";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const genAi = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAi.getGenerativeModel({model: "gemini-2.0-flash"});
-
-// Rate limit 4s mới cho gọi 1 lần
+// Khởi tạo Groq SDK
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY, 
+});
 const limiter = new Bottleneck({
-  minTime: 4000,      // Cách nhau tối thiểu 4000ms (4s)
-  maxConcurrent: 1,   // xử lý từng cái một để tránh tắc nghẽn
+  minTime: 2500,        
+  maxConcurrent: 2,     
+  reservoir: 30,
+  reservoirRefreshAmount: 30,
+  reservoirRefreshInterval: 60 * 1000,
 });
 
-limiter.on("failed", async (error, jobInfo)=> {
-    console.warn('Job ${id} failed ${error.message}$');
-    if (jobInfo.retryCount < 3){
-        console.log('Retry Job ${id}$');
-        return 2000;
-        
-    }
+limiter.on("failed", async (error, jobInfo) => {
+  const id = jobInfo.options.id;
+  console.warn(`Job ${id} failed: ${error.message}`);
+  
+  if (error.message.includes("429") && jobInfo.retryCount < 3) {
+    const delay = 3000 * Math.pow(2, jobInfo.retryCount);
+    console.log(`Retry Job ${id} in ${delay}ms`);
+    return delay;
+  }
 });
 
-class AIService{
-    //Task 1 subtask >.<
-    static async generateSubtasks(taskTitle, taskDescription) {
-    // Bọc hàm gọi API vào limiter
+class AIService {
+  
+  /**
+   * Generate Subtasks (Groq + Llama 3.3)
+   */
+  static async generateSubtasks(taskTitle, taskDescription) {
     return limiter.schedule(async () => {
       try {
-        console.log(`AI Generating subtasks for: "${taskTitle}"...`);
+        console.log(`[Groq] Generating subtasks for: "${taskTitle}"...`);
 
         const cleanDesc = taskDescription ? taskDescription.trim() : "No additional details provided.";
-        // Prompt Template 
+        
         const prompt = `
           You are a strict task management assistant.
           Objective: Break down the following task into 3 to 5 small, concrete, actionable subtasks.
@@ -57,47 +64,50 @@ class AIService{
           ["Step 1: Draft the initial outline based on Q3 data", "Step 2: Review specific KPIs mentioned in email", "Step 3: Export final report to PDF"]
         `;
 
-        // Gọi API
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let text = response.text();
+        const response = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.5, // Giảm temp để kết quả ổn định hơn
+          max_tokens: 1024,
+        });
 
-        // Xóa markdown ```json ... ```, xóa khoảng trắng thừa
+        let text = response.choices[0]?.message?.content || "[]";
+
+        // Cleaning Data 
         text = text.replace(/```json|```/g, '').trim();
-        // Xóa các ký tự lạ nếu có
-        text = text.replace(/^'|'$/g, ''); 
+        const firstBracket = text.indexOf('[');
+        const lastBracket = text.lastIndexOf(']');
+        if (firstBracket !== -1 && lastBracket !== -1) {
+            text = text.substring(firstBracket, lastBracket + 1);
+        }
 
-        // Parse JSON
         try {
           const subtasks = JSON.parse(text);
-          
-          // Kiểm tra xem có phải là mảng không
-          if (!Array.isArray(subtasks)) {
-            throw new Error("AI response is not an array");
-          }
+          if (!Array.isArray(subtasks)) throw new Error("Not an array");
           return subtasks;
-
         } catch (parseError) {
-          console.error(" JSON Parse Error:", parseError);
-          // Fallback: Nếu AI trả về text thường, cố gắng tách dòng thủ công
-          return text.split("\n").filter(line => line.length > 0);
+          console.error("Groq JSON Parse Error:", parseError);
+          // Fallback
+          return text.split("\n").filter(line => line.length > 0 && line.includes("Step"));
         }
 
       } catch (error) {
-        console.error("AI Service Error (Subtasks):", error.message);
-        // Trả về mảng rỗng để không crash BE/FE
+        console.error("Groq Service Error (Subtasks):", error.message);
         return [];
       }
     });
   }
 
-  // Cái này cho summarize hằng ngày
+  /**
+   * Summarize Day 
+   */
   static async summarizeDay(tasks = [], meetings = []) {
     return limiter.schedule(async () => {
       try {
-        console.log(`AI Summarizing day (JSON mode)...`);
+        console.log(`[Groq] Summarizing day...`);
 
-        // 1. Chuẩn bị dữ liệu đầu vào (Kèm Labels)
         const taskList = tasks.length > 0 
           ? tasks.slice(0, 15).map(t => `- Title: "${t.title}" | Status: ${t.status} | Labels: ${t.labels?.join(', ') || 'None'}`).join("\n") 
           : "No tasks today.";
@@ -106,7 +116,7 @@ class AIService{
           ? meetings.map(m => `- ${m.title} @ ${m.time}`).join("\n") 
           : "No meetings today.";
 
-        // 2. Prompt Engineering (Force JSON Structure)
+        // --- PROMPT TỐI ƯU (GIỮ NGUYÊN) ---
         const prompt = `
           Act as a professional personal assistant.
           Analyze the following data for today:
@@ -142,28 +152,35 @@ class AIService{
           3. If no tasks/meetings, return empty arrays but keep the structure.
         `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let text = response.text();
+        const response = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          // Dùng json_object 
+          response_format: { type: "json_object" }, 
+          messages: [
+            { 
+              role: "system", 
+              content: "You are a helpful assistant that outputs strict JSON." 
+            },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 1024,
+        });
 
-        // 3. Vệ sinh dữ liệu
-        text = text.replace(/```json|```/g, '').trim();
-
-        // 4. Parse JSON
-        return JSON.parse(text);
+        const content = response.choices[0]?.message?.content;
+        return JSON.parse(content);
 
       } catch (error) {
-        console.error("AI Service Error (Summary):", error.message);
-        // Fallback data nếu AI lỗi để FE không trắng trang
+        console.error("Groq Service Error (Summary):", error.message);
         return {
             greeting: "System is busy.",
             task_highlights: [],
             upcoming_meetings: [],
-            encouragement: "Please try again!"
+            encouragement: "Please try again later!"
         };
       }
     });
   }
-  
 }
+
 export default AIService;
