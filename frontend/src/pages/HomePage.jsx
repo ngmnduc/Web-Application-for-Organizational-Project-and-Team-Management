@@ -60,11 +60,15 @@ const HomePage = () => {
           axiosInstance.get(`/projects/${currentProjectId}/activities`)
         ]);
 
-        setStats(summaryRes.data);
-        setActivities(activityRes.data.activities || activityRes.data || []);
+        console.log(" Raw summaryRes:", summaryRes.data);
+        console.log(" Nested data:", summaryRes.data.data);
+        console.log(" tasksByStatus:", summaryRes.data.data?.tasksByStatus);
+
+        setStats(summaryRes.data.data);
+        setActivities(activityRes.data.data || []);
 
       } catch (error) {
-        console.error("Error loading dashboard data:", error);
+        console.error("Error:", error.response?.data || error.message);
       } finally {
         setLoading(false);
       }
@@ -82,7 +86,59 @@ const HomePage = () => {
     if (s === 'todo') return { color: '#fb923c', tailwind: 'bg-orange-400', label: 'Todo' };
     return { color: '#9ca3af', tailwind: 'bg-gray-400', label: status };
   };
+useEffect(() => {
+  if (!currentProjectId) return;
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [summaryRes, activityRes] = await Promise.all([
+        axiosInstance.get(`/projects/${currentProjectId}/summary`),
+        axiosInstance.get(`/projects/${currentProjectId}/activities`)
+      ]);
+
+      // Lưu đúng data nested
+      setStats(summaryRes.data.data);  // Lấy nested "data"
+      setActivities(activityRes.data.data || []);  // Lấy nested "data"
+
+      console.log("Stats loaded:", summaryRes.data.data);
+      console.log("Activities loaded:", activityRes.data.data);
+
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [currentProjectId]);useEffect(() => {
+  if (!currentProjectId) return;
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [summaryRes, activityRes] = await Promise.all([
+        axiosInstance.get(`/projects/${currentProjectId}/summary`),
+        axiosInstance.get(`/projects/${currentProjectId}/activities`)
+      ]);
+
+      //  Lưu đúng data nested
+      setStats(summaryRes.data.data);  // Lấy nested "data"
+      setActivities(activityRes.data.data || []);  // Lấy nested "data"
+
+      console.log("Stats loaded:", summaryRes.data.data);
+      console.log("Activities loaded:", activityRes.data.data);
+
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [currentProjectId]);
   const getPriorityConfig = (priority) => {
     const p = priority?.toLowerCase();
     if (p === 'high') return 'bg-red-500';
@@ -92,40 +148,63 @@ const HomePage = () => {
 
   // --- CHART CONFIG ---
   const getChartOption = () => {
-    if (!stats?.tasksByStatus) return { series: [] };
-
-    // Tạo dữ liệu thủ công từ các trường riêng lẻ của Backend
-    const data = [
-      { value: stats.todo || 0, name: 'Todo', itemStyle: { color: '#fb923c' } },   // Cam
-      { value: stats.doing || 0, name: 'Doing', itemStyle: { color: '#3b82f6' } }, // Xanh dương
-      { value: stats.done || 0, name: 'Done', itemStyle: { color: '#22c55e' } },   // Xanh lá
-    ];
-
-    // Lọc bỏ các mục có giá trị 0 để biểu đồ đẹp hơn (tuỳ chọn)
-    const validData = data.filter(item => item.value > 0);
-
-    // Nếu không có task nào
-    if (validData.length === 0) {
-        return {
-            title: { text: 'No Tasks', left: 'center', top: 'center', textStyle: { color: '#ccc', fontSize: 14 } },
-            series: [{ type: 'pie', radius: ['65%', '90%'], data: [{ value: 0, name: '', itemStyle: { color: '#f3f4f6' } }] }]
-        }
-    }
-
+  // Kiểm tra đúng path
+  if (!stats || !stats.tasksByStatus) {
+    console.log("No tasksByStatus found in stats:", stats);
     return {
-      tooltip: { trigger: 'item' },
-      series: [
-        {
-          name: 'Tasks',
-          type: 'pie',
-          radius: ['65%', '90%'],
-          avoidLabelOverlap: false,
-          label: { show: false },
-          data: validData
-        }
-      ]
+      title: { 
+        text: 'No Tasks', 
+        left: 'center', 
+        top: 'center', 
+        textStyle: { color: '#ccc', fontSize: 14 } 
+      },
+      series: [{ 
+        type: 'pie', 
+        radius: ['65%', '90%'], 
+        data: [{ value: 0, name: '', itemStyle: { color: '#f3f4f6' } }] 
+      }]
     };
+  }
+
+  // Đọc đúng field (sau khi đã lưu stats = summaryRes.data.data)
+  const data = [
+    { value: stats.todo || 0, name: 'Todo', itemStyle: { color: '#fb923c' } },
+    { value: stats.doing || 0, name: 'Doing', itemStyle: { color: '#3b82f6' } },
+    { value: stats.done || 0, name: 'Done', itemStyle: { color: '#22c55e' } },
+  ];
+
+  const validData = data.filter(item => item.value > 0);
+
+  if (validData.length === 0) {
+    return {
+      title: { 
+        text: 'No Tasks', 
+        left: 'center', 
+        top: 'center', 
+        textStyle: { color: '#ccc', fontSize: 14 } 
+      },
+      series: [{ 
+        type: 'pie', 
+        radius: ['65%', '90%'], 
+        data: [{ value: 0, name: '', itemStyle: { color: '#f3f4f6' } }] 
+      }]
+    };
+  }
+
+  return {
+    tooltip: { trigger: 'item' },
+    series: [
+      {
+        name: 'Tasks',
+        type: 'pie',
+        radius: ['65%', '90%'],
+        avoidLabelOverlap: false,
+        label: { show: false },
+        data: validData
+      }
+    ]
   };
+};
 
   return (
     <div className="p-6 space-y-6">
@@ -170,7 +249,7 @@ const HomePage = () => {
 
           {loading ? (
             <div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>
-          ) : stats?.tasksByStatus?.length > 0 ? (
+          ) : (stats && stats.tasksByStatus && stats.tasksByStatus.length > 0) ? (  // ✅ Kiểm tra đúng
             <>
               <div className="flex items-center justify-center h-48">
                 <ReactECharts 
