@@ -8,14 +8,18 @@ import Project from "../models/project.model.js";
  * @returns {String} IP address
  */
 const getClientIp = (req) => {
-  return (
-    req.headers["x-forwarded-for"]?.split(",")[0] ||
-    req.headers["x-real-ip"] ||
-    req.connection.remoteAddress ||
-    req.socket.remoteAddress ||
-    "unknown"
-  );
+  let ip =req.headers["x-forwarded-for"];
+  if (ip){
+    ip = ip.splits(",")[0].trim();
+  }
+  else{
+    ip = req.headers["x-real-ip"] ||
+         req.connection?.remoteAddress ||
+         req.socket?.remoteAddress ||
+         "unknown";
+  }
 };
+
 
 /**
  * @desc    Check if user already checked in today

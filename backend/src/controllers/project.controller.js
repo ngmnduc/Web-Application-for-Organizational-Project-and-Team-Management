@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
+import Organization from "../models/organization.model.js ";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
 
@@ -44,9 +45,16 @@ export const createProject = async (req, res) => {
       description,
       deadline: deadline || null,
       createdBy: creatorId,
-      members: initialMembers,
+      organizationId: req.user.currentOrganizationId,
     });
     await project.save();
+
+    await ProjectMember.create({
+    projectId: project._id,
+    userId: creatorId,
+    roleInProject: "Manager", 
+    status: "ACTIVE"
+});
     res.status(201).json({ success: true, message: "Project created successfully", data: project });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
@@ -68,7 +76,7 @@ export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid id" });
-    const project = await Project.findById(id).populate("members.user", "name email role");
+    const project = await Project.findById(id);
     if (!project || project.deletedAt) return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     res.json({ success: true, data: project });
   } catch (err) {
@@ -262,27 +270,18 @@ export const getProjectActivities = async (req, res) => {
 export const getPendingRequests = async (req, res) => {
   try {
     // Tìm các dự án có chứa thành viên PENDING
-    const projects = await Project.find({ "members.status": "PENDING" })
-      .select("name members") 
-      .populate("members.user", "name email avatarUrl");
+    const pendingRequests = await (await ProjectMember.find({status : "Pending"}))
+        .populate("projectId", "name")
+        .populate("userID", "name email avatar");
 
-    let pendingList = [];
+    const data = pendingRequests(req => ({
+      requestId : req._id,
+      projectId: req.projectId._id,
+      projectName: req.projectId.name,
+      user: req.userId
+    }))
 
-    // Tách mảng để lấy ra từng request cụ thể
-    projects.forEach(proj => {
-      const pendingMembers = proj.members.filter(m => m.status === "PENDING");
-      
-      pendingMembers.forEach(member => {
-        pendingList.push({
-          requestId: member._id,      // ID của request (quan trọng để duyệt)
-          projectId: proj._id,        // ID dự án (quan trọng để duyệt)
-          projectName: proj.name,     // Tên dự án để hiển thị
-          user: member.user           // Thông tin user
-        });
-      });
-    });
-
-    res.json({ success: true, data: pendingList });
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -384,26 +383,16 @@ export const joinProjectByCode = async (req, res) => {
       return res.status(404).json({ success: false, message: "Invalid or expired invite code." });
     }
 
-    const updatedProject = await Project.findOneAndUpdate(
-        { 
-            _id: project._id, 
-            "members.user": { $ne: userId }
-        },
-        { 
-            $push: { 
-                members: { 
-                    user: userId, 
-                    role: "Member", 
-                    status: "ACTIVE"
-                } 
-            } 
-        },
-        { new: true }
-    );
-
-    if (!updatedProject) {
-        return res.status(400).json({ success: false, message: "You are already a member of this project." });
+    const existingMember = await ProjectMember.findOne({projectId: project._id, userId : userId});
+    if (existingMember){
+        return res.status(400).json({ message: "Already joined" });
     }
+    await ProjectMember.create({
+      projectId: project._id,
+      userId: userId,
+      roleInProject: "Member",
+      status: "ACTIVE"
+    });
 
     try {
         await ActivityLog.create({
