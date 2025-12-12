@@ -31,6 +31,18 @@ const userSchema = new mongoose.Schema(
       default: "ACTIVE",
       index: true,
     },
+    // Organization fields
+    currentOrganizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+    },
+    organizations: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Organization",
+      },
+    ],
     deletedAt: {
       type: Date,
       default: null,
