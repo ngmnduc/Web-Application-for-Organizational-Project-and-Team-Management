@@ -88,6 +88,20 @@ export async function login(req, res, next) {
         message: "Your account has been blocked",
       });
     }
+    if (err.message === "ORGANIZATION_INACTIVE") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "Your organization has been deactivated. Please contact support.",
+      });
+    }
+    if (err.message === "ORGANIZATION_DELETED") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "Your organization has been deleted.",
+      });
+    }
     next(err);
   }
 }
@@ -372,6 +386,8 @@ export async function switchOrg(req, res, next) {
       success: true,
       message: "Organization switched successfully",
       data: {
+        token: result.token,
+        tokenType: "Bearer",
         user: result.user,
         organization: result.organization,
       },
@@ -382,6 +398,20 @@ export async function switchOrg(req, res, next) {
         success: false,
         error: "ForbiddenError",
         message: "You are not a member of this organization",
+      });
+    }
+    if (err.message === "ORGANIZATION_INACTIVE") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "This organization has been deactivated. Please contact support.",
+      });
+    }
+    if (err.message === "ORGANIZATION_DELETED") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "This organization has been deleted.",
       });
     }
     if (err.message === "USER_NOT_FOUND") {

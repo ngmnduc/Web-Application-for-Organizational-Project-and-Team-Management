@@ -5,6 +5,7 @@
 
 import mongoose from "mongoose";
 import Project from "../models/project.model.js";
+import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
@@ -22,10 +23,15 @@ const generateRandomCode = (length = 6) => {
 };
 
 /**
- * Create new project
+ * Create new project (BE1 Multi-tenant with ProjectMember model)
  */
 export const createProject = async (projectData, creatorId, currentOrganizationId) => {
   const { name, description, deadline, manager, startDate, endDate } = projectData;
+
+  // Validate organization exists
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
   // Auto-promote manager if specified
   if (manager && manager !== creatorId.toString()) {
@@ -35,15 +41,14 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
       await userToPromote.save();
       console.log(`✅ Auto-promoted user ${userToPromote.email} to Manager`);
     }
+    
+    // Validate manager belongs to same organization
+    if (userToPromote && userToPromote.currentOrganizationId?.toString() !== currentOrganizationId.toString()) {
+      throw new Error('MANAGER_NOT_IN_ORGANIZATION');
+    }
   }
 
-  // Build initial members array
-  const initialMembers = [{ user: creatorId, role: "Admin", status: "ACTIVE" }];
-  if (manager && manager !== creatorId.toString()) {
-    initialMembers.push({ user: manager, role: "Manager", status: "ACTIVE" });
-  }
-
-  // Create project
+  // Step 1: Create and save Project (with organizationId)
   const project = new Project({
     name: name.trim(),
     description: description?.trim() || "",
@@ -52,13 +57,40 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
     endDate: endDate || null,
     deadline: deadline || null,
     createdBy: creatorId,
-    members: initialMembers,
+    members: [], // Empty array - use ProjectMember table instead
     code: generateRandomCode(),
   });
 
   await project.save();
 
-  // Log activity
+  // Step 2: Get project._id
+  const projectId = project._id;
+
+  // Step 3: Create ProjectMember records (Creator as Admin, Manager if specified)
+  const projectMembers = [
+    {
+      organizationId: currentOrganizationId,
+      projectId: projectId,
+      userId: creatorId,
+      roleInProject: "Admin",
+      status: "ACTIVE"
+    }
+  ];
+
+  if (manager && manager !== creatorId.toString()) {
+    projectMembers.push({
+      organizationId: currentOrganizationId,
+      projectId: projectId,
+      userId: manager,
+      roleInProject: "Manager",
+      status: "ACTIVE"
+    });
+  }
+
+  // Use insertMany for optimization
+  await ProjectMember.insertMany(projectMembers);
+
+  // Step 4: Log activity
   try {
     await ActivityLog.create({
       projectId: project._id,

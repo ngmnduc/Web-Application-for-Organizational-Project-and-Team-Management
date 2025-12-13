@@ -22,7 +22,16 @@ const OrganizationSchema = new mongoose.Schema(
         stripeCustomerId: {
             type: String, 
             select: false 
-        } 
+        },
+        status: {
+            type: String,
+            enum: ["ACTIVE", "INACTIVE", "SUSPENDED"],
+            default: "ACTIVE"
+        },
+        deletedAt: {
+            type: Date,
+            default: null
+        }
     },
     { timestamps: true }
 );

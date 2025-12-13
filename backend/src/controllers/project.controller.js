@@ -54,6 +54,12 @@ export const createProject = async (req, res) => {
     if (err.message === 'USER_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ success: false, message: "Organization ID is required" });
+    }
+    if (err.message === 'MANAGER_NOT_IN_ORGANIZATION') {
+      return res.status(400).json({ success: false, message: "Manager must belong to the same organization" });
+    }
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
