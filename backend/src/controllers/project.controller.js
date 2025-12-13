@@ -46,11 +46,18 @@ export const createProject = async (req, res) => {
         message: "Organization is required" 
       });
     }
-    if (err.message === 'MANAGER_NOT_IN_ORGANIZATION') {
-      return res.status(400).json({ 
+    if (err.message === 'ORGANIZATION_NOT_FOUND') {
+      return res.status(404).json({ 
         success: false, 
-        error: "ValidationError", 
-        message: "Manager must belong to the same organization" 
+        error: "NotFoundError", 
+        message: "Organization not found" 
+      });
+    }
+    if (err.message === 'PLAN_LIMIT_REACHED') {
+      return res.status(403).json({ 
+        success: false, 
+        error: "PlanLimitReached", 
+        message: "Free plan limit reached (Max 1 Project). Please upgrade to Premium." 
       });
     }
     res.status(500).json({ 
@@ -94,6 +101,13 @@ export const listProjects = async (req, res) => {
       pagination: result.pagination
     });
   } catch (err) {
+    if (err.message === 'ORGANIZATION_ID_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization ID is required" 
+      });
+    }
     res.status(500).json({ 
       success: false, 
       error: "ServerError", 
@@ -354,8 +368,17 @@ export const getProjectActivities = async (req, res) => {
 // GET /projects/pending-requests
 export const getPendingRequests = async (req, res) => {
   try {
-    // Call service
-    const pendingList = await projectService.getPendingRequests();
+    const currentOrgId = req.user.currentOrganizationId;
+    
+    if (!currentOrgId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Organization context missing" 
+      });
+    }
+
+    // Call service with organizationId
+    const pendingList = await projectService.getPendingRequests(currentOrgId);
 
     res.json({ success: true, data: pendingList });
   } catch (err) {
@@ -487,6 +510,12 @@ export const joinProjectByCode = async (req, res) => {
       return res.status(404).json({ 
         success: false, 
         message: "Invalid or expired invite code" 
+      });
+    }
+    if (err.message === 'ALREADY_REQUESTED') {
+      return res.status(400).json({ 
+        success: false,
+        message: "You already requested to join this project" 
       });
     }
     if (err.message === 'ALREADY_MEMBER') {

@@ -1,13 +1,5 @@
 import mongoose from "mongoose";
 
-const labelSchema = new mongoose.Schema(
-    {
-        name: { type: String, required: true, trim: true },
-        color: { type: String, default: "#3b82f6" },
-    },
-    { timestamps: true }
-);
-
 const projectSchema = new mongoose.Schema(
     {
         name: { type: String, required: true, trim: true },
@@ -15,7 +7,7 @@ const projectSchema = new mongoose.Schema(
         
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         status: { type: String, enum: ["active", "archived"], default: "active" },
-        labels: { type: [labelSchema], default: [] }, 
+        labels: [{ type: mongoose.Schema.Types.ObjectId, ref: "Label" }], 
         organizationId: { 
             type: mongoose.Schema.Types.ObjectId, 
             ref: "Organization", 

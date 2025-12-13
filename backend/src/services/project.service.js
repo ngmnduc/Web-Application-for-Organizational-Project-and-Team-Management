@@ -9,6 +9,7 @@ import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
+import Organization from "../models/organization.model.js";
 
 /**
  * Generate random project code
@@ -23,80 +24,59 @@ const generateRandomCode = (length = 6) => {
 };
 
 /**
- * Create new project (BE1 Multi-tenant with ProjectMember model)
+ * Create new project
  */
 export const createProject = async (projectData, creatorId, currentOrganizationId) => {
-  const { name, description, deadline, manager, startDate, endDate } = projectData;
+  const { name, description, deadline } = projectData;
 
   // Validate organization exists
   if (!currentOrganizationId) {
     throw new Error('ORGANIZATION_REQUIRED');
   }
 
-  // Auto-promote manager if specified
-  if (manager && manager !== creatorId.toString()) {
-    const userToPromote = await User.findById(manager);
-    if (userToPromote && userToPromote.role === "Member") {
-      userToPromote.role = "Manager";
-      await userToPromote.save();
-      console.log(`✅ Auto-promoted user ${userToPromote.email} to Manager`);
-    }
+  // Check Organization Plan & Limits
+  const organization = await Organization.findById(currentOrganizationId);
+  if (!organization) {
+    throw new Error('ORGANIZATION_NOT_FOUND');
+  }
+
+  if (organization.plan === "FREE") {
+    const projectCount = await Project.countDocuments({ 
+      organizationId: currentOrganizationId,
+      deletedAt: null 
+    });
     
-    // Validate manager belongs to same organization
-    if (userToPromote && userToPromote.currentOrganizationId?.toString() !== currentOrganizationId.toString()) {
-      throw new Error('MANAGER_NOT_IN_ORGANIZATION');
+    if (projectCount >= 1) {
+      throw new Error('PLAN_LIMIT_REACHED');
     }
   }
 
-  // Step 1: Create and save Project (with organizationId)
+  // Create Project
   const project = new Project({
     name: name.trim(),
     description: description?.trim() || "",
     organizationId: currentOrganizationId,
-    startDate: startDate || null,
-    endDate: endDate || null,
     deadline: deadline || null,
     createdBy: creatorId,
-    members: [], // Empty array - use ProjectMember table instead
-    code: generateRandomCode(),
   });
 
   await project.save();
 
-  // Step 2: Get project._id
-  const projectId = project._id;
+  // Add Creator as Admin in ProjectMember
+  await ProjectMember.create({
+    projectId: project._id,
+    userId: creatorId,
+    roleInProject: "Admin",
+    status: "ACTIVE"
+  });
 
-  // Step 3: Create ProjectMember records (Creator as Admin, Manager if specified)
-  const projectMembers = [
-    {
-      organizationId: currentOrganizationId,
-      projectId: projectId,
-      userId: creatorId,
-      roleInProject: "Admin",
-      status: "ACTIVE"
-    }
-  ];
-
-  if (manager && manager !== creatorId.toString()) {
-    projectMembers.push({
-      organizationId: currentOrganizationId,
-      projectId: projectId,
-      userId: manager,
-      roleInProject: "Manager",
-      status: "ACTIVE"
-    });
-  }
-
-  // Use insertMany for optimization
-  await ProjectMember.insertMany(projectMembers);
-
-  // Step 4: Log activity
+  // Log activity
   try {
     await ActivityLog.create({
       projectId: project._id,
       userId: creatorId,
       action: "CREATE_PROJECT",
-      description: `Created project "${name}"`,
+      content: `created project "${name}"`,
     });
   } catch (err) {
     console.error("Failed to log activity:", err);
@@ -109,12 +89,15 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
  * Get all projects (with filters)
  */
 export const listProjects = async (filters = {}) => {
-  const query = { deletedAt: null };
-
-  // Apply organizationId filter (required)
-  if (filters.organizationId) {
-    query.organizationId = filters.organizationId;
+  // organizationId is required
+  if (!filters.organizationId) {
+    throw new Error('ORGANIZATION_ID_REQUIRED');
   }
+
+  const query = { 
+    deletedAt: null,
+    organizationId: filters.organizationId
+  };
 
   // Apply other filters
   if (filters.status) {
@@ -125,10 +108,6 @@ export const listProjects = async (filters = {}) => {
     query.isArchived = filters.archived === 'true';
   }
 
-  if (filters.userId) {
-    query['members.user'] = filters.userId;
-  }
-
   // Pagination
   const page = parseInt(filters.page) || 1;
   const limit = parseInt(filters.limit) || 20;
@@ -136,7 +115,6 @@ export const listProjects = async (filters = {}) => {
 
   const projects = await Project.find(query)
     .populate('createdBy', 'name email')
-    .populate('members.user', 'name email role')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
@@ -295,10 +273,11 @@ export const addMember = async (projectId, userId, role = "Member") => {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Check if user already exists
-  const existingMember = project.members.find(
-    m => m.user.toString() === userId.toString()
-  );
+  // Check if user already exists in ProjectMember
+  const existingMember = await ProjectMember.findOne({
+    projectId,
+    userId
+  });
 
   if (existingMember) {
     throw new Error('USER_ALREADY_MEMBER');
@@ -310,14 +289,13 @@ export const addMember = async (projectId, userId, role = "Member") => {
     throw new Error('USER_NOT_FOUND');
   }
 
-  // Add member
-  project.members.push({
-    user: userId,
-    role,
-    status: "ACTIVE",
+  // Add member to ProjectMember table
+  await ProjectMember.create({
+    projectId,
+    userId,
+    roleInProject: role,
+    status: "ACTIVE"
   });
-
-  await project.save();
 
   return project;
 };
@@ -345,12 +323,15 @@ export const removeMember = async (projectId, userId) => {
     throw new Error('CANNOT_REMOVE_CREATOR');
   }
 
-  // Remove member
-  project.members = project.members.filter(
-    m => m.user.toString() !== userId.toString()
-  );
+  // Remove member from ProjectMember table
+  const result = await ProjectMember.findOneAndDelete({
+    projectId,
+    userId
+  });
 
-  await project.save();
+  if (!result) {
+    throw new Error('MEMBER_NOT_FOUND');
+  }
 
   return project;
 };
@@ -433,32 +414,25 @@ export const getProjectActivities = async (projectId, limit = 20) => {
  * Check if user is project member
  */
 export const isProjectMember = async (projectId, userId) => {
-  const project = await Project.findById(projectId);
+  const member = await ProjectMember.findOne({
+    projectId,
+    userId,
+    status: 'ACTIVE'
+  });
 
-  if (!project || project.deletedAt) {
-    return false;
-  }
-
-  return project.members.some(
-    m => m.user.toString() === userId.toString() && m.status === 'ACTIVE'
-  );
+  return !!member;
 };
 
 /**
  * Get user's role in project
  */
 export const getUserRoleInProject = async (projectId, userId) => {
-  const project = await Project.findById(projectId);
+  const member = await ProjectMember.findOne({
+    projectId,
+    userId
+  });
 
-  if (!project || project.deletedAt) {
-    return null;
-  }
-
-  const member = project.members.find(
-    m => m.user.toString() === userId.toString()
-  );
-
-  return member ? member.role : null;
+  return member ? member.roleInProject : null;
 };
 
 /**
@@ -493,27 +467,41 @@ export const getProjectMembers = async (projectId) => {
 /**
  * Get pending join requests across all projects
  */
-export const getPendingRequests = async () => {
-  const projects = await Project.find({ "members.status": "PENDING" })
-    .select("name members")
-    .populate("members.user", "name email avatar");
+export const getPendingRequests = async (organizationId) => {
+  // Get all projects in organization
+  const projects = await Project.find({ 
+    organizationId,
+    deletedAt: null 
+  }).select('_id name');
+  
+  const projectIds = projects.map(p => p._id);
 
-  let pendingList = [];
+  // Get pending members
+  const pendingMembers = await ProjectMember.find({
+    projectId: { $in: projectIds },
+    status: "PENDING"
+  })
+    .populate("userId", "name email avatar")
+    .populate("projectId", "name");
 
-  projects.forEach(proj => {
-    const pendingMembers = proj.members.filter(m => m.status === "PENDING");
+  const formattedList = pendingMembers.map(pm => {
+    if (!pm.userId || !pm.projectId) return null;
     
-    pendingMembers.forEach(member => {
-      pendingList.push({
-        requestId: member._id,
-        projectId: proj._id,
-        projectName: proj.name,
-        user: member.user
-      });
-    });
-  });
+    return {
+      requestId: pm._id,
+      projectId: pm.projectId._id,
+      projectName: pm.projectId.name,
+      user: {
+        _id: pm.userId._id,
+        name: pm.userId.name,
+        email: pm.userId.email,
+        avatar: pm.userId.avatar
+      },
+      createdAt: pm.createdAt
+    };
+  }).filter(item => item !== null);
 
-  return pendingList;
+  return formattedList;
 };
 
 /**
@@ -616,23 +604,26 @@ export const joinProjectByCode = async (inviteCode, userId) => {
     throw new Error('INVALID_OR_EXPIRED_CODE');
   }
 
-  // Check if already a member
-  const existingMember = project.members.find(
-    m => m.user.toString() === userId.toString()
-  );
+  // Check if already a member in ProjectMember table
+  const existingMember = await ProjectMember.findOne({
+    projectId: project._id,
+    userId
+  });
 
   if (existingMember) {
+    if (existingMember.status === 'PENDING') {
+      throw new Error('ALREADY_REQUESTED');
+    }
     throw new Error('ALREADY_MEMBER');
   }
 
-  // Add user as member
-  project.members.push({
-    user: userId,
-    role: "Member",
+  // Add user as member in ProjectMember table
+  await ProjectMember.create({
+    projectId: project._id,
+    userId,
+    roleInProject: "Member",
     status: "ACTIVE"
   });
-
-  await project.save();
 
   // Log activity
   try {
@@ -640,7 +631,7 @@ export const joinProjectByCode = async (inviteCode, userId) => {
       projectId: project._id,
       userId: userId,
       action: "JOIN_PROJECT",
-      content: `joined project "${project.name}" using invite code.`
+      content: `joined project "${project.name}" via invite code.`
     });
   } catch (e) {
     console.error("Logging failed:", e.message);
