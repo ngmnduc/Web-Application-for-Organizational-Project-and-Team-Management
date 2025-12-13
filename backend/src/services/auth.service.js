@@ -4,6 +4,7 @@
  */
 
 import User from "../models/user.model.js";
+import Organization from "../models/organization.model.js";
 import OrganizationMember from "../models/organizationMember.model.js";
 import { signToken } from "../utils/jwt.js";
 import crypto from "crypto";

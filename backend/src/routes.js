@@ -21,6 +21,7 @@ import { checkProjectActive } from "./middlewares/archive.middleware.js";
 import taskRoutes from "./routes/task.routes.js";
 import meetingRoutes from "./routes/meeting.routes.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
+import organizationRoutes from "./routes/organization.routes.js";
 
 const router = Router();
 
@@ -58,6 +59,7 @@ router.get("/protected/manager",
 router.use("/", taskRoutes);
 router.use("/", meetingRoutes);
 router.use("/", attendanceRoutes);
+router.use("/", organizationRoutes);
 
 // Projects - All require organization context
 router.post("/projects", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), createProject);
