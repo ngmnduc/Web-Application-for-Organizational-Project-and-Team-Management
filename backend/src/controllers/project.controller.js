@@ -1,10 +1,3 @@
-
-import mongoose from "mongoose";
-import Project from "../models/project.model.js";
-import ProjectMember from "../models/projectMember.model.js";
-import User from "../models/user.model.js";
-import Task from "../models/task.model.js";
-import ActivityLog from "../models/activityLog.model.js";
 import * as projectValidator from "../validators/project.validator.js";
 import * as projectService from "../services/project.service.js";
 
@@ -21,53 +14,62 @@ export const createProject = async (req, res) => {
       });
     }
 
-    const creatorId = req.user && req.user._id;
-    if (!creatorId) {
-      return res.status(401).json({ 
-        success: false, 
-        error: "AuthenticationError", 
-        message: "Unauthorized" 
-      });
-    }
+    const currentOrgId = req.user.currentOrganizationId;
+    const userId = req.user._id;
 
-    // Get current organization from user 
-    const currentOrganizationId = req.user.currentOrganizationId;
-    if (!currentOrganizationId) {
+    if (!currentOrgId) {
       return res.status(400).json({ 
         success: false, 
-        error: "ValidationError", 
-        message: "No active organization. Please switch to an organization first." 
+        message: "Organization context missing" 
       });
     }
 
-    // 2. Call service with organizationId
-    const project = await projectService.createProject(req.body, creatorId, currentOrganizationId);
+    // 2. Call service
+    const project = await projectService.createProject(
+      req.body,
+      userId,
+      currentOrgId
+    );
 
-    // 3. Return response
     res.status(201).json({ 
       success: true, 
       message: "Project created successfully", 
       data: project 
     });
+
   } catch (err) {
-    // 4. Handle service errors
-    if (err.message === 'USER_NOT_FOUND') {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    // Handle service errors
     if (err.message === 'ORGANIZATION_REQUIRED') {
-      return res.status(400).json({ success: false, message: "Organization ID is required" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
+      });
     }
     if (err.message === 'MANAGER_NOT_IN_ORGANIZATION') {
-      return res.status(400).json({ success: false, message: "Manager must belong to the same organization" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Manager must belong to the same organization" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: err.message 
+    });
   }
 };
 
 // GET /projects
 export const listProjects = async (req, res) => {
   try {
-    // 1. Validate query
+    const currentOrgId = req.user.currentOrganizationId;
+    if (!currentOrgId) {
+      return res.status(200).json({ success: true, count: 0, data: [] });
+    }
+
+    // Validate query parameters
     const validation = projectValidator.validateProjectQuery(req.query);
     if (!validation.isValid) {
       return res.status(400).json({ 
@@ -77,18 +79,26 @@ export const listProjects = async (req, res) => {
       });
     }
 
-    // 2. Call service
-    const result = await projectService.listProjects(req.query);
+    // Call service with filters
+    const filters = {
+      ...req.query,
+      organizationId: currentOrgId
+    };
 
-    // 3. Return response
+    const result = await projectService.listProjects(filters);
+
     res.json({ 
       success: true, 
       count: result.projects.length,
-      pagination: result.pagination,
-      data: result.projects 
+      data: result.projects,
+      pagination: result.pagination
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: err.message 
+    });
   }
 };
 
@@ -104,20 +114,30 @@ export const getProject = async (req, res) => {
   } catch (err) {
     // Handle service errors
     if (err.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
-      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: err.message 
+    });
   }
 };
 
 // PUT /projects/:id
 export const updateProject = async (req, res) => {
   try {
-    const { id } = req.params;
-
     // 1. Validate input
     const validation = projectValidator.validateUpdateProject(req.body);
     if (!validation.isValid) {
@@ -128,10 +148,12 @@ export const updateProject = async (req, res) => {
       });
     }
 
-    // 2. Call service
-    const project = await projectService.updateProject(id, req.body, req.user._id);
+    const { id } = req.params;
+    const userId = req.user._id;
 
-    // 3. Return response
+    // 2. Call service
+    const project = await projectService.updateProject(id, req.body, userId);
+
     res.json({ 
       success: true, 
       message: "Project updated successfully", 
@@ -140,12 +162,24 @@ export const updateProject = async (req, res) => {
   } catch (err) {
     // Handle service errors
     if (err.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
-      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: err.message 
+    });
   }
 };
 
@@ -153,20 +187,37 @@ export const updateProject = async (req, res) => {
 export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id;
 
     // Call service
-    const project = await projectService.deleteProject(id, req.user._id);
+    const project = await projectService.deleteProject(id, userId);
 
-    res.json({ success: true, message: "Project deleted", data: project });
+    res.json({ 
+      success: true, 
+      message: "Project deleted", 
+      data: project 
+    });
   } catch (err) {
     // Handle service errors
     if (err.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
-      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: err.message 
+    });
   }
 };
 
@@ -178,16 +229,21 @@ export const getProjectMembers = async (req, res) => {
     // Call service
     const members = await projectService.getProjectMembers(id);
 
-    res.status(200).json({ 
-      success: true, 
-      data: members 
-    });
+    res.status(200).json({ success: true, data: members });
   } catch (err) {
     // Handle service errors
     if (err.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: err.message 
+    });
   }
 };
 
@@ -195,131 +251,103 @@ export const getProjectMembers = async (req, res) => {
 export const toggleArchive = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id;
 
     // Call service
-    const project = await projectService.toggleArchive(id, req.user._id);
+    const project = await projectService.toggleArchive(id, userId);
 
     res.json({ 
       success: true, 
-      message: `Project ${project.isArchived ? "archived" : "unarchived"}`, 
+      message: `Project ${project.isArchived ? 'archived' : 'unarchived'} successfully`, 
       data: project 
     });
   } catch (err) {
     // Handle service errors
     if (err.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
-      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: err.message 
+    });
   }
 };
 
-/**
- * @desc    Get project dashboard stats (Tasks count, Days left)
- * @route   GET /projects/:id/summary
- */
+// GET /projects/:id/summary
 export const getProjectSummary = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get base summary from service
-    const result = await projectService.getProjectSummary(id);
-    const project = result.project;
-
-    const now = new Date();
-
-    // Get detailed task statistics
-    const [totalTasks, todo, doing, done, overdue, high, medium, low] = await Promise.all([
-      Task.countDocuments({ projectId: id, deletedAt: null }),
-      Task.countDocuments({ projectId: id, status: "TODO", deletedAt: null }),
-      Task.countDocuments({ projectId: id, status: "DOING", deletedAt: null }),
-      Task.countDocuments({ projectId: id, status: "DONE", deletedAt: null }),
-      Task.countDocuments({ projectId: id, priority: "HIGH", deletedAt: null }),
-      Task.countDocuments({ projectId: id, priority: "MEDIUM", deletedAt: null }),
-      Task.countDocuments({ projectId: id, priority: "LOW", deletedAt: null }),
-      Task.countDocuments({
-        projectId: id,
-        deletedAt: null,
-        dueDate: { $lt: now },
-        status: { $ne: "DONE" }
-      })
-    ]);
-
-    let daysLeft = 0;
-    if (project.endDate) {
-      const endDateField = project.endDate || project.deadline;
-      if (endDateField) {
-        const end = new Date(endDateField);
-        const diffTime = end - now;
-        daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (daysLeft < 0) daysLeft = 0;
-      }
-    }
+    // Call service
+    const summary = await projectService.getProjectSummary(id);
 
     res.status(200).json({
       success: true,
-      data: {
-        totalTasks,
-        todo,
-        doing,
-        done,
-        overdue,
-        daysLeft,
-        priority: {
-          high,
-          medium,
-          low
-        },
-        tasksByStatus: [
-          { _id: 'TODO', count: todo },
-          { _id: 'DOING', count: doing },
-          { _id: 'DONE', count: done }
-        ]
-      }
+      data: summary
     });
   } catch (error) {
     // Handle service errors
     if (error.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
     if (error.message === 'PROJECT_NOT_FOUND') {
-      return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: error.message 
+    });
   }
 };
-/**
- * @desc    Get recent activity logs for project
- * @route   GET /projects/:id/activities
- */
+
+// GET /projects/:id/activities
 export const getProjectActivities = async (req, res) => {
   try {
     const { id } = req.params;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 20;
 
     // Call service
     const activities = await projectService.getProjectActivities(id, limit);
 
-    // Pagination for backward compatibility
-    const page = parseInt(req.query.page) || 1;
-    const total = activities.length;
-
     res.status(200).json({
       success: true,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
       data: activities
     });
   } catch (error) {
     // Handle service errors
     if (error.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: error.message 
+    });
   }
 };
 
@@ -331,15 +359,15 @@ export const getPendingRequests = async (req, res) => {
 
     res.json({ success: true, data: pendingList });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError",
+      message: err.message 
+    });
   }
 };
 
-/**
- * @desc    Get current invite code, generate if null
- * @route   GET /projects/:id/invite-code
- * @access  Private (Admin/Manager)
- */
+// GET /projects/:id/invite-code
 export const getInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
@@ -351,23 +379,34 @@ export const getInviteCode = async (req, res) => {
   } catch (err) {
     // Handle service errors
     if (err.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
-      return res.status(404).json({ success: false, message: "Project not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
+      });
     }
     if (err.message === 'FAILED_TO_GENERATE_CODE') {
-      return res.status(500).json({ success: false, message: "Failed to generate unique invite code after multiple retries." });
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to generate unique code" 
+      });
     }
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError",
+      message: err.message 
+    });
   }
 };
 
-/**
- * @desc    Generate a new random invite code
- * @route   PATCH /projects/:id/invite-code
- * @access  Private (Admin/Manager)
- */
+// PATCH /projects/:id/invite-code (Reset)
 export const resetInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
@@ -383,23 +422,34 @@ export const resetInviteCode = async (req, res) => {
   } catch (err) {
     // Handle service errors
     if (err.message === 'INVALID_PROJECT_ID') {
-      return res.status(400).json({ success: false, message: "Invalid project ID" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Invalid project ID" 
+      });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
-      return res.status(404).json({ success: false, message: "Project not found" });
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
+      });
     }
     if (err.message === 'FAILED_TO_RESET_CODE') {
-      return res.status(500).json({ success: false, message: "Failed to reset invite code after multiple retries." });
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to reset invite code" 
+      });
     }
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError",
+      message: err.message 
+    });
   }
 };
 
-/**
- * @desc    Allow user to join a project using an invite code
- * @route   POST /projects/join
- * @access  Private (Member)
- */
+// POST /projects/join
 export const joinProjectByCode = async (req, res) => {
   try {
     // 1. Validate input
@@ -418,23 +468,37 @@ export const joinProjectByCode = async (req, res) => {
     // 2. Call service
     const projectId = await projectService.joinProjectByCode(inviteCode, userId);
 
-    // 3. Return response
     res.json({ 
       success: true, 
       message: "Successfully joined project", 
       projectId 
     });
+
   } catch (err) {
-    // 4. Handle service errors
+    // Handle service errors
     if (err.message === 'INVALID_INVITE_CODE') {
-      return res.status(400).json({ success: false, message: "Invalid invite code format" });
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError",
+        message: "Invalid invite code format" 
+      });
     }
     if (err.message === 'INVALID_OR_EXPIRED_CODE') {
-      return res.status(404).json({ success: false, message: "Invalid or expired invite code." });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Invalid or expired invite code" 
+      });
     }
     if (err.message === 'ALREADY_MEMBER') {
-      return res.status(400).json({ success: false, message: "You are already a member of this project." });
+      return res.status(400).json({ 
+        success: false,
+        message: "You are already a member of this project" 
+      });
     }
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError",
+      message: err.message 
+    });
   }
 };

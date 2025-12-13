@@ -111,7 +111,12 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
 export const listProjects = async (filters = {}) => {
   const query = { deletedAt: null };
 
-  // Apply filters
+  // Apply organizationId filter (required)
+  if (filters.organizationId) {
+    query.organizationId = filters.organizationId;
+  }
+
+  // Apply other filters
   if (filters.status) {
     query.status = filters.status;
   }
@@ -364,29 +369,47 @@ export const getProjectSummary = async (projectId) => {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Get task statistics
-  const tasks = await Task.find({ projectId, deletedAt: null });
+  const now = new Date();
 
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 'DONE').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS').length;
-  const todoTasks = tasks.filter(t => t.status === 'TODO').length;
+  // Get task statistics in parallel
+  const [totalTasks, todo, doing, done, high, medium, low, overdue] = await Promise.all([
+    Task.countDocuments({ projectId, deletedAt: null }),
+    Task.countDocuments({ projectId, status: 'TODO', deletedAt: null }),
+    Task.countDocuments({ projectId, status: 'DOING', deletedAt: null }),
+    Task.countDocuments({ projectId, status: 'DONE', deletedAt: null }),
+    Task.countDocuments({ projectId, priority: 'HIGH', deletedAt: null }),
+    Task.countDocuments({ projectId, priority: 'MEDIUM', deletedAt: null }),
+    Task.countDocuments({ projectId, priority: 'LOW', deletedAt: null }),
+    Task.countDocuments({
+      projectId,
+      deletedAt: null,
+      dueDate: { $lt: now },
+      status: { $ne: 'DONE' }
+    })
+  ]);
 
-  const completionRate = totalTasks > 0
-    ? Math.round((completedTasks / totalTasks) * 100)
-    : 0;
+  // Calculate days left
+  let daysLeft = 0;
+  if (project.deadline) {
+    const end = new Date(project.deadline);
+    const diffTime = end - now;
+    daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) daysLeft = 0;
+  }
 
   return {
-    project,
-    stats: {
-      totalTasks,
-      completedTasks,
-      inProgressTasks,
-      todoTasks,
-      completionRate,
-      totalMembers: project.members.length,
-      activeMembers: project.members.filter(m => m.status === 'ACTIVE').length,
-    },
+    totalTasks,
+    todo,
+    doing,
+    done,
+    overdue,
+    daysLeft,
+    priority: { high, medium, low },
+    tasksByStatus: [
+      { _id: 'TODO', count: todo },
+      { _id: 'DOING', count: doing },
+      { _id: 'DONE', count: done }
+    ]
   };
 };
 
