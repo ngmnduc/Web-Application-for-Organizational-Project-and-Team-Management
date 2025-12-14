@@ -5,7 +5,7 @@ import {
   getProjectAttendance,
   getMyAttendance,
 } from "../controllers/attendance.controller.js";
-import { verifyToken, checkRole } from "../middlewares/auth.js";
+import { verifyToken, checkRole, requireOrgAccess } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -14,14 +14,14 @@ const router = express.Router();
  * @desc    Check-in attendance for a project
  * @access  Private
  */
-router.post("/projects/:projectId/attendance/checkin", verifyToken, checkIn);
+router.post("/projects/:projectId/attendance/checkin", verifyToken, requireOrgAccess, checkIn);
 
 /**
  * @route   GET /projects/:projectId/attendance/me
  * @desc    Get my attendance today for a project
  * @access  Private
  */
-router.get("/projects/:projectId/attendance/me", verifyToken, getMyAttendanceToday);
+router.get("/projects/:projectId/attendance/me", verifyToken, requireOrgAccess, getMyAttendanceToday);
 
 /**
  * @route   GET /projects/:projectId/attendance
@@ -31,6 +31,7 @@ router.get("/projects/:projectId/attendance/me", verifyToken, getMyAttendanceTod
 router.get(
   "/projects/:projectId/attendance",
   verifyToken,
+  requireOrgAccess,
   checkRole("Admin", "Manager"),
   getProjectAttendance
 );
@@ -40,6 +41,6 @@ router.get(
  * @desc    Get my attendance history across all projects
  * @access  Private
  */
-router.get("/attendance/me", verifyToken, getMyAttendance);
+router.get("/attendance/me", verifyToken, requireOrgAccess, getMyAttendance);
 
 export default router;

@@ -116,13 +116,22 @@ export const createTask = async (req, res) => {
       dueDate,
       estimateHours,
       spentHours,
-      // orderIndex, // Không lấy từ body nữa mà tự tính
     } = req.body;
 
+    // Validate required fields
     if (!title) {
       return res.status(400).json({
         success: false,
         message: "Title is required.",
+      });
+    }
+
+    // Get organizationId from authenticated user (BE1 Multi-tenant)
+    const organizationId = req.user?.currentOrganizationId;
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: "No active organization. Please switch to an organization first.",
       });
     }
 
@@ -134,23 +143,24 @@ export const createTask = async (req, res) => {
       });
     }
 
+    // Validate project belongs to user's organization
+    if (projectExists.organizationId?.toString() !== organizationId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Project does not belong to your organization",
+      });
+    }
+
     const convertedProjectId = new mongoose.Types.ObjectId(projectId);
     const convertedAssigneeId = assigneeId
       ? new mongoose.Types.ObjectId(assigneeId)
       : null;
 
-    // === LOGIC MỚI: Tự động tính Order Index theo Priority ===
-    // High: ~1000 (Lên đầu)
-    // Medium: ~5000 (Ở giữa)
-    // Low: ~9000 (Xuống cuối)
+    // Auto-calculate Order Index based on Priority
     let baseIndex = 5000; 
     if (priority === 'High' || priority === 'HIGH') baseIndex = 1000;
     if (priority === 'Low' || priority === 'LOW') baseIndex = 9000;
-
-    // Cộng thêm phần thập phân từ timestamp để tránh trùng lặp tuyệt đối
-    // Ví dụ: 5000.4521
     const calculatedOrderIndex = baseIndex + ((Date.now() % 10000) / 10000);
-    // ========================================================
 
     const task = new Task({
       title,
@@ -162,8 +172,9 @@ export const createTask = async (req, res) => {
       dueDate,
       estimateHours,
       spentHours,
-      orderIndex: calculatedOrderIndex, // <--- Gán giá trị vừa tính
+      orderIndex: calculatedOrderIndex,
       projectId: convertedProjectId,
+      organizationId: organizationId, // Add organizationId from user context
     });
 
     await task.save();

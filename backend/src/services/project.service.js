@@ -5,9 +5,11 @@
 
 import mongoose from "mongoose";
 import Project from "../models/project.model.js";
+import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
+import Organization from "../models/organization.model.js";
 
 /**
  * Generate random project code
@@ -24,71 +26,96 @@ const generateRandomCode = (length = 6) => {
 /**
  * Create new project
  */
-export const createProject = async (projectData, creatorId) => {
-  const { name, description, deadline, manager, startDate, endDate } = projectData;
+export const createProject = async (projectData, creatorId, currentOrganizationId) => {
+  const { name, description, deadline } = projectData;
 
-  // Auto-promote manager if specified
-  if (manager && manager !== creatorId.toString()) {
-    const userToPromote = await User.findById(manager);
-    if (userToPromote && userToPromote.role === "Member") {
-      userToPromote.role = "Manager";
-      await userToPromote.save();
-      console.log(`✅ Auto-promoted user ${userToPromote.email} to Manager`);
+  // Validate organization exists
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
+
+  // Check Organization Plan & Limits
+  const organization = await Organization.findById(currentOrganizationId);
+  if (!organization) {
+    throw new Error('ORGANIZATION_NOT_FOUND');
+  }
+
+  if (organization.plan === "FREE") {
+    const projectCount = await Project.countDocuments({ 
+      organizationId: currentOrganizationId,
+      deletedAt: null 
+    });
+    
+    if (projectCount >= 1) {
+      throw new Error('PLAN_LIMIT_REACHED');
     }
   }
 
-  // Build initial members array
-  const initialMembers = [{ user: creatorId, role: "Admin", status: "ACTIVE" }];
-  if (manager && manager !== creatorId.toString()) {
-    initialMembers.push({ user: manager, role: "Manager", status: "ACTIVE" });
-  }
+  // Use transaction for atomic operation
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  // Create project
-  const project = new Project({
-    name: name.trim(),
-    description: description?.trim() || "",
-    startDate: startDate || null,
-    endDate: endDate || null,
-    deadline: deadline || null,
-    createdBy: creatorId,
-    members: initialMembers,
-    code: generateRandomCode(),
-  });
-
-  await project.save();
-
-  // Log activity
   try {
-    await ActivityLog.create({
+    // Create Project
+    const [project] = await Project.create([{
+      name: name.trim(),
+      description: description?.trim() || "",
+      organizationId: currentOrganizationId,
+      deadline: deadline || null,
+      createdBy: creatorId,
+    }], { session });
+
+    // Add Creator as Admin in ProjectMember
+    await ProjectMember.create([{
       projectId: project._id,
       userId: creatorId,
-      action: "CREATE_PROJECT",
-      description: `Created project "${name}"`,
-    });
-  } catch (err) {
-    console.error("Failed to log activity:", err);
-  }
+      roleInProject: "Admin",
+      status: "ACTIVE"
+    }], { session });
 
-  return project;
+    // Log activity
+    try {
+      await ActivityLog.create([{
+        projectId: project._id,
+        userId: creatorId,
+        action: "CREATE_PROJECT",
+        content: `created project "${name}"`,
+      }], { session });
+    } catch (err) {
+      console.error("Failed to log activity:", err);
+    }
+
+    await session.commitTransaction();
+    return project;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 
 /**
  * Get all projects (with filters)
  */
 export const listProjects = async (filters = {}) => {
-  const query = { deletedAt: null };
+  // organizationId is required
+  if (!filters.organizationId) {
+    throw new Error('ORGANIZATION_ID_REQUIRED');
+  }
 
-  // Apply filters
+  const query = { 
+    deletedAt: null,
+    organizationId: filters.organizationId
+  };
+
+  // Apply other filters
   if (filters.status) {
     query.status = filters.status;
   }
 
   if (filters.archived !== undefined) {
     query.isArchived = filters.archived === 'true';
-  }
-
-  if (filters.userId) {
-    query['members.user'] = filters.userId;
   }
 
   // Pagination
@@ -98,7 +125,6 @@ export const listProjects = async (filters = {}) => {
 
   const projects = await Project.find(query)
     .populate('createdBy', 'name email')
-    .populate('members.user', 'name email role')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
@@ -119,16 +145,24 @@ export const listProjects = async (filters = {}) => {
 /**
  * Get single project by ID
  */
-export const getProjectById = async (projectId) => {
+export const getProjectById = async (projectId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
 
-  const project = await Project.findById(projectId)
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
+
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  })
     .populate('createdBy', 'name email')
     .populate('members.user', 'name email role avatar');
 
-  if (!project || project.deletedAt) {
+  if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
@@ -138,14 +172,22 @@ export const getProjectById = async (projectId) => {
 /**
  * Update project
  */
-export const updateProject = async (projectId, updateData, userId) => {
+export const updateProject = async (projectId, updateData, userId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
 
-  const project = await Project.findById(projectId);
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
-  if (!project || project.deletedAt) {
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
@@ -177,14 +219,22 @@ export const updateProject = async (projectId, updateData, userId) => {
 /**
  * Delete project (soft delete)
  */
-export const deleteProject = async (projectId, userId) => {
+export const deleteProject = async (projectId, userId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
 
-  const project = await Project.findById(projectId);
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
-  if (!project || project.deletedAt) {
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
@@ -209,28 +259,37 @@ export const deleteProject = async (projectId, userId) => {
 /**
  * Toggle project archive status
  */
-export const toggleArchive = async (projectId, userId) => {
+export const toggleArchive = async (projectId, userId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
 
-  const project = await Project.findById(projectId);
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
-  if (!project || project.deletedAt) {
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  project.isArchived = !project.isArchived;
+  // Toggle between 'active' and 'archived'
+  project.status = project.status === 'active' ? 'archived' : 'active';
   await project.save();
 
   // Log activity
-  const action = project.isArchived ? "ARCHIVE_PROJECT" : "UNARCHIVE_PROJECT";
+  const action = project.status === 'archived' ? "ARCHIVE_PROJECT" : "UNARCHIVE_PROJECT";
   try {
     await ActivityLog.create({
       projectId: project._id,
       userId,
       action,
-      description: `${project.isArchived ? 'Archived' : 'Unarchived'} project "${project.name}"`,
+      description: `${project.status === 'archived' ? 'Archived' : 'Unarchived'} project "${project.name}"`,
     });
   } catch (err) {
     console.error("Failed to log activity:", err);
@@ -242,7 +301,7 @@ export const toggleArchive = async (projectId, userId) => {
 /**
  * Add member to project
  */
-export const addMember = async (projectId, userId, role = "Member") => {
+export const addMember = async (projectId, userId, role = "Member", currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
@@ -251,16 +310,25 @@ export const addMember = async (projectId, userId, role = "Member") => {
     throw new Error('INVALID_USER_ID');
   }
 
-  const project = await Project.findById(projectId);
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
-  if (!project || project.deletedAt) {
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Check if user already exists
-  const existingMember = project.members.find(
-    m => m.user.toString() === userId.toString()
-  );
+  // Check if user already exists in ProjectMember
+  const existingMember = await ProjectMember.findOne({
+    projectId,
+    userId
+  });
 
   if (existingMember) {
     throw new Error('USER_ALREADY_MEMBER');
@@ -272,14 +340,13 @@ export const addMember = async (projectId, userId, role = "Member") => {
     throw new Error('USER_NOT_FOUND');
   }
 
-  // Add member
-  project.members.push({
-    user: userId,
-    role,
-    status: "ACTIVE",
+  // Add member to ProjectMember table
+  await ProjectMember.create({
+    projectId,
+    userId,
+    roleInProject: role,
+    status: "ACTIVE"
   });
-
-  await project.save();
 
   return project;
 };
@@ -287,7 +354,7 @@ export const addMember = async (projectId, userId, role = "Member") => {
 /**
  * Remove member from project
  */
-export const removeMember = async (projectId, userId) => {
+export const removeMember = async (projectId, userId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
@@ -296,9 +363,17 @@ export const removeMember = async (projectId, userId) => {
     throw new Error('INVALID_USER_ID');
   }
 
-  const project = await Project.findById(projectId);
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
-  if (!project || project.deletedAt) {
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
@@ -307,12 +382,15 @@ export const removeMember = async (projectId, userId) => {
     throw new Error('CANNOT_REMOVE_CREATOR');
   }
 
-  // Remove member
-  project.members = project.members.filter(
-    m => m.user.toString() !== userId.toString()
-  );
+  // Remove member from ProjectMember table
+  const result = await ProjectMember.findOneAndDelete({
+    projectId,
+    userId
+  });
 
-  await project.save();
+  if (!result) {
+    throw new Error('MEMBER_NOT_FOUND');
+  }
 
   return project;
 };
@@ -320,87 +398,413 @@ export const removeMember = async (projectId, userId) => {
 /**
  * Get project summary (stats)
  */
-export const getProjectSummary = async (projectId) => {
+export const getProjectSummary = async (projectId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
 
-  const project = await Project.findById(projectId);
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
-  if (!project || project.deletedAt) {
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Get task statistics
-  const tasks = await Task.find({ projectId, deletedAt: null });
+  const now = new Date();
 
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 'DONE').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS').length;
-  const todoTasks = tasks.filter(t => t.status === 'TODO').length;
+  // Get task statistics in parallel
+  const [totalTasks, todo, doing, done, high, medium, low, overdue] = await Promise.all([
+    Task.countDocuments({ projectId, deletedAt: null }),
+    Task.countDocuments({ projectId, status: 'TODO', deletedAt: null }),
+    Task.countDocuments({ projectId, status: 'DOING', deletedAt: null }),
+    Task.countDocuments({ projectId, status: 'DONE', deletedAt: null }),
+    Task.countDocuments({ projectId, priority: 'HIGH', deletedAt: null }),
+    Task.countDocuments({ projectId, priority: 'MEDIUM', deletedAt: null }),
+    Task.countDocuments({ projectId, priority: 'LOW', deletedAt: null }),
+    Task.countDocuments({
+      projectId,
+      deletedAt: null,
+      dueDate: { $lt: now },
+      status: { $ne: 'DONE' }
+    })
+  ]);
 
-  const completionRate = totalTasks > 0
-    ? Math.round((completedTasks / totalTasks) * 100)
-    : 0;
+  // Calculate days left
+  let daysLeft = 0;
+  if (project.deadline) {
+    const end = new Date(project.deadline);
+    const diffTime = end - now;
+    daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) daysLeft = 0;
+  }
 
   return {
-    project,
-    stats: {
-      totalTasks,
-      completedTasks,
-      inProgressTasks,
-      todoTasks,
-      completionRate,
-      totalMembers: project.members.length,
-      activeMembers: project.members.filter(m => m.status === 'ACTIVE').length,
-    },
+    totalTasks,
+    todo,
+    doing,
+    done,
+    overdue,
+    daysLeft,
+    priority: { high, medium, low },
+    tasksByStatus: [
+      { _id: 'TODO', count: todo },
+      { _id: 'DOING', count: doing },
+      { _id: 'DONE', count: done }
+    ]
   };
 };
 
 /**
  * Get project activities
  */
-export const getProjectActivities = async (projectId, limit = 20) => {
+export const getProjectActivities = async (projectId, currentOrganizationId, page = 1, limit = 20) => {
   if (!mongoose.isValidObjectId(projectId)) {
     throw new Error('INVALID_PROJECT_ID');
   }
 
-  const activities = await ActivityLog.find({ projectId })
-    .populate('userId', 'name email avatar')
-    .sort({ createdAt: -1 })
-    .limit(limit);
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
 
-  return activities;
+  // Verify project belongs to organization
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [activities, total] = await Promise.all([
+    ActivityLog.find({ projectId })
+      .populate('userId', 'name email avatar')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    ActivityLog.countDocuments({ projectId })
+  ]);
+
+  return {
+    activities,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  };
 };
 
 /**
  * Check if user is project member
  */
-export const isProjectMember = async (projectId, userId) => {
-  const project = await Project.findById(projectId);
-
-  if (!project || project.deletedAt) {
-    return false;
+export const isProjectMember = async (projectId, userId, currentOrganizationId) => {
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
   }
 
-  return project.members.some(
-    m => m.user.toString() === userId.toString() && m.status === 'ACTIVE'
-  );
+  // Verify project belongs to organization
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+
+  const member = await ProjectMember.findOne({
+    projectId,
+    userId,
+    status: 'ACTIVE'
+  });
+
+  return !!member;
 };
 
 /**
  * Get user's role in project
  */
-export const getUserRoleInProject = async (projectId, userId) => {
-  const project = await Project.findById(projectId);
-
-  if (!project || project.deletedAt) {
-    return null;
+export const getUserRoleInProject = async (projectId, userId, currentOrganizationId) => {
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
   }
 
-  const member = project.members.find(
-    m => m.user.toString() === userId.toString()
-  );
+  // Verify project belongs to organization
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
 
-  return member ? member.role : null;
+  if (!project) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+
+  const member = await ProjectMember.findOne({
+    projectId,
+    userId
+  });
+
+  return member ? member.roleInProject : null;
+};
+
+/**
+ * Get project members from ProjectMember table
+ */
+export const getProjectMembers = async (projectId, currentOrganizationId) => {
+  if (!mongoose.isValidObjectId(projectId)) {
+    throw new Error('INVALID_PROJECT_ID');
+  }
+
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
+
+  // Verify project belongs to organization
+  const project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!project) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+
+  const ProjectMember = mongoose.model('ProjectMember');
+  
+  const members = await ProjectMember.find({ projectId })
+    .populate('userId', 'name email avatar');
+
+  const formattedData = members.map((m) => {
+    if (!m.userId) return null;
+
+    return {
+      userId: m.userId._id,
+      name: m.userId.name,
+      email: m.userId.email,
+      projectRole: m.roleInProject,
+      status: m.status,
+      joinedAt: m.createdAt
+    };
+  }).filter(m => m !== null);
+
+  return formattedData;
+};
+
+/**
+ * Get pending join requests across all projects
+ */
+export const getPendingRequests = async (organizationId) => {
+  // Get all projects in organization
+  const projects = await Project.find({ 
+    organizationId,
+    deletedAt: null 
+  }).select('_id name');
+  
+  const projectIds = projects.map(p => p._id);
+
+  // Get pending members
+  const pendingMembers = await ProjectMember.find({
+    projectId: { $in: projectIds },
+    status: "PENDING"
+  })
+    .populate("userId", "name email avatar")
+    .populate("projectId", "name");
+
+  const formattedList = pendingMembers.map(pm => {
+    if (!pm.userId || !pm.projectId) return null;
+    
+    return {
+      requestId: pm._id,
+      projectId: pm.projectId._id,
+      projectName: pm.projectId.name,
+      user: {
+        _id: pm.userId._id,
+        name: pm.userId.name,
+        email: pm.userId.email,
+        avatar: pm.userId.avatar
+      },
+      createdAt: pm.createdAt
+    };
+  }).filter(item => item !== null);
+
+  return formattedList;
+};
+
+/**
+ * Get or generate invite code for project
+ */
+export const getOrCreateInviteCode = async (projectId, currentOrganizationId) => {
+  if (!mongoose.isValidObjectId(projectId)) {
+    throw new Error('INVALID_PROJECT_ID');
+  }
+
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
+
+  let project = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  }).select('+inviteCode');
+  
+  if (!project) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+
+  if (project.inviteCode) {
+    return project.inviteCode;
+  }
+
+  // Generate new code with retry logic
+  for (let i = 0; i < 5; i++) {
+    try {
+      let newCode;
+      do {
+        newCode = generateRandomCode(6);
+      } while (await Project.findOne({ inviteCode: newCode }));
+      
+      project.inviteCode = newCode;
+      await project.save();
+      return newCode;
+
+    } catch (err) {
+      if (err.code === 11000) {
+        console.warn(`Invite Code Race Condition for project ${projectId}. Retry ${i + 1}`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  
+  throw new Error('FAILED_TO_GENERATE_CODE');
+};
+
+/**
+ * Reset invite code for project
+ */
+export const resetInviteCode = async (projectId, currentOrganizationId) => {
+  if (!mongoose.isValidObjectId(projectId)) {
+    throw new Error('INVALID_PROJECT_ID');
+  }
+
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
+
+  // Verify project belongs to organization
+  const existingProject = await Project.findOne({
+    _id: projectId,
+    organizationId: currentOrganizationId,
+    deletedAt: null
+  });
+
+  if (!existingProject) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+
+  for (let i = 0; i < 5; i++) {
+    try {
+      let newCode;
+      do {
+        newCode = generateRandomCode(6);
+      } while (await Project.findOne({ inviteCode: newCode }));
+
+      const project = await Project.findByIdAndUpdate(
+        projectId,
+        { inviteCode: newCode },
+        { new: true, select: '+inviteCode' }
+      );
+
+      if (!project || project.deletedAt) {
+        throw new Error('PROJECT_NOT_FOUND');
+      }
+
+      return newCode;
+
+    } catch (err) {
+      if (err.code === 11000) {
+        console.warn(`Reset Code Race Condition for project ${projectId}. Retry ${i + 1}`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  
+  throw new Error('FAILED_TO_RESET_CODE');
+};
+
+/**
+ * Join project using invite code
+ */
+export const joinProjectByCode = async (inviteCode, userId, currentOrganizationId) => {
+  if (!inviteCode || typeof inviteCode !== 'string') {
+    throw new Error('INVALID_INVITE_CODE');
+  }
+
+  if (!currentOrganizationId) {
+    throw new Error('ORGANIZATION_REQUIRED');
+  }
+
+  const normalizedCode = inviteCode.toUpperCase().trim();
+
+  const project = await Project.findOne({ 
+    inviteCode: normalizedCode,
+    organizationId: currentOrganizationId,
+    deletedAt: null 
+  });
+  
+  if (!project) {
+    throw new Error('INVALID_OR_EXPIRED_CODE');
+  }
+
+  // Check if already a member in ProjectMember table
+  const existingMember = await ProjectMember.findOne({
+    projectId: project._id,
+    userId
+  });
+
+  if (existingMember) {
+    if (existingMember.status === 'PENDING') {
+      throw new Error('ALREADY_REQUESTED');
+    }
+    throw new Error('ALREADY_MEMBER');
+  }
+
+  // Add user as member in ProjectMember table
+  await ProjectMember.create({
+    projectId: project._id,
+    userId,
+    roleInProject: "Member",
+    status: "ACTIVE"
+  });
+
+  // Log activity
+  try {
+    await ActivityLog.create({
+      projectId: project._id,
+      userId: userId,
+      action: "JOIN_PROJECT",
+      content: `joined project "${project.name}" via invite code.`
+    });
+  } catch (e) {
+    console.error("Logging failed:", e.message);
+  }
+  
+  return project._id;
 };

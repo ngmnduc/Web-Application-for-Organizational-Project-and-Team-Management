@@ -10,7 +10,9 @@ import {
   getProjectActivities,
   getInviteCode,
   resetInviteCode,
-  joinProjectByCode
+  joinProjectByCode,
+  getPendingRequests,
+  toggleArchive
 } from "../controllers/project.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
 
@@ -27,6 +29,18 @@ router.get("/projects", verifyToken, listProjects);
  * @desc    Create new project
  */
 router.post("/projects", verifyToken, checkRole("Admin", "Manager"), createProject);
+
+/**
+ * @route   POST /projects/join
+ * @desc    Allow user to join a project using an invite code
+ */
+router.post("/projects/join", verifyToken, joinProjectByCode);
+
+/**
+ * @route   GET /projects/pending-requests
+ * @desc    Get all pending join requests (QUAN TRỌNG: Phải đặt trước /projects/:id)
+ */
+router.get("/projects/pending-requests", verifyToken, checkRole("Admin", "Manager"), getPendingRequests);
 
 /**
  * @route   GET /projects/:id
@@ -47,6 +61,12 @@ router.put("/projects/:id", verifyToken, checkRole("Admin", "Manager"), updatePr
 router.delete("/projects/:id", verifyToken, checkRole("Admin", "Manager"), deleteProject);
 
 /**
+ * @route   PATCH /projects/:id/archive
+ * @desc    Archive or Unarchive a project
+ */
+router.patch("/projects/:id/archive", verifyToken, checkRole("Admin", "Manager"), toggleArchive);
+
+/**
  * @route   GET /projects/:id/members
  * @desc    Get project members
  */
@@ -65,23 +85,14 @@ router.get("/projects/:id/summary", verifyToken, getProjectSummary);
 router.get("/projects/:id/activities", verifyToken, getProjectActivities);
 
 /**
- * @route   POST /projects/join
- * @desc    Allow user to join a project using an invite code
- * @access  Private (Authenticated Member)
- */
-router.post("/projects/join", verifyToken, joinProjectByCode);
-
-/**
  * @route   GET /projects/:id/invite-code
- * @desc    Get the project's current invite code; auto-generates if code is null
- * @access  Private (Admin/Manager)
+ * @desc    Get the project's current invite code
  */
 router.get("/projects/:id/invite-code", verifyToken, checkRole("Admin", "Manager"), getInviteCode);
 
 /**
  * @route   PATCH /projects/:id/invite-code
- * @desc    Generate and update the project's invite code (Reset code)
- * @access  Private (Admin/Manager)
+ * @desc    Reset invite code
  */
 router.patch("/projects/:id/invite-code", verifyToken, checkRole("Admin", "Manager"), resetInviteCode);
 
