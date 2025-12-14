@@ -120,9 +120,10 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // Call service
-    const project = await projectService.getProjectById(id);
+    const project = await projectService.getProjectById(id, currentOrgId);
 
     res.json({ success: true, data: project });
   } catch (err) {
@@ -132,6 +133,13 @@ export const getProject = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
       });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
@@ -164,9 +172,10 @@ export const updateProject = async (req, res) => {
 
     const { id } = req.params;
     const userId = req.user._id;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // 2. Call service
-    const project = await projectService.updateProject(id, req.body, userId);
+    const project = await projectService.updateProject(id, req.body, userId, currentOrgId);
 
     res.json({ 
       success: true, 
@@ -180,6 +189,13 @@ export const updateProject = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
       });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
@@ -202,9 +218,10 @@ export const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // Call service
-    const project = await projectService.deleteProject(id, userId);
+    const project = await projectService.deleteProject(id, userId, currentOrgId);
 
     res.json({ 
       success: true, 
@@ -239,9 +256,10 @@ export const deleteProject = async (req, res) => {
 export const getProjectMembers = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // Call service
-    const members = await projectService.getProjectMembers(id);
+    const members = await projectService.getProjectMembers(id, currentOrgId);
 
     res.status(200).json({ success: true, data: members });
   } catch (err) {
@@ -251,6 +269,20 @@ export const getProjectMembers = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
+      });
+    }
+    if (err.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
       });
     }
     res.status(500).json({ 
@@ -266,13 +298,14 @@ export const toggleArchive = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // Call service
-    const project = await projectService.toggleArchive(id, userId);
+    const project = await projectService.toggleArchive(id, userId, currentOrgId);
 
     res.json({ 
       success: true, 
-      message: `Project ${project.isArchived ? 'archived' : 'unarchived'} successfully`, 
+      message: `Project ${project.status === 'archived' ? 'archived' : 'unarchived'} successfully`, 
       data: project 
     });
   } catch (err) {
@@ -282,6 +315,13 @@ export const toggleArchive = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
       });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
@@ -303,9 +343,10 @@ export const toggleArchive = async (req, res) => {
 export const getProjectSummary = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // Call service
-    const summary = await projectService.getProjectSummary(id);
+    const summary = await projectService.getProjectSummary(id, currentOrgId);
 
     res.status(200).json({
       success: true,
@@ -318,6 +359,13 @@ export const getProjectSummary = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (error.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
       });
     }
     if (error.message === 'PROJECT_NOT_FOUND') {
@@ -339,14 +387,17 @@ export const getProjectSummary = async (req, res) => {
 export const getProjectActivities = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
+    const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
 
     // Call service
-    const activities = await projectService.getProjectActivities(id, limit);
+    const result = await projectService.getProjectActivities(id, currentOrgId, page, limit);
 
     res.status(200).json({
       success: true,
-      data: activities
+      data: result.activities,
+      pagination: result.pagination
     });
   } catch (error) {
     // Handle service errors
@@ -355,6 +406,20 @@ export const getProjectActivities = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (error.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
+      });
+    }
+    if (error.message === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ 
+        success: false, 
+        error: "NotFoundError", 
+        message: "Project not found" 
       });
     }
     res.status(500).json({ 
@@ -394,9 +459,10 @@ export const getPendingRequests = async (req, res) => {
 export const getInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // Call service
-    const code = await projectService.getOrCreateInviteCode(id);
+    const code = await projectService.getOrCreateInviteCode(id, currentOrgId);
 
     res.json({ success: true, code });
   } catch (err) {
@@ -406,6 +472,13 @@ export const getInviteCode = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
       });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
@@ -433,9 +506,10 @@ export const getInviteCode = async (req, res) => {
 export const resetInviteCode = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // Call service
-    const newCode = await projectService.resetInviteCode(id);
+    const newCode = await projectService.resetInviteCode(id, currentOrgId);
 
     res.json({ 
       success: true, 
@@ -449,6 +523,13 @@ export const resetInviteCode = async (req, res) => {
         success: false, 
         error: "ValidationError", 
         message: "Invalid project ID" 
+      });
+    }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
       });
     }
     if (err.message === 'PROJECT_NOT_FOUND') {
@@ -487,9 +568,10 @@ export const joinProjectByCode = async (req, res) => {
 
     const { inviteCode } = req.body;
     const userId = req.user._id;
+    const currentOrgId = req.user.currentOrganizationId;
 
     // 2. Call service
-    const projectId = await projectService.joinProjectByCode(inviteCode, userId);
+    const projectId = await projectService.joinProjectByCode(inviteCode, userId, currentOrgId);
 
     res.json({ 
       success: true, 
@@ -504,6 +586,13 @@ export const joinProjectByCode = async (req, res) => {
         success: false, 
         error: "ValidationError",
         message: "Invalid invite code format" 
+      });
+    }
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ValidationError", 
+        message: "Organization is required" 
       });
     }
     if (err.message === 'INVALID_OR_EXPIRED_CODE') {
