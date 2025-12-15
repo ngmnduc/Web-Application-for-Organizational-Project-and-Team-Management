@@ -5,7 +5,7 @@ import User from "../models/user.model.js";
 import Organization from "../models/organization.model.js ";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
-import Organization from "../models/organization.model.js";
+
 
 const generateRandomCode = (length = 6) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
