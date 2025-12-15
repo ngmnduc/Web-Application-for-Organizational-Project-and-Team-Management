@@ -8,20 +8,6 @@ import * as authService from "../services/auth.service.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-function toPublicUser(u) {
-  return {
-    id: u._id,
-    name: u.name,
-    email: u.email,
-    avatar: u.avatar,
-    phoneNumber: u.phoneNumber,
-    role: u.role,
-    status: u.status,
-    createdAt: u.createdAt,
-    updatedAt: u.updatedAt,
-  };
-}
-
 // POST /auth/signup
 export async function signup(req, res, next) {
   try {
@@ -102,6 +88,20 @@ export async function login(req, res, next) {
         message: "Your account has been blocked",
       });
     }
+    if (err.message === "ORGANIZATION_INACTIVE") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "Your organization has been deactivated. Please contact support.",
+      });
+    }
+    if (err.message === "ORGANIZATION_DELETED") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "Your organization has been deleted.",
+      });
+    }
     next(err);
   }
 }
@@ -145,7 +145,21 @@ export async function me(req, res, next) {
     // verifyToken middleware attaches req.user
     const user = req.user;
     if (!user) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
-    return res.json({ success: true, data: { user: toPublicUser(user) } });
+    
+    // Format user response
+    const publicUser = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+    
+    return res.json({ success: true, data: { user: publicUser } });
   } catch (err) {
     next(err);
   }
@@ -171,7 +185,19 @@ export async function promoteRole(req, res, next) {
     user.role = newRole;
     await user.save();
 
-    return res.json({ success: true, message: "User role updated", data: { user: toPublicUser(user) } });
+    const publicUser = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    return res.json({ success: true, message: "User role updated", data: { user: publicUser } });
   } catch (err) {
     next(err);
   }
@@ -241,7 +267,7 @@ export async function updateProfile(req, res, next) {
 
     // Update profile using service
     const updatedUser = await authService.updateUserProfile(
-      req.user.sub,
+      req.user._id,
       req.body
     );
 
@@ -360,6 +386,8 @@ export async function switchOrg(req, res, next) {
       success: true,
       message: "Organization switched successfully",
       data: {
+        token: result.token,
+        tokenType: "Bearer",
         user: result.user,
         organization: result.organization,
       },
@@ -370,6 +398,20 @@ export async function switchOrg(req, res, next) {
         success: false,
         error: "ForbiddenError",
         message: "You are not a member of this organization",
+      });
+    }
+    if (err.message === "ORGANIZATION_INACTIVE") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "This organization has been deactivated. Please contact support.",
+      });
+    }
+    if (err.message === "ORGANIZATION_DELETED") {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "This organization has been deleted.",
       });
     }
     if (err.message === "USER_NOT_FOUND") {

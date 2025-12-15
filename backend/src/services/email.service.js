@@ -38,10 +38,10 @@ Project Management Team`,
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Welcome email sent to ${to}`);
+    console.log(`Welcome email sent to ${to}`);
     return { success: true };
   } catch (error) {
-    console.error("❌ Error sending welcome email:", error);
+    console.error("Error sending welcome email:", error);
     return { success: false, error: error.message };
   }
 };
@@ -74,10 +74,10 @@ export const sendPasswordResetEmail = async (to, userName, resetToken) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Password reset email sent to ${to}`);
+    console.log(`Password reset email sent to ${to}`);
     return { success: true };
   } catch (error) {
-    console.error("❌ Error sending password reset email:", error);
+    console.error("Error sending password reset email:", error);
     return { success: false, error: error.message };
   }
 };
@@ -88,10 +88,10 @@ export const sendPasswordResetEmail = async (to, userName, resetToken) => {
 export const testEmailConfig = async () => {
   try {
     await transporter.verify();
-    console.log("✅ Email service is ready");
+    console.log("Email service is ready");
     return true;
   } catch (error) {
-    console.error("❌ Email service error:", error);
+    console.error("Email service error:", error);
     return false;
   }
 };

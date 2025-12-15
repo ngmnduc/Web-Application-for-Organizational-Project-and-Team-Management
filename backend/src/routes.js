@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { me, promoteRole, signup, login, handleGoogleLogin, changePassword, updateProfile, forgotPassword, resetPassword, switchOrg } from "./controllers/auth.controller.js";
-import { verifyToken, checkRole } from "./middlewares/auth.js";
+import { verifyToken, checkRole, requireOrgAccess } from "./middlewares/auth.js";
 import { ROLES } from "./models/user.model.js";
 import {
   createProject,
@@ -21,6 +21,7 @@ import { checkProjectActive } from "./middlewares/archive.middleware.js";
 import taskRoutes from "./routes/task.routes.js";
 import meetingRoutes from "./routes/meeting.routes.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
+import organizationRoutes from "./routes/organization.routes.js";
 
 const router = Router();
 
@@ -58,34 +59,35 @@ router.get("/protected/manager",
 router.use("/", taskRoutes);
 router.use("/", meetingRoutes);
 router.use("/", attendanceRoutes);
+router.use("/", organizationRoutes);
 
-// Projects
-router.post("/projects", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), createProject);
-router.get("/projects", verifyToken, listProjects);
-router.get("/projects/pending-requests", verifyToken, checkRole(ROLES.ADMIN), getPendingRequests);
-router.get("/projects/:id", verifyToken, getProject);
-router.put("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateProject);
-router.delete("/projects/:id", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), deleteProject);
-router.patch("/projects/:id/archive", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), toggleArchive);
-router.get("/projects/:id/summary", verifyToken, getProjectSummary);
-router.get("/projects/:id/activities", verifyToken, getProjectActivities);
+// Projects - All require organization context
+router.post("/projects", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), createProject);
+router.get("/projects", verifyToken, requireOrgAccess, listProjects);
+router.get("/projects/pending-requests", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN), getPendingRequests);
+router.get("/projects/:id", verifyToken, requireOrgAccess, getProject);
+router.put("/projects/:id", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateProject);
+router.delete("/projects/:id", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), deleteProject);
+router.patch("/projects/:id/archive", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), toggleArchive);
+router.get("/projects/:id/summary", verifyToken, requireOrgAccess, getProjectSummary);
+router.get("/projects/:id/activities", verifyToken, requireOrgAccess, getProjectActivities);
 
-// Project Members
-router.get("/projects/:id/members", verifyToken, getMembers);
-router.post("/projects/:id/members", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, addMember);
-router.delete("/projects/:id/members/:memberId", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, removeMember);
-router.post("/projects/:id/join", verifyToken, joinRequest);
-router.patch("/projects/:projectId/members/:memberId/approve", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), approveMember);
+// Project Members - Require organization context
+router.get("/projects/:id/members", verifyToken, requireOrgAccess, getMembers);
+router.post("/projects/:id/members", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, addMember);
+router.delete("/projects/:id/members/:memberId", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, removeMember);
+router.post("/projects/:id/join", verifyToken, requireOrgAccess, joinRequest);
+router.patch("/projects/:projectId/members/:memberId/approve", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), approveMember);
 
-// Project Labels
-router.get("/projects/:id/labels", verifyToken, getLabels);
-router.post("/projects/:id/labels", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, createLabel);
-router.patch("/projects/:id/labels/:labelId", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateLabel);
-router.delete("/projects/:id/labels/:labelId", verifyToken, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, deleteLabel);
+// Project Labels - Require organization context
+router.get("/projects/:id/labels", verifyToken, requireOrgAccess, getLabels);
+router.post("/projects/:id/labels", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, createLabel);
+router.patch("/projects/:id/labels/:labelId", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateLabel);
+router.delete("/projects/:id/labels/:labelId", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, deleteLabel);
 
-// Users
-router.get("/users", verifyToken, listUsers); // Member cũng có thể xem danh sách users
-router.get("/users/search", verifyToken, searchUsers);
+// Users - Require organization context for search
+router.get("/users", verifyToken, requireOrgAccess, listUsers);
+router.get("/users/search", verifyToken, requireOrgAccess, searchUsers);
 router.get("/users/:id", verifyToken, checkRole(ROLES.ADMIN), getUser);
 router.patch("/users/:id/status", verifyToken, checkRole(ROLES.ADMIN), updateUserStatus);
 router.delete("/users/:id", verifyToken, checkRole(ROLES.ADMIN), deleteUser);

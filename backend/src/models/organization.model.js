@@ -23,6 +23,16 @@ const OrganizationSchema = new mongoose.Schema(
             type: String, 
             select: false 
         },
+        status: {
+            type: String,
+            enum: ["ACTIVE", "INACTIVE", "SUSPENDED"],
+            default: "ACTIVE"
+        },
+        deletedAt: {
+            type: Date,
+            default: null
+        },
+
         // IP whitelist cho attendance
         allowedIps: [{
             ip: { type: String, required: true },

@@ -8,7 +8,7 @@ import {
   addWhitelistIP,
   getWhitelistIPs
 } from "../controllers/attendance.controller.js";
-import { verifyToken, checkRole } from "../middlewares/auth.js";
+import { verifyToken, checkRole, requireOrgAccess } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -18,7 +18,7 @@ const router = express.Router();
  * @desc    Check-in attendance (auto-detect organization from user)
  * @access  Private
  */
-router.post("/checkin", verifyToken, checkIn);
+router.post("/checkin", verifyToken,requireOrgAccess, checkIn);
 
 /**
  * @route   GET /attendance/me/today
@@ -32,7 +32,7 @@ router.get("/me/today", verifyToken, getMyAttendanceToday);
  * @desc    Get my attendance history
  * @access  Private
  */
-router.get("/me", verifyToken, getMyAttendance);
+router.get("/me", verifyToken,requireOrgAccess, getMyAttendance);
 
 /**
  * @route   GET /attendance/all
@@ -42,6 +42,7 @@ router.get("/me", verifyToken, getMyAttendance);
 router.get(
   "/all",
   verifyToken,
+  requireOrgAccess,
   checkRole("Admin", "Manager"),
   getProjectAttendance
 );
