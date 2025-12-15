@@ -5,13 +5,34 @@ import OrganizationMember from "../models/organizationMember.model.js";
 // GET /users (admin only)
 export const listUsers = async (req, res) => {
   try {
-    const users = await User.find({ deletedAt: null }).select("name email role status createdAt updatedAt");
+    // 1. Lấy Org ID từ user đang đăng nhập
+    const currentOrgId = req.user.currentOrganizationId;
+
+    if (!currentOrgId) {
+      return res.status(400).json({ success: false, message: "No organization context found." });
+    }
+
+    // 2. Tạo bộ lọc: Chỉ lấy user thuộc Org này
+    const query = { 
+      deletedAt: null,
+      organizations: currentOrgId // Mongoose tự tìm xem currentOrgId có nằm trong mảng organizations không
+    };
+
+    // 3. Hỗ trợ lọc theo Role (Frontend gửi ?role=Manager sẽ chỉ lấy Manager)
+    if (req.query.role) {
+      query.role = req.query.role;
+    }
+
+    // 4. Thực thi query
+    const users = await User.find(query)
+      .select("name email role status avatar createdAt updatedAt")
+      .sort({ createdAt: -1 });
+
     res.json({ success: true, count: users.length, data: users });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
-
 // GET /users/search?q=...
 export const searchUsers = async (req, res) => {
   try {
@@ -65,23 +86,21 @@ export const searchUsers = async (req, res) => {
 export const getUser = async (req, res) => {
   try {
     const { id } = req.params;
+    const currentOrgId = req.user.currentOrganizationId;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: "Invalid user ID format",
-      });
+      return res.status(400).json({ success: false, message: "Invalid user ID format" });
     }
 
-    const user = await User.findById(id).select("name email role status createdAt updatedAt");
+    // [QUAN TRỌNG] Tìm user theo ID NHƯNG phải thuộc cùng Org
+    const user = await User.findOne({
+      _id: id,
+      organizations: currentOrgId, // Chặn việc soi thông tin user công ty khác
+      deletedAt: null
+    }).select("name email role status createdAt updatedAt");
 
-    if (!user || user.deletedAt) {
-      return res.status(404).json({
-        success: false,
-        error: "NotFoundError",
-        message: "User not found",
-      });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found in this organization" });
     }
 
     res.json({ success: true, data: user });

@@ -1,11 +1,10 @@
 /**
  * Project Service Layer
- * Business logic for project management (Updated to use ProjectMember model)
+ * Business logic for project management
  */
 
 import mongoose from "mongoose";
 import Project from "../models/project.model.js";
-import ProjectMember from "../models/projectMember.model.js";
 import ProjectMember from "../models/projectMember.model.js";
 import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
@@ -25,7 +24,7 @@ const generateRandomCode = (length = 6) => {
 };
 
 /**
- * Create new project (UPDATED: Using ProjectMember model)
+ * Create new project
  */
 export const createProject = async (projectData, creatorId, currentOrganizationId) => {
   const { name, description, deadline } = projectData;
@@ -97,7 +96,7 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
 };
 
 /**
- * Get all projects (UPDATED: Filter by user's projects through ProjectMember)
+ * Get all projects (with filters)
  */
 export const listProjects = async (filters = {}) => {
   // organizationId is required
@@ -120,31 +119,31 @@ export const listProjects = async (filters = {}) => {
   }
 
   // Pagination
-  const pageNum = parseInt(page) || 1;
-  const limitNum = parseInt(limit) || 20;
-  const skip = (pageNum - 1) * limitNum;
+  const page = parseInt(filters.page) || 1;
+  const limit = parseInt(filters.limit) || 20;
+  const skip = (page - 1) * limit;
 
   const projects = await Project.find(query)
     .populate('createdBy', 'name email')
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(limitNum);
+    .limit(limit);
 
   const total = await Project.countDocuments(query);
 
   return {
     projects,
     pagination: {
-      page: pageNum,
-      limit: limitNum,
+      page,
+      limit,
       total,
-      pages: Math.ceil(total / limitNum),
+      pages: Math.ceil(total / limit),
     },
   };
 };
 
 /**
- * Get single project by ID (UPDATED: Include members from ProjectMember)
+ * Get single project by ID
  */
 export const getProjectById = async (projectId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
@@ -167,29 +166,11 @@ export const getProjectById = async (projectId, currentOrganizationId) => {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Get members from ProjectMember table
-  const members = await ProjectMember.find({ projectId, status: "ACTIVE" })
-    .populate("userId", "name email avatar")
-    .select("roleInProject createdAt");
-
-  // Combine project with members
-  const projectWithMembers = {
-    ...project.toObject(),
-    members: members.map(m => ({
-      userId: m.userId._id,
-      name: m.userId.name,
-      email: m.userId.email,
-      avatar: m.userId.avatar,
-      role: m.roleInProject,
-      joinedAt: m.createdAt
-    }))
-  };
-
-  return projectWithMembers;
+  return project;
 };
 
 /**
- * Update project (Enhanced with validation)
+ * Update project
  */
 export const updateProject = async (projectId, updateData, userId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
@@ -210,9 +191,9 @@ export const updateProject = async (projectId, updateData, userId, currentOrgani
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Update fields with validation
-  if (updateData.name?.trim()) project.name = updateData.name.trim();
-  if (updateData.description !== undefined) project.description = updateData.description?.trim() || "";
+  // Update fields
+  if (updateData.name) project.name = updateData.name.trim();
+  if (updateData.description !== undefined) project.description = updateData.description.trim();
   if (updateData.startDate !== undefined) project.startDate = updateData.startDate;
   if (updateData.endDate !== undefined) project.endDate = updateData.endDate;
   if (updateData.deadline !== undefined) project.deadline = updateData.deadline;
@@ -226,7 +207,7 @@ export const updateProject = async (projectId, updateData, userId, currentOrgani
       projectId: project._id,
       userId,
       action: "UPDATE_PROJECT",
-      content: `Updated project "${project.name}"`,
+      description: `Updated project "${project.name}"`,
     });
   } catch (err) {
     console.error("Failed to log activity:", err);
@@ -236,7 +217,7 @@ export const updateProject = async (projectId, updateData, userId, currentOrgani
 };
 
 /**
- * Delete project (soft delete) - Enhanced with logging
+ * Delete project (soft delete)
  */
 export const deleteProject = async (projectId, userId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
@@ -266,7 +247,7 @@ export const deleteProject = async (projectId, userId, currentOrganizationId) =>
       projectId: project._id,
       userId,
       action: "DELETE_PROJECT",
-      content: `Deleted project "${project.name}"`,
+      description: `Deleted project "${project.name}"`,
     });
   } catch (err) {
     console.error("Failed to log activity:", err);
@@ -318,38 +299,7 @@ export const toggleArchive = async (projectId, userId, currentOrganizationId) =>
 };
 
 /**
- * Get project members (UPDATED: From ProjectMember table)
- */
-export const getProjectMembers = async (projectId) => {
-  if (!mongoose.isValidObjectId(projectId)) {
-    throw new Error('INVALID_PROJECT_ID');
-  }
-
-  // Query from ProjectMember table
-  const members = await ProjectMember.find({ projectId })
-    .populate("userId", "name email avatar")
-    .select("roleInProject status createdAt");
-
-  // Format data
-  const formattedMembers = members.map((m) => {
-    if (!m.userId) return null;
-
-    return {
-      userId: m.userId._id,
-      name: m.userId.name,
-      email: m.userId.email,
-      avatar: m.userId.avatar,
-      projectRole: m.roleInProject,
-      status: m.status,
-      joinedAt: m.createdAt
-    };
-  }).filter(m => m !== null);
-
-  return formattedMembers;
-};
-
-/**
- * Add member to project (UPDATED: Using ProjectMember model)
+ * Add member to project
  */
 export const addMember = async (projectId, userId, role = "Member", currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
@@ -386,6 +336,10 @@ export const addMember = async (projectId, userId, role = "Member", currentOrgan
 
   // Check if user exists
   const user = await User.findById(userId);
+  if (!user.organizations.includes(currentOrganizationId)) {
+    throw new Error('USER_NOT_BELONG_TO_ORGANIZATION');
+}
+
   if (!user) {
     throw new Error('USER_NOT_FOUND');
   }
@@ -398,11 +352,11 @@ export const addMember = async (projectId, userId, role = "Member", currentOrgan
     status: "ACTIVE"
   });
 
-  return { success: true, message: "Member added successfully" };
+  return project;
 };
 
 /**
- * Remove member from project (UPDATED: Using ProjectMember model)
+ * Remove member from project
  */
 export const removeMember = async (projectId, userId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
@@ -442,11 +396,11 @@ export const removeMember = async (projectId, userId, currentOrganizationId) => 
     throw new Error('MEMBER_NOT_FOUND');
   }
 
-  return { success: true, message: "Member removed successfully" };
+  return project;
 };
 
 /**
- * Get project summary (Enhanced with more stats)
+ * Get project summary (stats)
  */
 export const getProjectSummary = async (projectId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) {
@@ -519,11 +473,6 @@ export const getProjectActivities = async (projectId, currentOrganizationId, pag
     throw new Error('INVALID_PROJECT_ID');
   }
 
-  const { page = 1, limit = 10 } = options;
-  const skip = (parseInt(page) - 1) * parseInt(limit);
-
-  const total = await ActivityLog.countDocuments({ projectId });
-
   if (!currentOrganizationId) {
     throw new Error('ORGANIZATION_REQUIRED');
   }
@@ -562,7 +511,7 @@ export const getProjectActivities = async (projectId, currentOrganizationId, pag
 };
 
 /**
- * Check if user is project member (UPDATED: Check ProjectMember table)
+ * Check if user is project member
  */
 export const isProjectMember = async (projectId, userId, currentOrganizationId) => {
   if (!currentOrganizationId) {
@@ -590,7 +539,7 @@ export const isProjectMember = async (projectId, userId, currentOrganizationId) 
 };
 
 /**
- * Get user's role in project (UPDATED: Check ProjectMember table)
+ * Get user's role in project
  */
 export const getUserRoleInProject = async (projectId, userId, currentOrganizationId) => {
   if (!currentOrganizationId) {

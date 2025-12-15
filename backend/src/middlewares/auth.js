@@ -15,7 +15,8 @@ export async function verifyToken(req, res, next) {
     req.userRole = decoded.role;
 
     // load user from DB and ensure still exists
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('+currentOrganizationId +organizations'); 
+
     if (!user) {
       return res.status(401).json({ error: { message: "User not found or removed" } });
     }

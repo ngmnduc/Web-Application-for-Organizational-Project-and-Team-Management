@@ -2,79 +2,103 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import ProjectMember from "../src/models/projectMember.model.js"; 
 import Organization from "../src/models/organization.model.js"; 
+import User from "../src/models/user.model.js";
+import Project from "../src/models/project.model.js";
 
-dotenv.config();
+dotenv.config(); 
+// -----------------------
 
-const migrateData = async () => {
+const fixAndMigrate = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("Connected to MongoDB for Migration (Fix & Cleanup)...");
-
-    const defaultOrg = await Organization.findOne();
-    if (!defaultOrg) {
-        console.error("ERROR: No Organization found. Please seed one first.");
-        process.exit(1);
+    if (!process.env.MONGO_URI) {
+        throw new Error(" MONGO_URI is undefined. Check your .env file!");
     }
 
-    const projectsCollection = mongoose.connection.db.collection("projects");
-    const projects = await projectsCollection.find({}).toArray();
-    
-    console.log(`Found ${projects.length} projects to process.`);
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log(" Connected to MongoDB. Starting Fix & Migrate...");
 
-    let migratedCount = 0;
+    // 1. Lấy Organization Mặc định (đã seed)
+    const defaultOrg = await Organization.findOne();
+    if (!defaultOrg) {
+        throw new Error(" Không tìm thấy Organization nào. Hãy chạy seed-org.js trước!");
+    }
+    console.log(`Default Org: ${defaultOrg.name} (${defaultOrg._id})`);
+
+    // ==========================================
+    // BƯỚC 1: FIX USER (Cấp Org cho các user bị thiếu)
+    // ==========================================
+    console.log(" Fixing Users...");
+    const userUpdateResult = await User.updateMany(
+        { $or: [{ currentOrganizationId: null }, { currentOrganizationId: { $exists: false } }] },
+        { 
+            $set: { currentOrganizationId: defaultOrg._id },
+            $addToSet: { organizations: defaultOrg._id }
+        }
+    );
+    console.log(`   -> Updated ${userUpdateResult.modifiedCount} users without Org.`);
+
+    // ==========================================
+    // BƯỚC 2: RESET PROJECT MEMBER (Làm sạch để tạo lại)
+    // ==========================================
+    console.log("🗑  Clearing invalid ProjectMembers...");
+    await ProjectMember.deleteMany({}); // Xóa hết làm lại cho sạch
+    console.log("   -> ProjectMember collection cleared.");
+
+    // ==========================================
+    // BƯỚC 3: MIGRATE PROJECT & TẠO MEMBER MỚI
+    // ==========================================
+    const projects = await Project.find({});
+    console.log(` Processing ${projects.length} projects...`);
+
+    let memberCount = 0;
 
     for (const project of projects) {
-      let targetOrgId = project.organizationId || defaultOrg._id;
-
-      if (project.members && Array.isArray(project.members) && project.members.length > 0) {
+        // 3.1. Đảm bảo Project có organizationId
+        let targetOrgId = project.organizationId || defaultOrg._id;
         
-        console.log(`Checking members for: ${project.name}...`);
-
-        for (const memberData of project.members) {
-          let userId = memberData;
-          let role = "Member"; 
-
-          if (typeof memberData === 'object' && memberData._id) {
-              userId = memberData._id;
-              if (memberData.role) {
-                  role = memberData.role; 
-              }
-          }
-
-          const exists = await ProjectMember.findOne({
-              projectId: project._id,
-              userId: userId
-          });
-
-          if (!exists) {
-              await ProjectMember.create({
-                  organizationId: targetOrgId,
-                  projectId: project._id,
-                  userId: userId,
-                  roleInProject: role, 
-                  status: "ACTIVE"
-              });
-              migratedCount++;
-          } else {
-              if (exists.roleInProject === "Member" && role !== "Member") {
-                  exists.roleInProject = role;
-                  await exists.save();
-                  console.log(`   -> Updated role for user in project ${project.name}`);
-              }
-          }
+        if (!project.organizationId) {
+            project.organizationId = targetOrgId;
+            await project.save();
+            console.log(`   -> Fixed Org for Project: ${project.name}`);
         }
-      }
+
+        // 3.2. Tạo Admin Member (Người tạo dự án)
+        if (project.createdBy) {
+            await ProjectMember.create({
+                organizationId: targetOrgId,
+                projectId: project._id,
+                userId: project.createdBy,
+                roleInProject: "Admin",
+                status: "ACTIVE"
+            });
+            memberCount++;
+        }
+
+        // 3.3. Migrate từ mảng 'members' cũ
+        const rawProject = project.toObject();
+        if (rawProject.members && Array.isArray(rawProject.members)) {
+            for (const m of rawProject.members) {
+                const mId = m._id || m;
+                const mRole = m.role || "Member";
+                
+                if (mId.toString() === project.createdBy.toString()) continue;
+
+                await ProjectMember.create({
+                    organizationId: targetOrgId,
+                    projectId: project._id,
+                    userId: mId,
+                    roleInProject: mRole,
+                    status: "ACTIVE"
+                });
+                memberCount++;
+            }
+        }
     }
 
     console.log(`-----------------------------------`);
-    console.log(`New/Updated records: ${migratedCount}`);
-    console.log("Cleaning up legacy 'members' field from Projects...");
-    await projectsCollection.updateMany(
-        { members: { $exists: true } }, 
-        { $unset: { members: "" } }
-    );
-    console.log("Cleanup Complete! Database is clean.");
-
+    console.log(`TOTAL MEMBERS CREATED: ${memberCount}`);
+    console.log(`DATABASE IS NOW FULLY SYNCED WITH SAAS MODEL.`);
+    
     process.exit(0);
   } catch (error) {
     console.error("Migration Error:", error);
@@ -82,4 +106,4 @@ const migrateData = async () => {
   }
 };
 
-migrateData();
+fixAndMigrate();

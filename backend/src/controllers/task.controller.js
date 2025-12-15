@@ -74,7 +74,13 @@ export const createTask = async (req, res) => {
     const currentOrgId = req.user?.currentOrganizationId;
     const userId = req.user?._id;
     const projectId = req.params.id;
-
+    
+    if (!projectId || projectId === 'null' || !mongoose.isValidObjectId(projectId)) {
+        return res.status(400).json({ 
+            success: false, 
+            message: "Invalid Project ID. Please select a project first." 
+        });
+    }
     const task = await taskService.createTask(
       req.body,
       userId,

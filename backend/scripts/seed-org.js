@@ -36,6 +36,18 @@ const seedOrg = async () => {
         currentOrganizationId: newOrg._id,
         $addToSet: { organizations: newOrg._id }
     });
+
+    const result = await User.updateMany(
+        { currentOrganizationId: { $exists: false } },
+        { 
+            $set: { currentOrganizationId: newOrg._id },
+            $addToSet: { organizations: newOrg._id }
+        }
+    );
+    console.log(`Updated User context for Owner + ${result.modifiedCount} other users.`);
+
+    process.exit(0);
+    
     console.log("Updated User context.");
 
     process.exit(0);
