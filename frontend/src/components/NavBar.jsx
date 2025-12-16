@@ -33,15 +33,23 @@ const HeaderIcons = ({   unreadCount, onLogout }) => {
                     className="flex items-center space-x-2 cursor-pointer p-1"
                     onClick={() => setIsDropdownOpen(prev => !prev)}
                 >
-                    <div 
-                        className="relative w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm"
-                        style={{ 
-                            backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)',
-                            color: 'var(--color-brand)'                  
-                        }}
-                    >
-                        {initials}
-                    </div>
+                    {user?.avatar ? (
+                        <img 
+                            src={user.avatar} 
+                            alt={user.name} 
+                            className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                        />
+                    ) : (
+                        <div 
+                            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border border-transparent"
+                            style={{ 
+                                backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)',
+                                color: 'var(--color-brand)'                  
+                            }}
+                        >
+                            {initials}
+                        </div>
+                    )}
                     {/* Hiển thị tên (ẩn trên mobile) */}
                     <span className="text-sm font-medium text-gray-700 hidden md:block">{user?.name}</span>
                     <ChevronDownIcon className="w-4 h-4 text-gray-700" />
