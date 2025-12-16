@@ -1,4 +1,5 @@
 import User from "../models/user.model.js";
+import Organization from "../models/organization.model.js"; // ✅ THÊM
 import { signToken } from "../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
 import crypto from "crypto";
@@ -7,8 +8,7 @@ import * as authValidator from "../validators/auth.validator.js";
 import * as authService from "../services/auth.service.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-// POST /auth/signup
+// POST /auth/signup 
 export async function signup(req, res, next) {
   try {
     // Validate request data
@@ -21,17 +21,73 @@ export async function signup(req, res, next) {
       });
     }
 
-    // Create user using service
+    //  Create user using service
     const { name, email, password } = req.body;
     const result = await authService.createUser(name, email, password);
 
+    const userId = result.user.id || result.user._id;
+
+    //  Get created user
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error("USER_CREATION_FAILED");
+    }
+
+    //  Create default organization for new user
+    const newOrg = await Organization.create({
+      name: `${name}'s Organization`, // "John's Organization"
+      ownerId: user._id,
+      status: 'ACTIVE',
+      allowedIps: [],
+      attendanceSettings: {
+        enableIpCheck: true,
+        standardCheckInHour: 9,
+        standardCheckOutHour: 17,
+        allowLateCheckIn: true,
+        lateThresholdMinutes: 15
+      }
+    });
+
+    //  Link user to organization
+    user.currentOrganizationId = newOrg._id;
+    user.organizations = [newOrg._id];
+    user.role = "Admin"; // Owner of their org is Admin
+    await user.save();
+
+    //  Generate new token with organizationId
+    const tokenPayload = {
+      sub: user._id.toString(),    
+      email: user.email,
+      role: user.role,
+      organizationId: newOrg._id.toString() 
+    };
+    const newToken = signToken(tokenPayload);
+
+    //  Send welcome email (optional, don't block response)
+    try {
+      await sendWelcomeEmail(user.email, user.name);
+    } catch (emailErr) {
+      console.error("Failed to send welcome email:", emailErr);
+      // Don't throw error, just log
+    }
+
+    //  Return response with user + organization
     return res.status(201).json({
       success: true,
-      message: "User created successfully",
+      message: "User and Organization created successfully",
       data: {
-        token: result.token,
+        token: newToken,
         tokenType: "Bearer",
-        user: result.user,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          currentOrganizationId: newOrg._id,
+          organizations: user.organizations,
+          createdAt: user.createdAt,
+        },
+        organization: newOrg
       },
     });
   } catch (err) {
@@ -42,11 +98,17 @@ export async function signup(req, res, next) {
         message: "Email already registered",
       });
     }
+    if (err.message === "USER_CREATION_FAILED") {
+      return res.status(500).json({
+        success: false,
+        error: "ServerError",
+        message: "Failed to create user",
+      });
+    }
     next(err);
   }
 }
 
-// POST /auth/login
 export async function login(req, res, next) {
   try {
     // Validate request data
@@ -59,18 +121,55 @@ export async function login(req, res, next) {
       });
     }
 
-    // Login using service
+    // Login using service (GỌI ĐÚNG loginUser)
     const { email, password } = req.body;
-    const result = await authService.loginUser(email, password);
+    const authResult = await authService.loginUser(email, password); //  SỬA: loginUser thay vì createUser
+    const publicUserId = authResult.user.id || authResult.user._id; 
 
-    return res.json({
+    // Query lấy User gốc + các trường cần thiết
+    const user = await User.findById(publicUserId).select('+currentOrganizationId +organizations');
+
+    if (!user) {
+         return res.status(401).json({ success: false, message: "User not found after login verification." });
+    }
+    if (!user.currentOrganizationId) {
+        // Fallback: Nếu user cũ chưa có Org, có thể lấy Org đầu tiên trong list làm default
+        if (user.organizations && user.organizations.length > 0) {
+            user.currentOrganizationId = user.organizations[0];
+            await User.findByIdAndUpdate(user._id, { currentOrganizationId: user.organizations[0] });
+        } else {
+             return res.status(403).json({
+                success: false,
+                error: "ForbiddenError",
+                message: "User has no Organization linked. Please contact support.",
+            });
+        }
+    }
+
+    
+    //  Get organization info (optional)
+   const tokenPayload = {
+      sub: user._id.toString(),    
+      email: user.email,
+      role: user.role,
+      organizationId: user.currentOrganizationId.toString() // SỬA: .toString()
+    };
+    
+    // Gọi hàm signToken từ utils (nhớ import hàm này ở đầu file)
+    const newToken = signToken(tokenPayload);
+
+    // 5. Lấy thông tin Org để trả về FE
+    const organization = await Organization.findById(user.currentOrganizationId)
+        .select('name ownerId status plan createdAt');
+
+    return res.status(200).json({
       success: true,
       message: "Login successful",
       data: {
-        token: result.token,
+        token: newToken,
         tokenType: "Bearer",
-        user: result.user,
-        organization: result.organization,
+        user: authResult.user,
+        organization: organization //  Thêm organization info
       },
     });
   } catch (err) {
