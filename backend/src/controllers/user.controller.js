@@ -5,7 +5,7 @@ import OrganizationMember from "../models/organizationMember.model.js";
 // GET /users (admin only)
 export const listUsers = async (req, res) => {
   try {
-    const users = await User.find({ deletedAt: null }).select("name email role status createdAt updatedAt");
+    const users = await User.find({ deletedAt: null }).select("name email role status avatar createdAt updatedAt");
     res.json({ success: true, count: users.length, data: users });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });

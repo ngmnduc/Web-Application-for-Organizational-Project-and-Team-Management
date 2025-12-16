@@ -108,7 +108,7 @@ export const getProjectMembers = async (req, res) => {
 
     // Query bảng riêng ProjectMember
     const members = await ProjectMember.find({ projectId: id })
-      .populate("userId", "name email"); // Chỉ lấy name, email từ bảng User
+      .populate("userId", "name email avatar role"); // Chỉ lấy name, email từ bảng User
 
     //  Chuẩn hóa dữ liệu trả về FE
     const formattedData = members.map((m) => {
@@ -121,7 +121,8 @@ export const getProjectMembers = async (req, res) => {
             email: m.userId.email,       // Email từ bảng User
             projectRole: m.roleInProject,// Role trong dự án (Manager/Member)
             status: m.status,            // Trạng thái (ACTIVE/PENDING)
-            joinedAt: m.createdAt
+            joinedAt: m.createdAt,
+            avatar: m.userId.avatar,
         };
     }).filter(m => m !== null); // Lọc bỏ null
 

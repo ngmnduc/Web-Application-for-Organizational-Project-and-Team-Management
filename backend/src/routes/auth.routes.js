@@ -7,5 +7,11 @@ const router = Router();
 router.post("/signup", signup);
 router.post("/login", login);
 router.post("/google", handleGoogleLogin); 
+// Private
+router.get("/me", verifyToken, me);                  // Lấy info
+router.get("/profile", verifyToken, me);             // Alias cho me 
+router.patch("/profile", verifyToken, updateProfile);// Cập nhật info (Avatar, Tên...)
+router.post("/change-password", verifyToken, changePassword);
+router.post("/switch-org", verifyToken, switchOrg);
 
 export default router;

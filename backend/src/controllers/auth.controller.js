@@ -241,7 +241,7 @@ export async function updateProfile(req, res, next) {
 
     // Update profile using service
     const updatedUser = await authService.updateUserProfile(
-      req.user.sub,
+      req.user._id,
       req.body
     );
 
