@@ -87,13 +87,13 @@ export const validateUpdateProfile = (data) => {
     if (!/^[0-9+\-() ]*$/.test(data.phoneNumber)) {
       errors.push('Invalid phone number format');
     }
-  }t
+  }
 
   if (data.avatar !== undefined && data.avatar !== null && data.avatar !== '') {
     try {
       new URL(data.avatar);
     } catch {
-      errors.push('Avatar mus be a valid URL');
+      errors.push('Avatar must be a valid URL');
     }
   }
 

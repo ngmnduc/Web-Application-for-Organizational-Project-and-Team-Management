@@ -15,7 +15,8 @@ export async function verifyToken(req, res, next) {
     req.userRole = decoded.role;
 
     // load user from DB and ensure still exists
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('+currentOrganizationId +organizations'); 
+
     if (!user) {
       return res.status(401).json({ error: { message: "User not found or removed" } });
     }
@@ -37,4 +38,50 @@ export function checkRole(...allowed) {
     }
     next();
   };
+}
+
+/**
+ * Middleware: Require valid organization access
+ * Validates that token contains organizationId and it matches user's currentOrganizationId
+ */
+export function requireOrgAccess(req, res, next) {
+  try {
+    // Check if token has organizationId
+    const tokenOrgId = req.auth?.organizationId;
+    
+    if (!tokenOrgId) {
+      return res.status(403).json({ 
+        success: false,
+        error: "ForbiddenError", 
+        message: "No organization context in token. Please switch to an organization." 
+      });
+    }
+
+    // Check if user's current organization matches token
+    const currentOrgId = req.user?.currentOrganizationId?.toString();
+    
+    if (!currentOrgId) {
+      return res.status(403).json({ 
+        success: false,
+        error: "ForbiddenError", 
+        message: "User has no active organization. Please switch to an organization." 
+      });
+    }
+
+    if (tokenOrgId !== currentOrgId) {
+      return res.status(403).json({ 
+        success: false,
+        error: "ForbiddenError", 
+        message: "Organization context mismatch. Please refresh your token." 
+      });
+    }
+
+    next();
+  } catch (err) {
+    return res.status(403).json({ 
+      success: false,
+      error: "ForbiddenError", 
+      message: "Invalid organization access" 
+    });
+  }
 }

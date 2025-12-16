@@ -190,3 +190,21 @@ export const validateProjectQuery = (query) => {
     errors,
   };
 };
+
+/**
+ * Validate join project by code
+ */
+export const validateJoinByCode = (data) => {
+  const errors = [];
+
+  if (!data.inviteCode || typeof data.inviteCode !== 'string') {
+    errors.push('Invite code is required');
+  } else if (data.inviteCode.trim().length === 0) {
+    errors.push('Invite code cannot be empty');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
