@@ -139,6 +139,16 @@ export const createMeeting = async (req, res) => {
       });
     }
 
+    // Get organizationId from authenticated user (BE1 Multi-tenant)
+    const organizationId = req.user?.currentOrganizationId;
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "ValidationError",
+        message: "No active organization. Please switch to an organization first.",
+      });
+    }
+
     // Validate required fields
     if (!title) {
       return res.status(400).json({
@@ -186,6 +196,15 @@ export const createMeeting = async (req, res) => {
       });
     }
 
+    // Validate project belongs to user's organization
+    if (project.organizationId?.toString() !== organizationId.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: "ForbiddenError",
+        message: "Project does not belong to your organization",
+      });
+    }
+
     // Check for time conflicts
     const hasConflict = await hasTimeConflict(projectId, start, end);
     if (hasConflict) {
@@ -198,6 +217,7 @@ export const createMeeting = async (req, res) => {
 
     // Create meeting
     const meeting = new Meeting({
+      organizationId: organizationId, // Add organizationId from user context
       projectId,
       title,
       description: description || "",

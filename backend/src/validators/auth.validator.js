@@ -93,7 +93,7 @@ export const validateUpdateProfile = (data) => {
     try {
       new URL(data.avatar);
     } catch {
-      errors.push('Avatar mus be a valid URL');
+      errors.push('Avatar must be a valid URL');
     }
   }*/
 

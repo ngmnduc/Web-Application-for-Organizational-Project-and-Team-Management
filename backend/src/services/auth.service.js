@@ -4,6 +4,7 @@
  */
 
 import User from "../models/user.model.js";
+import Organization from "../models/organization.model.js";
 import OrganizationMember from "../models/organizationMember.model.js";
 import { signToken } from "../utils/jwt.js";
 import crypto from "crypto";
@@ -29,8 +30,12 @@ export const createUser = async (name, email, password) => {
   // Create user
   const user = await User.create({ name, email, password, role });
 
-  // Generate token
-  const token = signToken({ sub: user._id.toString(), role: user.role });
+  // Generate token (no organizationId for first user/admin)
+  const token = signToken({ 
+    sub: user._id.toString(), 
+    role: user.role,
+    organizationId: null
+  });
 
   return {
     token,
@@ -71,18 +76,33 @@ export const loginUser = async (email, password) => {
     .limit(1);
 
   let currentOrganization = null;
+  let organizationId = null;
 
   // If user has organizations, set current to most recent
   if (orgMembers.length > 0 && orgMembers[0].organizationId) {
     currentOrganization = orgMembers[0].organizationId;
 
+    // Validate organization status (BE1 Requirement)
+    if (currentOrganization.status === 'INACTIVE') {
+      throw new Error("ORGANIZATION_INACTIVE");
+    }
+    if (currentOrganization.deletedAt) {
+      throw new Error("ORGANIZATION_DELETED");
+    }
+
     // Update user's currentOrganizationId
     user.currentOrganizationId = currentOrganization._id;
     await user.save();
+    
+    organizationId = currentOrganization._id.toString();
   }
 
-  // Generate token
-  const token = signToken({ sub: user._id.toString(), role: user.role });
+  // Generate token with organizationId
+  const token = signToken({ 
+    sub: user._id.toString(), 
+    role: user.role,
+    organizationId
+  });
 
   return {
     token,
@@ -135,8 +155,12 @@ export const handleGoogleAuth = async (credential) => {
     }
   }
 
-  // Generate token
-  const token = signToken({ sub: user._id.toString(), role: user.role });
+  // Generate token (no organizationId for new Google users)
+  const token = signToken({ 
+    sub: user._id.toString(), 
+    role: user.role,
+    organizationId: user.currentOrganizationId?.toString() || null
+  });
 
   return {
     token,
@@ -257,6 +281,16 @@ export const switchOrganization = async (userId, organizationId) => {
     throw new Error("NOT_ORGANIZATION_MEMBER");
   }
 
+  const organization = membership.organizationId;
+
+  // Validate organization status (BE1 Requirement)
+  if (organization.status === 'INACTIVE') {
+    throw new Error("ORGANIZATION_INACTIVE");
+  }
+  if (organization.deletedAt) {
+    throw new Error("ORGANIZATION_DELETED");
+  }
+
   // Update user's current organization
   const user = await User.findByIdAndUpdate(
     userId,
@@ -268,12 +302,20 @@ export const switchOrganization = async (userId, organizationId) => {
     throw new Error("USER_NOT_FOUND");
   }
 
+  // Generate NEW token with new organizationId (BE1 Requirement)
+  const newToken = signToken({ 
+    sub: user._id.toString(), 
+    role: user.role,
+    organizationId: organizationId.toString()
+  });
+
   return {
+    token: newToken,
     user: toPublicUser(user),
     organization: {
-      _id: membership.organizationId._id,
-      name: membership.organizationId.name,
-      logo: membership.organizationId.logo,
+      _id: organization._id,
+      name: organization.name,
+      logo: organization.logo,
     },
   };
 };
