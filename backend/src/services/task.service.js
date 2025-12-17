@@ -165,9 +165,16 @@ export const updateTaskStatus = async (taskId, status, currentUser) => {
   return task;
 };
 
-export const reorderTask = async (taskId, newStatus, newPosition) => {
+export const reorderTask = async (taskId, newStatus, newPosition, currentUser) => {
   if (!taskId || newPosition === undefined) {
     throw new Error('MISSING_REQUIRED_FIELDS');
+  }
+
+  const task = await Task.findById(taskId);
+  if (!task) throw new Error('TASK_NOT_FOUND');  
+
+  if (currentUser.role === "Member" && String(task.assigneeId) !== String(currentUser._id)) {
+    throw new Error('UNAUTHORIZED_ACCESS');
   }
 
   const updatedTask = await Task.findByIdAndUpdate(
