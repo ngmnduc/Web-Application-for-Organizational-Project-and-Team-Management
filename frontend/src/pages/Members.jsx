@@ -319,6 +319,7 @@ const Members = () => {
                 const res = await fetch(`${API_BASE_URL}/projects/${targetProjectId}/members`, { headers: getHeaders() });
                 if (!res.ok) throw new Error('Access denied');
                 const data = await res.json();
+                
                 const mapped = (data.data || []).map(m => ({
                     id: m.user.id || m.user._id,
                     name: m.user.name,
@@ -330,8 +331,12 @@ const Members = () => {
                     projects: [],
                     membershipId: m._id // QUAN TRỌNG: ID để xóa khỏi dự án
                 }));
-                setMembers(mapped);
-            } 
+
+                // --- ĐÃ SỬA: Lọc bỏ Admin ra khỏi danh sách hiển thị ---
+                const visibleMembers = mapped.filter(m => m.role !== 'Admin');
+                setMembers(visibleMembers);
+                // -----------------------------------------------------
+            }
             // B: View All (Admin)
             else if (userRole === 'Admin') {
                 const [usersRes, projectsRes] = await Promise.all([
@@ -346,7 +351,7 @@ const Members = () => {
 
                 const mapped = (usersData.data || []).map(u => {
                     const uid = u._id || u.id;
-                    const joined = allProjects.filter(p => p.members.some(m => String(m.user._id || m.user) === String(uid)));
+                    const joined = allProjects.filter(p => p.members?.some(m => String(m.user._id || m.user) === String(uid)));
                     return {
                         id: uid,
                         name: u.name,
