@@ -89,13 +89,13 @@ export const validateUpdateProfile = (data) => {
     }
   }
 
-  if (data.avatar !== undefined && data.avatar !== null && data.avatar !== '') {
+/*  if (data.avatar !== undefined && data.avatar !== null && data.avatar !== '') {
     try {
       new URL(data.avatar);
     } catch {
       errors.push('Avatar must be a valid URL');
     }
-  }
+  }*/
 
   return {
     isValid: errors.length === 0,

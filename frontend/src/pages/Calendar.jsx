@@ -14,8 +14,7 @@ import {
 import { useOutletContext } from 'react-router-dom';
 
 import { LoaderOverlay } from '../components/LoaderOverlay';
-import { ErrorState } from '../components/ErrorState';
-import TaskSummary from '../components/TaskSummary';
+import TaskSummary from '../components/TaskSummary'; 
 import { CalendarDayCell } from '../components/CalendarDayCell';
 
 const API_BASE_URL = 'http://localhost:4000/api';
@@ -121,15 +120,12 @@ const CreateMeetingModal = ({ isOpen, onClose, projects, onSuccess }) => {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || "Failed to create meeting");
-            
+
             onSuccess(); 
             onClose();
             setFormData(prev => ({ ...prev, title: '', location: '', description: '' }));
-        } catch (error) {
-            setErrorMsg(error.message);
-        } finally {
-            setIsSubmitting(false);
-        }
+        } catch (error) { setErrorMsg(error.message); } 
+        finally { setIsSubmitting(false); }
     };
 
     if (!isOpen) return null;
@@ -166,7 +162,7 @@ const CreateMeetingModal = ({ isOpen, onClose, projects, onSuccess }) => {
 };
 
 // --- CALENDAR PANEL ---
-const CalendarPanel = ({ currentMonth, setCurrentMonth, selectedDate, onSelectDate, events }) => {
+const CalendarPanel = ({ currentMonth, setCurrentMonth, selectedDate, onSelectDate, events, attendance }) => {
     const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     const getDaysInMonth = (date) => {
         const year = date.getFullYear();
@@ -181,6 +177,7 @@ const CalendarPanel = ({ currentMonth, setCurrentMonth, selectedDate, onSelectDa
 
     const days = getDaysInMonth(currentMonth);
     const eventDates = new Set(events.map(e => normalizeDate(e.startTime)));
+    const attendanceDates = new Set(attendance.map(a => normalizeDate(a.checkInTime)));
 
     const handlePrev = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
     const handleNext = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
@@ -200,17 +197,21 @@ const CalendarPanel = ({ currentMonth, setCurrentMonth, selectedDate, onSelectDa
                 </div>
                 <button onClick={handleToday} className="px-4 py-1.5 text-sm text-white font-bold rounded-lg shadow-sm hover:opacity-90" style={{ backgroundColor: 'var(--color-brand)' }}>Today</button>
             </div>
-            <div className="grid grid-cols-7 gap-y-2 text-center flex-grow content-start">
+            
+            <div className="grid grid-cols-7 gap-2 text-center flex-grow content-start">
                 {daysOfWeek.map(day => <div key={day} className="text-gray-400 text-xs font-bold uppercase mb-4">{day}</div>)}
                 {days.map((date, idx) => {
                     if (!date) return <div key={`empty-${idx}`} />;
+                    
                     const dateStr = normalizeDate(date);
+                    const isCheckedIn = attendanceDates.has(dateStr);
+
                     return (
-                        <div key={idx} onClick={() => onSelectDate(date)} className="cursor-pointer h-full">
+                        <div key={idx} onClick={() => onSelectDate(date)} className="cursor-pointer h-24">
                             <CalendarDayCell 
                                 date={date.getDate()}
                                 isSelected={normalizeDate(date) === normalizeDate(selectedDate)}
-                                isCheckedIn={false} 
+                                isCheckedIn={isCheckedIn}
                                 hasEvent={eventDates.has(dateStr)} 
                             />
                         </div>
@@ -228,9 +229,7 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
     const [error, setError] = useState('');
 
     useEffect(() => {
-        setMsg('');
-        setError('');
-        setCheckInStatus(null);
+        setMsg(''); setError(''); setCheckInStatus(null);
     }, [selectedDate]);
 
     const selectedDateKey = normalizeDate(selectedDate);
@@ -249,11 +248,8 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
             const data = await res.json();
             
             if (!res.ok) {
-                if (res.status === 409) {
-                    onCheckInSuccess(); 
-                } else {
-                    throw new Error(data.message);
-                }
+                if (res.status === 409) { onCheckInSuccess(); } 
+                else { throw new Error(data.message); }
             } else {
                 setCheckInStatus('success');
                 onCheckInSuccess(); 
@@ -270,12 +266,11 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
             <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <ClockIcon className="w-6 h-6 text-[var(--color-brand)]"/> 
-                        Attendance Info
+                        <ClockIcon className="w-6 h-6 text-[var(--color-brand)]"/> Attendance
                     </h2>
                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{formatDateUS(selectedDate)}</span>
                 </div>
-                
+
                 <div className="flex flex-col items-center py-4">
                     {attendanceRecord ? (
                          <div className="text-center animate-fade-in">
@@ -287,34 +282,25 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
                          </div>
                     ) : isToday ? (
                         <>
-                            <button 
-                                onClick={handleCheckIn}
-                                disabled={checkInStatus === 'loading'}
-                                className="px-8 py-3 bg-[var(--color-brand)] text-white font-bold rounded-xl shadow-md hover:opacity-90 transition disabled:opacity-70"
-                                style={{ backgroundColor: 'var(--color-brand)' }}
-                            >
+                            <button onClick={handleCheckIn} disabled={checkInStatus === 'loading'} className="px-8 py-3 bg-[var(--color-brand)] text-white font-bold rounded-xl shadow-md hover:opacity-90 transition disabled:opacity-70" style={{ backgroundColor: 'var(--color-brand)' }}>
                                 {checkInStatus === 'loading' ? 'Processing...' : 'Check In Now'}
                             </button>
                             {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
                         </>
                     ) : (
-                        <div className="text-center text-gray-400">
-                            <p className="text-sm">No attendance record for this day.</p>
-                        </div>
+                        <div className="text-center text-gray-400"><p className="text-sm">No attendance record.</p></div>
                     )}
                 </div>
             </div>
-
+            
             {/* SCHEDULE LIST */}
             <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex-grow flex flex-col">
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
                     <h2 className="text-lg font-bold text-gray-800">Events</h2>
-                    
+
                     {/* CHỈ HIỆN NÚT NẾU CÓ QUYỀN TẠO MEETING (Admin/Manager) */}
                     {canCreateMeeting && (
-                        <button onClick={onOpenCreateModal} className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors" title="Create Meeting">
-                            <PlusIcon className="w-5 h-5" />
-                        </button>
+                        <button onClick={onOpenCreateModal} className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors" title="Create Meeting"><PlusIcon className="w-5 h-5" /></button>
                     )}
                 </div>
 
@@ -323,9 +309,7 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
                         <div key={evt._id} onClick={() => onEventClick(evt)} className="p-3 bg-gray-50 rounded-lg border-l-4 border-[var(--color-brand)] group hover:shadow-md transition-all cursor-pointer">
                             <div className="flex justify-between items-start">
                                 <h4 className="font-bold text-gray-800 text-sm group-hover:text-[var(--color-brand)] transition-colors">{evt.title}</h4>
-                                <span className="text-xs font-mono text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
-                                    {formatTimeUS(evt.startTime)}
-                                </span>
+                                <span className="text-xs font-mono text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">{formatTimeUS(evt.startTime)}</span>
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                                 {evt.location?.includes('http') ? <VideoCameraIcon className="w-3.5 h-3.5"/> : <MapPinIcon className="w-3.5 h-3.5"/>}
@@ -346,16 +330,16 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
 
 // --- MAIN PAGE ---
 const Calendar = () => {
+    // --- ĐÃ KHÔI PHỤC TaskSummary ---
     const { dynamicTasksSummary } = useOutletContext();
-    const [isLoading, setIsLoading] = useState(true);
     
+    const [isLoading, setIsLoading] = useState(true);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [projects, setProjects] = useState([]);
     const [allMeetings, setAllMeetings] = useState([]);
     const [myAttendance, setMyAttendance] = useState([]);
-    const [userRole, setUserRole] = useState('Member'); // State để lưu role
-    
+    const [userRole, setUserRole] = useState('Member'); 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedMeeting, setSelectedMeeting] = useState(null);
 
@@ -375,7 +359,7 @@ const Calendar = () => {
 
             const projData = await projRes.json();
             const attData = await attRes.json();
-
+            
             const projectList = projData.data || [];
             setProjects(projectList);
             setMyAttendance(attData.data || []);
@@ -384,17 +368,13 @@ const Calendar = () => {
                 const meetingPromises = projectList.map(p => 
                     fetch(`${API_BASE_URL}/projects/${p._id}/meetings`, { headers: getHeaders() })
                         .then(r => r.json())
-                        .then(d => d.data || [])
-                        .catch(() => [])
+                        .then(d => d.data || []).catch(() => [])
                 );
                 const meetingsResults = await Promise.all(meetingPromises);
                 setAllMeetings(meetingsResults.flat());
             }
             setIsLoading(false);
-        } catch (error) {
-            console.error("Fetch error:", error);
-            setIsLoading(false);
-        }
+        } catch (error) { console.error("Fetch error:", error); setIsLoading(false); }
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);
@@ -408,10 +388,9 @@ const Calendar = () => {
 
     return (
         <div className="flex-1 p-6 md:p-8 bg-gray-50 min-h-screen font-sans flex flex-col">
-            <div className="mb-6">
-                <TaskSummary summaryData={dynamicTasksSummary} />
-            </div>
-
+            {/* ĐÃ KHÔI PHỤC PHẦN SUMMARY */}
+            <div className="mb-6"><TaskSummary summaryData={dynamicTasksSummary} /></div>
+            
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-grow items-stretch">
                 <div className="flex flex-col h-full"> 
                     <CalendarPanel 
@@ -432,24 +411,12 @@ const Calendar = () => {
                         onOpenCreateModal={() => setIsCreateModalOpen(true)}
                         onEventClick={(evt) => setSelectedMeeting(evt)}
                         projects={projects}
-                        canCreateMeeting={canCreateMeeting} // Truyền prop xuống
+                        canCreateMeeting={canCreateMeeting}
                     />
                 </div>
             </div>
-
-            <CreateMeetingModal 
-                isOpen={isCreateModalOpen} 
-                onClose={() => setIsCreateModalOpen(false)}
-                projects={projects}
-                onSuccess={fetchData} 
-            />
-
-            <MeetingDetailModal 
-                isOpen={!!selectedMeeting}
-                onClose={() => setSelectedMeeting(null)}
-                meeting={selectedMeeting}
-                projects={projects}
-            />
+            <CreateMeetingModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} projects={projects} onSuccess={fetchData} />
+            <MeetingDetailModal isOpen={!!selectedMeeting} onClose={() => setSelectedMeeting(null)} meeting={selectedMeeting} projects={projects} />
         </div>
     );
 };

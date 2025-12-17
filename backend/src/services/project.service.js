@@ -6,6 +6,7 @@
 import mongoose from "mongoose";
 import Project from "../models/project.model.js";
 import ProjectMember from "../models/projectMember.model.js";
+import OrganizationMember from "../models/organizationMember.model.js";
 import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import ActivityLog from "../models/activityLog.model.js";
@@ -69,7 +70,6 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
     await ProjectMember.create([{
       projectId: project._id,
       userId: creatorId,
-      organizationId: currentOrganizationId,
       roleInProject: "Admin",
       status: "ACTIVE"
     }], { session });
@@ -161,7 +161,7 @@ export const getProjectById = async (projectId, currentOrganizationId) => {
     deletedAt: null
   })
     .populate('createdBy', 'name email')
-    .populate('members.user', 'name email role avatar');
+    //.populate('members.user', 'name email role avatar');
 
   if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
@@ -569,45 +569,53 @@ export const getUserRoleInProject = async (projectId, userId, currentOrganizatio
 /**
  * Get project members from ProjectMember table
  */
+
 export const getProjectMembers = async (projectId, currentOrganizationId) => {
-  if (!mongoose.isValidObjectId(projectId)) {
-    throw new Error('INVALID_PROJECT_ID');
-  }
+  if (!mongoose.isValidObjectId(projectId)) throw new Error('INVALID_PROJECT_ID');
+  if (!currentOrganizationId) throw new Error('ORGANIZATION_REQUIRED');
 
-  if (!currentOrganizationId) {
-    throw new Error('ORGANIZATION_REQUIRED');
-  }
-
-  // Verify project belongs to organization
+  // 1. Check Project
   const project = await Project.findOne({
     _id: projectId,
     organizationId: currentOrganizationId,
     deletedAt: null
   });
 
-  if (!project) {
-    throw new Error('PROJECT_NOT_FOUND');
-  }
+  if (!project) throw new Error('PROJECT_NOT_FOUND');
   
+  // 2. Query ProjectMember
   const members = await ProjectMember.find({ projectId })
-    .populate('userId', 'name email avatar');
+    .populate('userId', 'name email avatar role'); // Populate thêm role hệ thống của user
 
-  const formattedData = members.map((m) => {
+  // 3. Format Data khớp với Members.jsx
+  return members.map((m) => {
     if (!m.userId) return null;
 
     return {
-      userId: m.userId._id,
-      name: m.userId.name,
-      email: m.userId.email,
-      projectRole: m.roleInProject,
+      _id: m._id, // Đây là membershipId (để xóa member khỏi project)
+      
+      // --- QUAN TRỌNG: Gom thông tin user vào object 'user' ---
+      user: {
+          _id: m.userId._id,
+          name: m.userId.name,
+          email: m.userId.email,
+          avatar: m.userId.avatar,
+          role: m.userId.role // Role hệ thống (Admin/User)
+      },
+      // --------------------------------------------------------
+
+      // Các field của ProjectMember giữ ở ngoài
+      role: m.roleInProject,        // Frontend dùng field này để hiển thị select box
+      roles: [m.roleInProject],     // Frontend dùng mảng này để check quyền
+      projectRole: m.roleInProject, 
+      
       status: m.status,
       joinedAt: m.createdAt
     };
   }).filter(m => m !== null);
-
-  return formattedData;
 };
 
+// ... (Các hàm bên dưới giữ nguyên)
 /**
  * Get pending join requests across all projects
  */
@@ -760,15 +768,12 @@ export const joinProjectByCode = async (inviteCode, userId, currentOrganizationI
     throw new Error('INVALID_INVITE_CODE');
   }
 
-  if (!currentOrganizationId) {
-    throw new Error('ORGANIZATION_REQUIRED');
-  }
-
+  
   const normalizedCode = inviteCode.toUpperCase().trim();
 
   const project = await Project.findOne({ 
     inviteCode: normalizedCode,
-    organizationId: currentOrganizationId,
+    // organizationId: currentOrganizationId, Bỏ check tạm vì vừa vào đâu thể có id dc
     deletedAt: null 
   });
   
@@ -776,27 +781,50 @@ export const joinProjectByCode = async (inviteCode, userId, currentOrganizationI
     throw new Error('INVALID_OR_EXPIRED_CODE');
   }
 
-  // Check if already a member in ProjectMember table
-  const existingMember = await ProjectMember.findOne({
+  const targetOrgId = project.organizationId;
+  const OrganizationMemberModel = mongoose.model("OrganizationMember");
+
+  const existingOrgMember = await OrganizationMemberModel.findOne({
+    organizationId: targetOrgId,
+    userId: userId
+  });
+
+ if (!existingOrgMember) {
+    await OrganizationMemberModel.create({
+      organizationId: targetOrgId,
+      userId: userId,
+      roleInOrganization: "ORG_MEMBER",
+      status: "ACTIVE"
+    });
+
+    // Cập nhật currentOrg cho User để lần sau vào thẳng Dashboard
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { organizations: targetOrgId },
+      currentOrganizationId: targetOrgId
+    });
+  }
+
+  const ProjectMemberModel = mongoose.model("ProjectMember");
+  
+  const existingMember = await ProjectMemberModel.findOne({
     projectId: project._id,
     userId
   });
 
   if (existingMember) {
-    if (existingMember.status === 'PENDING') {
-      throw new Error('ALREADY_REQUESTED');
-    }
+    if (existingMember.status === 'PENDING') throw new Error('ALREADY_REQUESTED');
     throw new Error('ALREADY_MEMBER');
   }
 
-  // Add user as member in ProjectMember table
-  await ProjectMember.create({
+  // 4. Add vào Project
+  await ProjectMemberModel.create({
     projectId: project._id,
     userId,
+    organizationId: targetOrgId, // Lưu đúng Org ID
     roleInProject: "Member",
     status: "ACTIVE"
   });
-
+  
   // Log activity
   try {
     await ActivityLog.create({
