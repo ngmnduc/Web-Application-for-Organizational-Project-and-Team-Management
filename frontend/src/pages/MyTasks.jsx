@@ -112,7 +112,7 @@ const MyTasks = () => {
   const { user } = useAuth();
 
   const currentUser = {
-    id: user?._id,
+    id: user?.id || user?._id,
     role: user?.role || 'Member',
     name: user?.name || user?.fullname || 'User',
   };
@@ -125,7 +125,7 @@ const MyTasks = () => {
     //Manager/Admin có thể kéo thả tất cả
     if (isManagerOrAdmin) return true;
     if (!task.assigneeId || !currentUser.id ) return false;
-    return task.assigneeId === currentUser.id;
+    return String(task.assigneeId) === String(currentUser.id);
   };
 
   const columns = [

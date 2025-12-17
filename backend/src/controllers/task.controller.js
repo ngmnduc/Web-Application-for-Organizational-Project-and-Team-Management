@@ -180,7 +180,7 @@ export const updateTaskStatus = async (req, res) => {
 export const reorderTask = async (req, res) => {
   try {
     const { taskId, newStatus, newPosition } = req.body;
-    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition);
+    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition, req.user);
     
     res.json({ 
       success: true, 
