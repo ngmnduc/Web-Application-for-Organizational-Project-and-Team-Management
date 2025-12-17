@@ -161,7 +161,7 @@ export const getProjectById = async (projectId, currentOrganizationId) => {
     deletedAt: null
   })
     .populate('createdBy', 'name email')
-    .populate('members.user', 'name email role avatar');
+    //.populate('members.user', 'name email role avatar');
 
   if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
@@ -569,45 +569,53 @@ export const getUserRoleInProject = async (projectId, userId, currentOrganizatio
 /**
  * Get project members from ProjectMember table
  */
+
 export const getProjectMembers = async (projectId, currentOrganizationId) => {
-  if (!mongoose.isValidObjectId(projectId)) {
-    throw new Error('INVALID_PROJECT_ID');
-  }
+  if (!mongoose.isValidObjectId(projectId)) throw new Error('INVALID_PROJECT_ID');
+  if (!currentOrganizationId) throw new Error('ORGANIZATION_REQUIRED');
 
-  if (!currentOrganizationId) {
-    throw new Error('ORGANIZATION_REQUIRED');
-  }
-
-  // Verify project belongs to organization
+  // 1. Check Project
   const project = await Project.findOne({
     _id: projectId,
     organizationId: currentOrganizationId,
     deletedAt: null
   });
 
-  if (!project) {
-    throw new Error('PROJECT_NOT_FOUND');
-  }
+  if (!project) throw new Error('PROJECT_NOT_FOUND');
   
+  // 2. Query ProjectMember
   const members = await ProjectMember.find({ projectId })
-    .populate('userId', 'name email avatar');
+    .populate('userId', 'name email avatar role'); // Populate thêm role hệ thống của user
 
-  const formattedData = members.map((m) => {
+  // 3. Format Data khớp với Members.jsx
+  return members.map((m) => {
     if (!m.userId) return null;
 
     return {
-      userId: m.userId._id,
-      name: m.userId.name,
-      email: m.userId.email,
-      projectRole: m.roleInProject,
+      _id: m._id, // Đây là membershipId (để xóa member khỏi project)
+      
+      // --- QUAN TRỌNG: Gom thông tin user vào object 'user' ---
+      user: {
+          _id: m.userId._id,
+          name: m.userId.name,
+          email: m.userId.email,
+          avatar: m.userId.avatar,
+          role: m.userId.role // Role hệ thống (Admin/User)
+      },
+      // --------------------------------------------------------
+
+      // Các field của ProjectMember giữ ở ngoài
+      role: m.roleInProject,        // Frontend dùng field này để hiển thị select box
+      roles: [m.roleInProject],     // Frontend dùng mảng này để check quyền
+      projectRole: m.roleInProject, 
+      
       status: m.status,
       joinedAt: m.createdAt
     };
   }).filter(m => m !== null);
-
-  return formattedData;
 };
 
+// ... (Các hàm bên dưới giữ nguyên)
 /**
  * Get pending join requests across all projects
  */
