@@ -346,7 +346,7 @@ const Members = () => {
 
                 const mapped = (usersData.data || []).map(u => {
                     const uid = u._id || u.id;
-                    const joined = allProjects.filter(p => p.members.some(m => String(m.user._id || m.user) === String(uid)));
+                    const joined = allProjects.filter(p => p.members?.some(m => String(m.user._id || m.user) === String(uid)));
                     return {
                         id: uid,
                         name: u.name,
