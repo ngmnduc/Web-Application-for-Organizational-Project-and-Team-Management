@@ -173,8 +173,13 @@ export const reorderTask = async (taskId, newStatus, newPosition, currentUser) =
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');  
 
-  if (currentUser.role === "Member" && String(task.assigneeId) !== String(currentUser._id)) {
-    throw new Error('UNAUTHORIZED_ACCESS');
+  if (currentUser.role === "Member") {
+      const currentUserId = String(currentUser._id || currentUser.id);
+      const assigneeId = task.assigneeId ? String(task.assigneeId) : null;
+
+      if (assigneeId !== currentUserId) {
+        throw new Error('UNAUTHORIZED_ACCESS');
+      }
   }
 
   const updatedTask = await Task.findByIdAndUpdate(

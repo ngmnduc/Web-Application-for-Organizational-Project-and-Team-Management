@@ -47,7 +47,7 @@ router.get("/projects/:id/tasks", verifyToken, getTasksByProject);
  */
 router.post("/projects/:id/tasks", verifyToken, requireOrgAccess, checkRole("Admin", "Manager"), createTask);
 
-router.patch('/tasks/reorder', reorderTask);
+router.patch('/tasks/reorder', verifyToken, requireOrgAccess, reorderTask);
 
 /**
  * @route   PUT /tasks/:id
