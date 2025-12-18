@@ -180,7 +180,7 @@ export const updateTaskStatus = async (req, res) => {
 export const reorderTask = async (req, res) => {
   try {
     const { taskId, newStatus, newPosition } = req.body;
-    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition);
+    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition, req.user);
     
     res.json({ 
       success: true, 
@@ -194,6 +194,11 @@ export const reorderTask = async (req, res) => {
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
+    
+    if (err.message === 'UNAUTHORIZED_ACCESS') {
+      return res.status(403).json({ success: false, message: "You can only reorder your own tasks" });
+    }
+    
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
