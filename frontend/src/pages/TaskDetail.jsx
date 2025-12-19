@@ -54,6 +54,12 @@ const TaskDetail = () => {
     title: "", description: "", assigneeId: "", priority: "MEDIUM", status: "TODO", dueDate: ""
   });
 
+  // state cho attachment 
+  const [isAttachmentInputOpen, setIsAttachmentInputOpen] = useState(false);
+  const [newAttachmentUrl, setNewAttachmentUrl] = useState("");
+  const [newAttachmentTitle, setNewAttachmentTitle] = useState("");
+  const attachmentInputRef = useRef(null); // Ref để focus vào ô input URL
+
   // tách fetchTask ra để reuse
   const fetchTask = useCallback(async () => {
     try {
@@ -286,6 +292,46 @@ const TaskDetail = () => {
         // Hiển thị chi tiết lỗi từ backend nếu có
         alert("Failed to update task: " + (err.message || JSON.stringify(err)));
     }
+  };
+
+  // ====== HANDLERS: ATTACHMENTS ======
+  const handleOpenAttachmentInput = () => {
+    setIsAttachmentInputOpen(true);
+    // Focus vào input sau khi mở
+    setTimeout(() => {
+        if (attachmentInputRef.current) {
+            attachmentInputRef.current.focus();
+        }
+    }, 100);
+  };
+
+  const handleAddAttachment = async () => {
+    if (!newAttachmentUrl.trim()) {
+        alert("URL cannot be empty.");
+        return;
+    }
+    
+    // --- START: Thay thế logic giả lập bằng API thực ---
+    
+    // Giả lập thêm vào UI và đóng input
+    const mockAttachment = {
+        _id: Date.now(),
+        url: newAttachmentUrl.trim(),
+        title: newAttachmentTitle.trim() || newAttachmentUrl.trim(),
+    };
+    
+    setTask(prev => ({
+        ...prev,
+        attachments: [...(prev.attachments || []), mockAttachment]
+    }));
+    
+    setNewAttachmentUrl("");
+    setNewAttachmentTitle("");
+    setIsAttachmentInputOpen(false);
+    
+    // --- END: Thay thế logic giả lập này bằng API thực ---
+
+    alert("Attachment added (Mock Success). Remember to implement API call!");
   };
 
  // ========== RENDER GUARDS ==========
@@ -593,8 +639,52 @@ const TaskDetail = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             <div className="flex justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Attachments</h2>
-              {canManage && <button className="text-xs text-blue-600 font-medium hover:underline">+ Add</button>}
+              {canManage && (
+                 <button 
+                    onClick={handleOpenAttachmentInput} 
+                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                 >
+                    + Add File
+                 </button>
+              )}
             </div>
+            
+            {/* INPUT ĐỂ THÊM ATTACHMENT MỚI */}
+            {canManage && isAttachmentInputOpen && (
+                <div className="flex flex-col gap-2 mb-4 p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                    <input
+                        ref={attachmentInputRef}
+                        type="url"
+                        value={newAttachmentUrl}
+                        onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                        placeholder="Link URL (required)"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+                        required
+                    />
+                    <input
+                        type="text"
+                        value={newAttachmentTitle}
+                        onChange={(e) => setNewAttachmentTitle(e.target.value)}
+                        placeholder="File Title (optional)"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+                    />
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={() => setIsAttachmentInputOpen(false)}
+                            className="px-3 py-1 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200 transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleAddAttachment}
+                            disabled={!newAttachmentUrl.trim()}
+                            className="px-3 py-1 rounded-lg bg-[var(--color-brand)] text-white text-xs font-medium disabled:opacity-50 hover:bg-blue-700 transition"
+                        >
+                            Add Attachment
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {attachments.length === 0 ? (
               <p className="text-xs text-gray-400 italic">
