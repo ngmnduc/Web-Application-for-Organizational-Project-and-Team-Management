@@ -1,5 +1,7 @@
 import * as projectValidator from "../validators/project.validator.js";
 import * as projectService from "../services/project.service.js";
+import User from "../models/user.model.js"; 
+import { signToken } from "../utils/jwt.js"; 
 
 // POST /projects
 export const createProject = async (req, res) => {
@@ -568,19 +570,47 @@ export const joinProjectByCode = async (req, res) => {
 
     const { inviteCode } = req.body;
     const userId = req.user._id;
-    //const currentOrgId = req.user.currentOrganizationId;
+    const currentOrganizationId = req.user.currentOrganizationId; 
 
-    // 2. Call service
-    const projectId = await projectService.joinProjectByCode(inviteCode, userId, null);
+    // 2. Call service (WITH TRANSACTION)
+    const projectId = await projectService.joinProjectByCode(
+      inviteCode, 
+      userId, 
+      currentOrganizationId
+    );
+
+    // 3. Lấy lại thông tin User MỚI NHẤT (sau khi service update)
+    const updatedUser = await User.findById(userId);
+
+    // 4.  Tạo TOKEN MỚI với organizationId và role mới nhất
+    const newToken = signToken({
+      sub: updatedUser._id.toString(),
+      email: updatedUser.email,
+      role: updatedUser.role, // Role được giữ nguyên nếu đã là Admin/Manager
+      organizationId: updatedUser.currentOrganizationId.toString()
+    });
 
     res.json({ 
       success: true, 
       message: "Successfully joined project", 
-      projectId 
+      projectId,
+      data: {
+        token: newToken, //  Frontend phải update token mới
+        user: {
+          id: updatedUser._id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role, // Role hiện tại (không bị đổi nếu là Admin)
+          currentOrganizationId: updatedUser.currentOrganizationId,
+          organizations: updatedUser.organizations
+        }
+      }
     });
 
   } catch (err) {
-    // Handle service errors
+    console.error("[JOIN_PROJECT] Error:", err.message);
+
+    // Handle all service errors
     if (err.message === 'INVALID_INVITE_CODE') {
       return res.status(400).json({ 
         success: false, 
@@ -588,35 +618,45 @@ export const joinProjectByCode = async (req, res) => {
         message: "Invalid invite code format" 
       });
     }
-    if (err.message === 'ORGANIZATION_REQUIRED') {
-      return res.status(400).json({ 
-        success: false, 
-        error: "ValidationError", 
-        message: "Organization is required" 
-      });
-    }
+    
     if (err.message === 'INVALID_OR_EXPIRED_CODE') {
       return res.status(404).json({ 
         success: false, 
+        error: "NotFoundError",
         message: "Invalid or expired invite code" 
       });
     }
+    
+    //  NEW: Handle PROJECT_ARCHIVED error
+    if (err.message === 'PROJECT_ARCHIVED') {
+      return res.status(403).json({ 
+        success: false, 
+        error: "ForbiddenError",
+        message: "This project has been archived and cannot accept new members" 
+      });
+    }
+    
     if (err.message === 'ALREADY_REQUESTED') {
-      return res.status(400).json({ 
+      return res.status(409).json({ 
         success: false,
+        error: "ConflictError",
         message: "You already requested to join this project" 
       });
     }
+    
     if (err.message === 'ALREADY_MEMBER') {
-      return res.status(400).json({ 
+      return res.status(409).json({ 
         success: false,
+        error: "ConflictError",
         message: "You are already a member of this project" 
       });
     }
+    
+    // Generic server error
     res.status(500).json({ 
       success: false, 
       error: "ServerError",
-      message: err.message 
+      message: err.message || "Failed to join project"
     });
   }
 };

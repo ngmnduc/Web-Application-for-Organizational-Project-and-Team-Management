@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { signup, login } from '../services/authService'; 
+import { signup } from '../services/authService'; // Bỏ import login vì không dùng nữa
 import { useAuth } from '../services/AuthContext';
 import tag from '../assets/images/logo.png';
-import { Mail, Lock, User } from "lucide-react";
+import { Mail, Lock } from "lucide-react"; // Bỏ import User icon nếu không dùng
 import { GoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../services/authService';
 
@@ -24,7 +24,7 @@ const SignUpPage = () => {
   };
 
   const handlePostSignupRedirect = async (token) => {
-    // Xử lý Payment (Gói Admin)
+    // 1. Xử lý Payment (Nếu user chọn gói Admin từ trang Pricing)
     if (location.state?.from === 'pricing' && location.state?.plan === 'Admin') {
         try {
             const response = await fetch(`${API_BASE_URL}/payment/session`, { 
@@ -39,36 +39,13 @@ const SignUpPage = () => {
         } catch (error) { console.error("Payment error:", error); }
     }
 
-    // Xử lý Join Project
+    // 2. Xử lý Join Project
+    // Nếu có invite code -> Backend đã tự add vào project -> Về Home
     if (location.state?.action === 'join' && location.state?.code) {
-        try {
-            console.log("Auto joining project after signup...");
-            const res = await fetch(`${API_BASE_URL}/projects/join`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ inviteCode: location.state.code })
-            });
-            const data = await res.json();
-            
-            if (res.ok) {
-                // Thành công -> Về Home
-                navigate('/home');
-                return;
-            } else {
-                console.error("Auto join failed:", data.message);
-                // Vẫn về Home nhưng có thể user sẽ thấy mình chưa có project
-                navigate('/home');
-            }
-        } catch (error) {
-            console.error("Auto join error:", error);
-            navigate('/home');
-        }
+        navigate('/home');
     } else {
-        // Mặc định về Pricing 
-        navigate('/pricing');
+        // Mặc định: Về Dashboard (thay vì Pricing, vì đã có org rồi)
+        navigate('/home');
     }
   };
 
@@ -93,21 +70,28 @@ const SignUpPage = () => {
     try {
       setIsLoading(true);
       const name = `${formData.firstName} ${formData.lastName}`.trim();
-      await signup(name, formData.email, formData.password);
+      const inviteCode = location.state?.code || null;
       
-      // Auto login
-      const res = await login(formData.email, formData.password);
-      const user = res.data?.user || res.user; 
-      const token = res.data?.token || res.token;
+      // --- LOGIC MỚI: Gọi Signup và nhận Token luôn ---
+      const response = await signup(name, formData.email, formData.password, inviteCode);
+      
+      // Backend trả về: { success: true, data: { token, user... } }
+      // Service trả về: response.data
+      const token = response.data?.token || response.token; 
+      const user = response.data?.user || response.user;
 
       if (user && token) {
-          saveLogin(user, token);
-          await handlePostSignupRedirect(token);
+          saveLogin(user, token); // Lưu token nóng hổi vào Context
+          await handlePostSignupRedirect(token); // Điều hướng ngay
       } else {
+          // Trường hợp hy hữu không có token
           navigate('/login');
       }
+      // ------------------------------------------------
+
     } catch (err) {
-      setError(err.error?.message || 'Signup failed.');
+      console.error(err);
+      setError(err.error?.message || err.message || 'Signup failed.');
     } finally {
       setIsLoading(false);
     }
