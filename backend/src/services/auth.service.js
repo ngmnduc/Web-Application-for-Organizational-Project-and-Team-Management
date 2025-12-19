@@ -35,6 +35,12 @@ export const createUser = async (name, email, password) => {
   } else {
     user = await User.create({ name, email, password, role });
   }
+    let user;
+  if (session) {
+    [user] = await User.create([{ name, email, password, role }], { session });
+  } else {
+    user = await User.create({ name, email, password, role });
+  }
 
   // Generate token (no organizationId for first user/admin)
   const token = signToken({ 
@@ -336,14 +342,11 @@ export async function createUserWithSession(name, email, password, session) {
     throw new Error("EMAIL_EXISTS");
   }
 
-  // Hash password
-  const hashedPassword = await bcrypt.hash(password, 10);
-
   // Create user with session
   const [user] = await User.create([{
     name,
     email,
-    password: hashedPassword,
+    password: password,
     role: "Member", // Default, will be updated to Admin if creating org
     status: "ACTIVE",
   }], { session });

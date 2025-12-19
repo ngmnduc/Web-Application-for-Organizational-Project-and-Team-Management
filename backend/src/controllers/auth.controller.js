@@ -3,7 +3,6 @@ import Organization from "../models/organization.model.js";
 import Project from "../models/project.model.js"; 
 import ProjectMember from "../models/projectMember.model.js"; 
 import OrganizationMember from "../models/organizationMember.model.js";
-import ActivityLog from "../models/activityLog.model.js"; // ✅ THÊM
 import { signToken } from "../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
 import crypto from "crypto";
@@ -124,7 +123,7 @@ export async function signup(req, res, next) {
         userId: user._id,
         organizationId: finalOrganizationId,
         roleInOrganization: "ORG_MEMBER"
-      }], { session }); // 
+      }], { session }); 
 
       // C. Add to ProjectMember
       const existingPrjMem = await ProjectMember.findOne({ 
@@ -142,22 +141,6 @@ export async function signup(req, res, next) {
         }], { session }); 
       }
 
-      // D. ACTIVITY LOG: User joined project
-      await ActivityLog.create([{
-        userId: user._id,
-        organizationId: finalOrganizationId,
-        projectId: projectToJoin._id,
-        action: "PROJECT_MEMBER_ADDED",
-        entityType: "ProjectMember",
-        entityId: user._id,
-        description: `${user.name} joined the project via invite code`,
-        metadata: {
-          inviteCode: inviteCode.toUpperCase().trim(),
-          projectName: projectToJoin.name,
-          role: "Member"
-        }
-      }], { session }); 
-
     } 
     //  CASE 2: CREATE NEW ORGANIZATION
     else {
@@ -174,7 +157,7 @@ export async function signup(req, res, next) {
           allowLateCheckIn: true,
           lateThresholdMinutes: 15
         }
-      }], { session }); //  Create với session
+      }], { session }); 
 
       finalOrganizationId = newOrg._id;
       finalOrgObj = newOrg;
@@ -190,21 +173,8 @@ export async function signup(req, res, next) {
         userId: user._id,
         organizationId: newOrg._id,
         roleInOrganization: "ORG_ADMIN"
-      }], { session }); // Create với session
+      }], { session }); 
 
-      // ACTIVITY LOG: Organization created
-      await ActivityLog.create([{
-        userId: user._id,
-        organizationId: newOrg._id,
-        action: "ORGANIZATION_CREATED",
-        entityType: "Organization",
-        entityId: newOrg._id,
-        description: `${user.name} created organization "${newOrg.name}"`,
-        metadata: {
-          organizationName: newOrg.name,
-          plan: newOrg.plan
-        }
-      }], { session }); //  Create với session
     }
 
     //  COMMIT TRANSACTION 
