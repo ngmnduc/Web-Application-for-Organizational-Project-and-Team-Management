@@ -70,6 +70,7 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
     await ProjectMember.create([{
       projectId: project._id,
       userId: creatorId,
+      organizationId: currentOrganizationId,
       roleInProject: "Admin",
       status: "ACTIVE"
     }], { session });

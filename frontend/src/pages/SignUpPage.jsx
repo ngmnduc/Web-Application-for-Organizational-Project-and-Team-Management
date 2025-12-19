@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { signup, login } from '../services/authService'; 
+import { signup } from '../services/authService'; // Bỏ import login vì không dùng nữa
 import { useAuth } from '../services/AuthContext';
 import tag from '../assets/images/logo.png';
-import { Mail, Lock, User } from "lucide-react";
+import { Mail, Lock } from "lucide-react"; // Bỏ import User icon nếu không dùng
 import { GoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../services/authService';
 
@@ -40,11 +40,12 @@ const SignUpPage = () => {
     }
 
     // 2. Xử lý Join Project
+    // Nếu có invite code -> Backend đã tự add vào project -> Về Home
     if (location.state?.action === 'join' && location.state?.code) {
         navigate('/home');
     } else {
-        // Mặc định về Pricing nếu không có action gì đặc biệt
-        navigate('/pricing');
+        // Mặc định: Về Dashboard (thay vì Pricing, vì đã có org rồi)
+        navigate('/home');
     }
   };
 
@@ -69,23 +70,25 @@ const SignUpPage = () => {
     try {
       setIsLoading(true);
       const name = `${formData.firstName} ${formData.lastName}`.trim();
-      
       const inviteCode = location.state?.code || null;
       
-      // Truyền inviteCode vào hàm signup để Backend xử lý
-      await signup(name, formData.email, formData.password, inviteCode);
+      // --- LOGIC MỚI: Gọi Signup và nhận Token luôn ---
+      const response = await signup(name, formData.email, formData.password, inviteCode);
       
-      // Auto login ngay sau khi đăng ký thành công
-      const res = await login(formData.email, formData.password);
-      const user = res.data?.user || res.user; 
-      const token = res.data?.token || res.token;
+      // Backend trả về: { success: true, data: { token, user... } }
+      // Service trả về: response.data
+      const token = response.data?.token || response.token; 
+      const user = response.data?.user || response.user;
 
       if (user && token) {
-          saveLogin(user, token);
-          await handlePostSignupRedirect(token);
+          saveLogin(user, token); // Lưu token nóng hổi vào Context
+          await handlePostSignupRedirect(token); // Điều hướng ngay
       } else {
+          // Trường hợp hy hữu không có token
           navigate('/login');
       }
+      // ------------------------------------------------
+
     } catch (err) {
       console.error(err);
       setError(err.error?.message || err.message || 'Signup failed.');

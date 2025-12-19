@@ -336,14 +336,11 @@ export async function createUserWithSession(name, email, password, session) {
     throw new Error("EMAIL_EXISTS");
   }
 
-  // Hash password
-  const hashedPassword = await bcrypt.hash(password, 10);
-
   // Create user with session
   const [user] = await User.create([{
     name,
     email,
-    password: hashedPassword,
+    password: password,
     role: "Member", // Default, will be updated to Admin if creating org
     status: "ACTIVE",
   }], { session });
