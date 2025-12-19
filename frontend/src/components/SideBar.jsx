@@ -94,6 +94,7 @@ const SideBar = ({ unreadCount, basePath="" }) => {
 
     const visibleMenuItems = menuItems.filter(item => {
         if (item.hideForAdmin && isAdmin) return false;
+        if (item.adminOnly && !isAdmin) return false;
         return true;
     });
 
