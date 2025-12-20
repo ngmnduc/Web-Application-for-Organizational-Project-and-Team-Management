@@ -82,23 +82,15 @@ export const handleWebhook = async (req, res) => {
     try {
       console.log(`Payment success for User ID: ${userId}`);
 
-      // 2. Tìm User
-      const user = await User.findById(userId);
-
-      if (user && user.currentOrganizationId) {
-        // 3. Nâng cấp Plan của Organization
-        await Organization.findByIdAndUpdate(user.currentOrganizationId, { 
-          plan: "ADMIN" 
+    try {
+      const user = await User.findOne(userId);
+      if (user && user.currentOrganizationId){
+        await Organization.findByIdAndUpdate(user.currentOrganizationId,{
+          plan: "ADMIN"
         });
-        console.log(`Organization ${user.currentOrganizationId} upgraded to ADMIN plan`);
-      } else {
-        console.warn(`User ${userId} has no organization to upgrade.`);
+        console.log('Organization${user.currentOrganizationId} upgraded to ADMIN plan')
       }
-
-      // 4. Nâng Role User
-      await User.findByIdAndUpdate(userId, { role: "Admin" });
-      console.log("User role updated to ADMIN");
-
+      await User.findByIdAndUpdate(userId,{role: "Admin"})
     } catch (err) {
       console.error("Database update failed:", err);
     }
