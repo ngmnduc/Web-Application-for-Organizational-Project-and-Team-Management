@@ -47,9 +47,6 @@ const SignUpPage = () => {
         navigate('/pending'); 
     } else {
         navigate('/home');
-    } else {
-        // Mặc định: Về Dashboard (thay vì Pricing, vì đã có org rồi)
-        navigate('/home');
     }
   };
 
