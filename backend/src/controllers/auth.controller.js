@@ -421,39 +421,57 @@ export async function me(req, res, next) {
   }
 }
 
-// PUT /auth/:id/role  (Admin only)
+
+// PUT /auth/:id/role
 export async function promoteRole(req, res, next) {
   try {
     const { id } = req.params;
     const { role } = req.body || {};
     const newRole = role || "Manager";
 
-    // validate role
-    if (!Array.isArray(User.schema.path("role").enumValues) || !User.schema.path("role").enumValues.includes(newRole)) {
-      // fallback: check common roles
-      const allowed = ["Admin", "Manager", "Member"];
-      if (!allowed.includes(newRole)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
+  
+    const allowed = ["Admin", "Manager", "Member"];
+    if (!allowed.includes(newRole)) {
+        return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
     }
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ success: false, error: "NotFoundError", message: "User not found" });
 
+    // 2. Update Role Hệ Thống
     user.role = newRole;
     await user.save();
 
+    // 3. === LOGIC ĐỒNG BỘ SANG PROJECT (AUTO-SYNC) ===
+    if (user.currentOrganizationId) {
+        // Map role hệ thống sang role dự án
+        // Hệ thống: Admin/Manager/Member -> Dự án: Admin/Manager/Member
+        let projectRole = newRole;
+
+        // Cập nhật tất cả dự án trong Org mà user này đang tham gia
+        await ProjectMember.updateMany(
+            { 
+                userId: user._id, 
+                organizationId: user.currentOrganizationId 
+            },
+            { 
+                $set: { roleInProject: projectRole } 
+            }
+        );
+        console.log(`[SYNC] Role synced: User ${user.email} is now ${projectRole} in all projects.`);
+    }
+    // ==================================================
+    
+    // Trả về data mới nhất
     const publicUser = {
       id: user._id,
       name: user.name,
       email: user.email,
-      avatar: user.avatar,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
+      role: user.role, // Role mới
       status: user.status,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
     };
 
-    return res.json({ success: true, message: "User role updated", data: { user: publicUser } });
+    return res.json({ success: true, message: "User role updated and synced", data: { user: publicUser } });
   } catch (err) {
     next(err);
   }

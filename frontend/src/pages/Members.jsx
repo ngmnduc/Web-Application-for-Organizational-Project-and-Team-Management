@@ -371,7 +371,39 @@ const Members = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const handleChangeRole = async (userId, newRole) => { /*...*/ };
+    const handleChangeRole = async (userId, newRole) => { 
+        try {
+            // 1. Gọi API update role
+            const res = await fetch(`${API_BASE_URL}/auth/${userId}/role`, {
+                method: 'PUT',
+                headers: getHeaders(),
+                body: JSON.stringify({ role: newRole })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                showNotification(`Updated role to ${newRole}`, "success");
+                
+                // 2. Cập nhật ngay UI mà không cần F5
+                setMembers(prevMembers => prevMembers.map(member => {
+                    if (member.id === userId) {
+                        return { 
+                            ...member, 
+                            role: newRole,        // Update role hiển thị
+                            systemRole: newRole   // Update role hệ thống
+                        };
+                    }
+                    return member;
+                }));
+            } else {
+                showNotification(data.message || "Failed to update role", "error");
+            }
+        } catch (error) {
+            console.error("Change role error:", error);
+            showNotification("Error updating role", "error");
+        }
+    };
 
     // --- FIX: REMOVE MEMBER (Tìm đúng ID để xóa) ---
     const handleRemoveClick = (member) => {

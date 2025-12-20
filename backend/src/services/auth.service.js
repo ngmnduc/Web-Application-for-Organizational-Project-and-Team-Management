@@ -35,12 +35,6 @@ export const createUser = async (name, email, password) => {
   } else {
     user = await User.create({ name, email, password, role });
   }
-    let user;
-  if (session) {
-    [user] = await User.create([{ name, email, password, role }], { session });
-  } else {
-    user = await User.create({ name, email, password, role });
-  }
 
   // Generate token (no organizationId for first user/admin)
   const token = signToken({ 
