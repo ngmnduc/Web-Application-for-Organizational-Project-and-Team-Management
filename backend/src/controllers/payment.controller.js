@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import User from "../models/user.model.js";
-
+import Organization from "../models/organization.model.js";
 dotenv.config();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -73,16 +73,24 @@ export const handleWebhook = async (req, res) => {
     console.error(`Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
   if (event.type === "checkout.session.completed") {
+    
+    // 1.  Phải lấy session và userId từ event trước
     const session = event.data.object;
-    const userId = session.metadata.userId;
-
-    console.log(` Payment success for User ID: ${userId}`);
+    const userId = session.metadata.userId; // Lấy từ metadata lúc tạo session
 
     try {
-      await User.findByIdAndUpdate(userId, { role: "Admin" });
-      console.log(" User role updated to ADMIN");
+      console.log(`Payment success for User ID: ${userId}`);
+
+    try {
+      const user = await User.findOne(userId);
+      if (user && user.currentOrganizationId){
+        await Organization.findByIdAndUpdate(user.currentOrganizationId,{
+          plan: "ADMIN"
+        });
+        console.log('Organization${user.currentOrganizationId} upgraded to ADMIN plan')
+      }
+      await User.findByIdAndUpdate(userId,{role: "Admin"})
     } catch (err) {
       console.error("Database update failed:", err);
     }

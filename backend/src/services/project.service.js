@@ -597,10 +597,13 @@ export const getProjectMembers = async (projectId, currentOrganizationId) => {
   return members.map((m) => {
     if (!m.userId) return null;
 
+    let realRole = m.roleInProject;
+    
+    if (m.userId.role === 'Admin') realRole = 'Admin';
+    else if (m.userId.role === 'Manager') realRole = 'Manager';
+
     return {
       _id: m._id, // Đây là membershipId (để xóa member khỏi project)
-      
-      // --- QUAN TRỌNG: Gom thông tin user vào object 'user' ---
       user: {
           _id: m.userId._id,
           name: m.userId.name,
@@ -611,17 +614,15 @@ export const getProjectMembers = async (projectId, currentOrganizationId) => {
       // --------------------------------------------------------
 
       // Các field của ProjectMember giữ ở ngoài
-      role: m.roleInProject,        // Frontend dùng field này để hiển thị select box
-      roles: [m.roleInProject],     // Frontend dùng mảng này để check quyền
-      projectRole: m.roleInProject, 
-      
+      role: realRole,       
+      roles: [realRole],    
+      projectRole: realRole,      
       status: m.status,
       joinedAt: m.createdAt
     };
   }).filter(m => m !== null);
 };
 
-// ... (Các hàm bên dưới giữ nguyên)
 /**
  * Get pending join requests across all projects
  */
@@ -860,13 +861,19 @@ export const joinProjectByCode = async (inviteCode, userId, currentOrganizationI
       }
       throw new Error('ALREADY_MEMBER');
     }
+    const currentUser = await User.findById(userId).session(session);
+    
+    // Nếu là Sếp, vào dự án set luôn là Sếp
+    let projectRole = "Member";
+    if (currentUser.role === 'Admin') projectRole = 'Admin';
+    if (currentUser.role === 'Manager') projectRole = 'Manager';
 
     //  Add to ProjectMember
     await ProjectMember.create([{
       projectId: project._id,
       userId,
       organizationId: targetOrgId,
-      roleInProject: "Member", // Role trong project
+      roleInProject: "projectRole", // Role trong project
       status: "PENDING"
     }], { session });
     
