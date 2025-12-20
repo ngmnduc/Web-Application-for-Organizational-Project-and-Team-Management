@@ -73,12 +73,11 @@ export const handleWebhook = async (req, res) => {
     console.error(`Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
   if (event.type === "checkout.session.completed") {
+    
+    // 1.  Phải lấy session và userId từ event trước
     const session = event.data.object;
-    const userId = session.metadata.userId;
-
-    console.log(` Payment success for User ID: ${userId}`);
+    const userId = session.metadata.userId; // Lấy từ metadata lúc tạo session
 
     try {
       const user = await User.findOne(userId);

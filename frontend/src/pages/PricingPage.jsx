@@ -132,9 +132,12 @@ export default function PricingPage() {
             <img src={logoIcon} alt="Logo Icon" className="w-14 h-14 object-contain transition-transform group-hover:scale-105" />
             <img src={logoText} alt="Syncora Text" className="h-8 object-contain transition-transform group-hover:scale-105" />
         </div>
-        <Link to="/introduction" className="flex items-center gap-2 px-6 py-2 border border-orange-500 text-orange-500 rounded-lg hover:bg-orange-500 hover:text-black transition-all duration-300 font-medium">
+        <button 
+          onClick={() => navigate('/')} 
+          className="flex items-center gap-2 px-6 py-2 border border-orange-500 text-orange-500 rounded-lg hover:bg-orange-500 hover:text-black transition-all duration-300 font-medium"
+        >
           <ArrowLeft className="w-4 h-4" /> Back
-        </Link>
+        </button>
       </nav>
 
       <div className="relative z-10 container mx-auto px-6 py-10">
