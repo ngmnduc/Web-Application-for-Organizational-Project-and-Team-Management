@@ -402,6 +402,12 @@ export async function me(req, res, next) {
         const user = req.user;
         if (!user) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
         
+        let organization = null;
+        if (user.currentOrganizationId) {
+            organization = await Organization.findById(user.currentOrganizationId)
+                .select('name ownerId status plan createdAt'); // Lấy trường Plan
+        }
+
         // Format user response
         const publicUser = {
           id: user._id,
@@ -415,7 +421,8 @@ export async function me(req, res, next) {
           updatedAt: user.updatedAt,
         };
         
-        return res.json({ success: true, data: { user: publicUser } });
+        // Trả về cả User và Organization (chứa Plan mới nhất)
+        return res.json({ success: true, data: { user: publicUser, organization } });
       } catch (err) {
         next(err);
       }
