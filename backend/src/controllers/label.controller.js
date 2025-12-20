@@ -1,6 +1,5 @@
 import Label from "../models/label.model.js";
 import Project from "../models/project.model.js";
-import Label from "../models/label.model.js"; // <--- Import Model Label
 import mongoose from "mongoose";
 
 // GET /projects/:id/labels
@@ -19,7 +18,6 @@ export const getLabels = async (req, res) => {
 
     res.json({ success: true, data: labels });
   } catch (err) {
-    console.error("Get Labels Error:", err);
     console.error("Get Labels Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
