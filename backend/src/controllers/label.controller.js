@@ -1,5 +1,6 @@
 import Label from "../models/label.model.js";
 import Project from "../models/project.model.js";
+import Label from "../models/label.model.js"; // <--- Import Model Label
 import mongoose from "mongoose";
 
 // GET /projects/:id/labels
@@ -19,6 +20,7 @@ export const getLabels = async (req, res) => {
     res.json({ success: true, data: labels });
   } catch (err) {
     console.error("Get Labels Error:", err);
+    console.error("Get Labels Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -36,6 +38,7 @@ export const createLabel = async (req, res) => {
       return res.status(400).json({ success: false, error: "ValidationError", message: "Label name is required" });
     }
 
+    // 1. Phải tìm Project trước để lấy organizationId (Model Label bắt buộc trường này)
     const project = await Project.findById(id);
     if (!project || project.deletedAt) {
       return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
@@ -54,7 +57,9 @@ export const createLabel = async (req, res) => {
       message: "Label created successfully", 
       data: newLabel
     });
+
   } catch (err) {
+    console.error("Create Label Error:", err);
     console.error("Create Label Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
@@ -87,6 +92,7 @@ export const updateLabel = async (req, res) => {
 
     res.json({ success: true, message: "Label updated", data: updatedLabel });
   } catch (err) {
+    console.error("Update Label Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -111,7 +117,9 @@ export const deleteLabel = async (req, res) => {
     }
 
     res.json({ success: true, message: "Label deleted" });
+
   } catch (err) {
+    console.error("Delete Label Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
