@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { signup } from '../services/authService'; // Bỏ import login vì không dùng nữa
-import { signup } from '../services/authService'; // Bỏ import login vì không dùng nữa
 import { useAuth } from '../services/AuthContext';
 import tag from '../assets/images/logo.png';
-import { Mail, Lock } from "lucide-react"; // Bỏ import User icon nếu không dùng
 import { Mail, Lock } from "lucide-react"; // Bỏ import User icon nếu không dùng
 import { GoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../services/authService';
