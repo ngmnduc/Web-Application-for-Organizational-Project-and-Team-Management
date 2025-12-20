@@ -58,7 +58,6 @@ export const createLabel = async (req, res) => {
 
   } catch (err) {
     console.error("Create Label Error:", err);
-    console.error("Create Label Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
