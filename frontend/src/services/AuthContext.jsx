@@ -2,40 +2,84 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
 
+// Định nghĩa URL API 
+const API_URL = "http://localhost:4000/api"; 
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true); 
 
-  // Load từ localStorage khi refresh
+  // Gọi API lấy User mới nhất mỗi khi tải trang
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) setUser(JSON.parse(savedUser));
+    const initAuth = async () => {
+      const token = localStorage.getItem("token");
+      const savedUser = localStorage.getItem("user");
+
+      // 1. Hiển thị tạm dữ liệu cũ để người dùng không thấy màn hình trắng
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // 2. Gọi API /auth/me để lấy dữ liệu "tươi" từ DB
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          // 3. Cập nhật lại State và LocalStorage với dữ liệu mới (Role Manager)
+          setUser(data.data.user);
+          localStorage.setItem("user", JSON.stringify(data.data.user));
+          console.log("🔄 Auth Context: User data refreshed from server");
+        } else {
+          // Nếu token hết hạn hoặc lỗi -> Logout
+          logout();
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        // Nếu lỗi mạng, vẫn giữ user cũ từ localStorage
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
-  //  1. Logic đổi theme mỗi khi user thay đổi
+  //  Logic đổi theme
   useEffect(() => {
     if (user && user.role === "Admin") {
       document.body.classList.add("admin-theme");
     } else {
       document.body.classList.remove("admin-theme");
     }
-  }, [user]); //  chạy mỗi khi user login/logout
-
+  }, [user]);
 
   const saveLogin = (userData, token) => {
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("token", token);
-    setUser(userData);  //  React state → mọi component cập nhật ngay
+    setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     document.body.classList.remove("admin-theme");
-    setUser(null); //  Re-render toàn app
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, saveLogin, logout, setUser }}>
+    <AuthContext.Provider value={{ user, saveLogin, logout, setUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
