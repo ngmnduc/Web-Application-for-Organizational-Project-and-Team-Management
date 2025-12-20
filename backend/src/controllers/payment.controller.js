@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import User from "../models/user.model.js";
+import Organization from "../models/organization.model.js"; 
 
 dotenv.config();
 
@@ -78,11 +79,25 @@ export const handleWebhook = async (req, res) => {
     const session = event.data.object;
     const userId = session.metadata.userId;
 
-    console.log(` Payment success for User ID: ${userId}`);
+    console.log(`Payment success for User ID: ${userId}`);
 
     try {
-      await User.findByIdAndUpdate(userId, { role: "Admin" });
-      console.log(" User role updated to ADMIN");
+      const user = await User.findById(userId);
+      if (user && user.currentOrganizationId) {
+          await Organization.findByIdAndUpdate(user.currentOrganizationId, { 
+              plan: "PREMIUM" 
+          });
+          console.log(`Organization ${user.currentOrganizationId} upgraded to PREMIUM`);
+
+          if (user.role !== "Admin") {
+              user.role = "Admin";
+              await user.save();
+              console.log("User role updated to ADMIN");
+          }
+      } else {
+          console.error("⚠️ User not found or no Organization linked.");
+      }
+
     } catch (err) {
       console.error("Database update failed:", err);
     }

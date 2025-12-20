@@ -1,12 +1,13 @@
 import axiosInstance from "./api";
 
-export const signup = async (name, email, password, inviteCode = null) => {
+export const signup = async (name, email, password, inviteCode = null, plan = null) => {
   try {
     const response = await axiosInstance.post("/auth/signup", {
       name,
       email,
       password,
-      inviteCode, 
+      inviteCode,
+      plan,
     });
 
     if (response.data?.data?.token) {

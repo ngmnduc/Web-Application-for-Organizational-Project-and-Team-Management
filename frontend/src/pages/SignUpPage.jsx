@@ -71,9 +71,8 @@ const SignUpPage = () => {
       setIsLoading(true);
       const name = `${formData.firstName} ${formData.lastName}`.trim();
       const inviteCode = location.state?.code || null;
-      
-      // --- LOGIC MỚI: Gọi Signup và nhận Token luôn ---
-      const response = await signup(name, formData.email, formData.password, inviteCode);
+      const plan = location.state?.plan || 'Free'; 
+      const response = await signup(name, formData.email, formData.password, inviteCode, plan);
       
       // Backend trả về: { success: true, data: { token, user... } }
       // Service trả về: response.data
