@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { signup, login } from '../services/authService'; 
+import { signup } from '../services/authService'; // Bỏ import login vì không dùng nữa
 import { useAuth } from '../services/AuthContext';
 import tag from '../assets/images/logo.png';
-import { Mail, Lock, User } from "lucide-react";
+import { Mail, Lock } from "lucide-react"; // Bỏ import User icon nếu không dùng
 import { GoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../services/authService';
 
@@ -41,10 +41,9 @@ const SignUpPage = () => {
 
     // 2. Xử lý Join Project
     if (location.state?.action === 'join' && location.state?.code) {
-        navigate('/home');
+        navigate('/pending'); 
     } else {
-        // Mặc định về Pricing nếu không có action gì đặc biệt
-        navigate('/pricing');
+        navigate('/home');
     }
   };
 
@@ -69,23 +68,21 @@ const SignUpPage = () => {
     try {
       setIsLoading(true);
       const name = `${formData.firstName} ${formData.lastName}`.trim();
-      
       const inviteCode = location.state?.code || null;
       
-      // Truyền inviteCode vào hàm signup để Backend xử lý
-      await signup(name, formData.email, formData.password, inviteCode);
+      // --- Gọi Signup và nhận Token luôn ---
+      const response = await signup(name, formData.email, formData.password, inviteCode);
       
-      // Auto login ngay sau khi đăng ký thành công
-      const res = await login(formData.email, formData.password);
-      const user = res.data?.user || res.user; 
-      const token = res.data?.token || res.token;
+      const token = response.data?.token || response.token; 
+      const user = response.data?.user || response.user;
 
       if (user && token) {
-          saveLogin(user, token);
-          await handlePostSignupRedirect(token);
+          saveLogin(user, token); // Lưu token vào Context
+          await handlePostSignupRedirect(token); // Điều hướng ngay
       } else {
           navigate('/login');
       }
+
     } catch (err) {
       console.error(err);
       setError(err.error?.message || err.message || 'Signup failed.');

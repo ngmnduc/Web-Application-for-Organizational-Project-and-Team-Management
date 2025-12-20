@@ -3,7 +3,6 @@ import Organization from "../models/organization.model.js";
 import Project from "../models/project.model.js"; 
 import ProjectMember from "../models/projectMember.model.js"; 
 import OrganizationMember from "../models/organizationMember.model.js";
-import ActivityLog from "../models/activityLog.model.js"; // ✅ THÊM
 import { signToken } from "../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
 import crypto from "crypto";
@@ -124,7 +123,7 @@ export async function signup(req, res, next) {
         userId: user._id,
         organizationId: finalOrganizationId,
         roleInOrganization: "ORG_MEMBER"
-      }], { session }); // 
+      }], { session }); 
 
       // C. Add to ProjectMember
       const existingPrjMem = await ProjectMember.findOne({ 
@@ -138,25 +137,9 @@ export async function signup(req, res, next) {
           projectId: projectToJoin._id,
           organizationId: finalOrganizationId,
           roleInProject: "Member",
-          status: "ACTIVE"
+          status: "PENDING"
         }], { session }); 
       }
-
-      // D. ACTIVITY LOG: User joined project
-      await ActivityLog.create([{
-        userId: user._id,
-        organizationId: finalOrganizationId,
-        projectId: projectToJoin._id,
-        action: "PROJECT_MEMBER_ADDED",
-        entityType: "ProjectMember",
-        entityId: user._id,
-        description: `${user.name} joined the project via invite code`,
-        metadata: {
-          inviteCode: inviteCode.toUpperCase().trim(),
-          projectName: projectToJoin.name,
-          role: "Member"
-        }
-      }], { session }); 
 
     } 
     //  CASE 2: CREATE NEW ORGANIZATION
@@ -174,7 +157,7 @@ export async function signup(req, res, next) {
           allowLateCheckIn: true,
           lateThresholdMinutes: 15
         }
-      }], { session }); //  Create với session
+      }], { session }); 
 
       finalOrganizationId = newOrg._id;
       finalOrgObj = newOrg;
@@ -190,21 +173,8 @@ export async function signup(req, res, next) {
         userId: user._id,
         organizationId: newOrg._id,
         roleInOrganization: "ORG_ADMIN"
-      }], { session }); // Create với session
+      }], { session }); 
 
-      // ACTIVITY LOG: Organization created
-      await ActivityLog.create([{
-        userId: user._id,
-        organizationId: newOrg._id,
-        action: "ORGANIZATION_CREATED",
-        entityType: "Organization",
-        entityId: newOrg._id,
-        description: `${user.name} created organization "${newOrg.name}"`,
-        metadata: {
-          organizationName: newOrg.name,
-          plan: newOrg.plan
-        }
-      }], { session }); //  Create với session
     }
 
     //  COMMIT TRANSACTION 
@@ -451,39 +421,57 @@ export async function me(req, res, next) {
   }
 }
 
-// PUT /auth/:id/role  (Admin only)
+
+// PUT /auth/:id/role
 export async function promoteRole(req, res, next) {
   try {
     const { id } = req.params;
     const { role } = req.body || {};
     const newRole = role || "Manager";
 
-    // validate role
-    if (!Array.isArray(User.schema.path("role").enumValues) || !User.schema.path("role").enumValues.includes(newRole)) {
-      // fallback: check common roles
-      const allowed = ["Admin", "Manager", "Member"];
-      if (!allowed.includes(newRole)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
+  
+    const allowed = ["Admin", "Manager", "Member"];
+    if (!allowed.includes(newRole)) {
+        return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
     }
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ success: false, error: "NotFoundError", message: "User not found" });
 
+    // 2. Update Role Hệ Thống
     user.role = newRole;
     await user.save();
 
+    // 3. === LOGIC ĐỒNG BỘ SANG PROJECT (AUTO-SYNC) ===
+    if (user.currentOrganizationId) {
+        // Map role hệ thống sang role dự án
+        // Hệ thống: Admin/Manager/Member -> Dự án: Admin/Manager/Member
+        let projectRole = newRole;
+
+        // Cập nhật tất cả dự án trong Org mà user này đang tham gia
+        await ProjectMember.updateMany(
+            { 
+                userId: user._id, 
+                organizationId: user.currentOrganizationId 
+            },
+            { 
+                $set: { roleInProject: projectRole } 
+            }
+        );
+        console.log(`[SYNC] Role synced: User ${user.email} is now ${projectRole} in all projects.`);
+    }
+    // ==================================================
+    
+    // Trả về data mới nhất
     const publicUser = {
       id: user._id,
       name: user.name,
       email: user.email,
-      avatar: user.avatar,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
+      role: user.role, // Role mới
       status: user.status,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
     };
 
-    return res.json({ success: true, message: "User role updated", data: { user: publicUser } });
+    return res.json({ success: true, message: "User role updated and synced", data: { user: publicUser } });
   } catch (err) {
     next(err);
   }
