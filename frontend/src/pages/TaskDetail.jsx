@@ -13,6 +13,8 @@ import {
 } from "../services/taskService";
 import { useAuth } from "../services/AuthContext"; // Import useAuth
 import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon, SparklesIcon } from "@heroicons/react/24/solid";
+import { toast } from "react-toastify";
+import Swal from 'sweetalert2';
 
 const TaskDetail = () => {
   const { taskId } = useParams();
@@ -151,7 +153,7 @@ const TaskDetail = () => {
      
     } catch (err) {
       console.error("Create subtask error:", err);
-      alert("Không tạo được sub-task: " + (err.message || "Lỗi server"));
+      toast.error("Cannot create sub-task: " + (err.message || "Server error"));
       setError("Failed to create sub-task");
     } finally {
       setIsCreatingSubtask(false);
@@ -171,7 +173,18 @@ const TaskDetail = () => {
   };
 
   const handleDeleteSubtask = async (subtaskId) => {
-    if (!window.confirm("Delete this sub-task?")) return;
+    const result = await Swal.fire({
+      title: 'Delete this sub-task?',
+      text: "This action cannot be undone.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'OK',
+      cancelButtonText: 'Cancel'
+  });
+    if (!result.isConfirmed) return;
+    
     try {
       await deleteSubtask(taskId, subtaskId);
       const updatedTask = await getTaskById(taskId);
@@ -214,7 +227,7 @@ const TaskDetail = () => {
       const newSubtasks = await generateAiSubtasks(taskId);
       
       if (!newSubtasks || newSubtasks.length === 0) {
-        alert("AI returned no subtasks.");
+        toast.error("AI returned no subtasks.");
         return;
       }
       
@@ -225,18 +238,18 @@ const TaskDetail = () => {
       
       //  Set cooldown sau khi thành công
       setCooldownSeconds(5);
-      alert(` AI created ${newSubtasks.length} subtasks!`);
+      toast.success(` AI created ${newSubtasks.length} subtasks!`);
       
     } catch (err) {
       console.error("❌ AI Error:", err);
       
       //  Xử lý lỗi cụ thể
       if (err.response?.status === 429 || err.message?.includes("quota")) {
-        alert("⚠️ AI quota exceeded. Please try again later (quota resets daily).");
+        toast.error("⚠️ AI quota exceeded. Please try again later (quota resets daily).");
       } else if (err.message?.includes("timeout")) {
-        alert("⏱️ AI request timed out. Please try again.");
+        toast.error("⏱️ AI request timed out. Please try again.");
       } else {
-        alert("❌ AI Error: " + (err.message || "Cannot create subtasks"));
+        toast.error("❌ AI Error: " + (err.message || "Cannot create subtasks"));
       }
       
     } finally {
@@ -286,11 +299,11 @@ const TaskDetail = () => {
         }));
         
         setIsEditOpen(false);
-        alert("Task updated successfully!"); // Báo thành công
+        toast.success("Task updated successfully!"); // Báo thành công
     } catch (err) {
         console.error("Update task failed", err);
         // Hiển thị chi tiết lỗi từ backend nếu có
-        alert("Failed to update task: " + (err.message || JSON.stringify(err)));
+        toast.error("Failed to update task: " + (err.message || JSON.stringify(err)));
     }
   };
 
@@ -307,7 +320,7 @@ const TaskDetail = () => {
 
   const handleAddAttachment = async () => {
     if (!newAttachmentUrl.trim()) {
-        alert("URL cannot be empty.");
+        toast.error("URL cannot be empty.");
         return;
     }
     
@@ -331,7 +344,7 @@ const TaskDetail = () => {
     
     // --- END: Thay thế logic giả lập này bằng API thực ---
 
-    alert("Attachment added (Mock Success). Remember to implement API call!");
+    toast.success("Attachment added (Mock Success). Remember to implement API call!");
   };
 
  // ========== RENDER GUARDS ==========

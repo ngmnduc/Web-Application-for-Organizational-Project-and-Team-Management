@@ -1,4 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import LoginPage from "./pages/LoginPage.jsx";
 import MainLayout from "./layouts/MainLayout.jsx";
 import HomePage from "./pages/HomePage.jsx";
@@ -21,6 +23,20 @@ import PendingPage from "./pages/PendingPage.jsx";
 
 function App() {
   return (
+    <>
+      {/* ---  ĐẶT TOAST CONTAINER Ở ĐÂY (NÓ SẼ NẰM ĐÈ LÊN MỌI TRANG) --- */}
+      <ToastContainer 
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     <Routes>
       
       {/* trang mặc định */}
@@ -73,7 +89,8 @@ function App() {
 
       {/* fallback 404 */}
       <Route path="*" element={<div>404 - Page not found</div>} />
-    </Routes>
+      </Routes>
+    </> 
   );
 }
 
