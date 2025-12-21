@@ -139,12 +139,37 @@ export const listProjects = async (filters = {}, userId, userRole) => {
     .populate('createdBy', 'name email')
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean();
+
+  // Thêm memberCount và members cho mỗi project
+  const projectsWithMembers = await Promise.all(
+    projects.map(async (project) => {
+      const members = await ProjectMember.find({ 
+        projectId: project._id,
+        status: 'ACTIVE'
+      })
+        .populate('userId', 'name email role avatar _id')
+        .lean();
+
+      return {
+        ...project,
+        memberCount: members.length,
+        members: members.map(m => ({
+          _id: m._id,
+          user: m.userId,
+          role: m.roleInProject,
+          status: m.status,
+          joinedAt: m.createdAt
+        }))
+      };
+    })
+  );
 
   const total = await Project.countDocuments(query);
 
   return {
-    projects,
+    projects: projectsWithMembers,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };
 };
@@ -167,13 +192,31 @@ export const getProjectById = async (projectId, currentOrganizationId) => {
     deletedAt: null
   })
     .populate('createdBy', 'name email')
-    //.populate('members.user', 'name email role avatar');
+    .lean();
 
   if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  return project;
+  // Thêm members và memberCount
+  const members = await ProjectMember.find({ 
+    projectId: project._id,
+    status: 'ACTIVE'
+  })
+    .populate('userId', 'name email role avatar _id')
+    .lean();
+
+  return {
+    ...project,
+    memberCount: members.length,
+    members: members.map(m => ({
+      _id: m._id,
+      user: m.userId,
+      role: m.roleInProject,
+      status: m.status,
+      joinedAt: m.createdAt
+    }))
+  };
 };
 
 /**

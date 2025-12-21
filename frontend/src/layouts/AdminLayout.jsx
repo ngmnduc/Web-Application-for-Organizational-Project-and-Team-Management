@@ -26,7 +26,7 @@ const AdminLayout = () => {
 
     if (path === '/admin/tasks') {
       setHeaderData({
-        title: 'My Tasks',
+        title: 'Admin Tasks',
         subtitle: 'Manage and track your assigned tasks across all projects',
       });
     } else if (path.startsWith('/admin/tasks/')) {
@@ -47,7 +47,7 @@ const AdminLayout = () => {
       });
     } else if (path === '/admin/projects') {
       setHeaderData({
-        title: 'Test Workspace',
+        title: 'Projects',
         subtitle: 'Manage all projects and their collaboration',
       });
     } else if (path === '/admin/notifications') {
@@ -63,8 +63,8 @@ const AdminLayout = () => {
     } else {
       // /admin/home hoặc mọi đường dẫn admin khác
       setHeaderData({
-        title: 'Dashboard',
-        subtitle: 'Welcome to your dashboard',
+        title: 'Admin Dashboard',
+        subtitle: 'Check your projects status and more',
       });
     }
   }, [location.pathname]);
