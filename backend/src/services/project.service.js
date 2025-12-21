@@ -98,7 +98,7 @@ export const createProject = async (projectData, creatorId, currentOrganizationI
 };
 
 /**
- * Get all projects (with filters)
+ * Get all projects 
  */
 export const listProjects = async (filters = {}, userId, userRole) => {
   // organizationId is required
@@ -106,16 +106,22 @@ export const listProjects = async (filters = {}, userId, userRole) => {
     throw new Error('ORGANIZATION_ID_REQUIRED');
   }
 
-  const query = { 
-    deletedAt: null,
-    organizationId: filters.organizationId
+  const organizationId = new mongoose.Types.ObjectId(filters.organizationId);
+  const page = parseInt(filters.page) || 1;
+  const limit = parseInt(filters.limit) || 20;
+  const skip = (page - 1) * limit;
+
+  // 1. Build Match Stage
+  const matchStage = {
+    organizationId: organizationId,
+    deletedAt: null
   };
 
-  // --- LOGIC MỚI: NẾU KHÔNG PHẢI ADMIN/MANAGER, CHỈ LẤY DỰ ÁN ĐÃ ACTIVE ---
-  // Nếu là Admin/Manager của Org thì xem được hết 
-  // Nếu là Member thường -> Phải check bảng ProjectMember xem đã ACTIVE chưa
+  if (filters.status) matchStage.status = filters.status;
+  if (filters.archived !== undefined) matchStage.isArchived = filters.archived === 'true';
+
+  // 2. Authorization
   if (userRole !== 'Admin' && userRole !== 'Manager') {
-      // 1. Tìm tất cả các project mà user này là thành viên ACTIVE
       const activeMemberships = await ProjectMember.find({
           userId: userId,
           organizationId: filters.organizationId,
@@ -123,53 +129,116 @@ export const listProjects = async (filters = {}, userId, userRole) => {
       }).select('projectId');
 
       const activeProjectIds = activeMemberships.map(m => m.projectId);
-
-      // 2. Thêm điều kiện vào query: Chỉ lấy project nằm trong list Active này
-      query._id = { $in: activeProjectIds };
+      matchStage._id = { $in: activeProjectIds };
   }
 
-  if (filters.status) query.status = filters.status;
-  if (filters.archived !== undefined) query.isArchived = filters.archived === 'true';
+  // 3. AGGREGATION PIPELINE
+  const projects = await Project.aggregate([
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "tasks",
+        localField: "_id",
+        foreignField: "projectId",
+        as: "projectTasks"
+      }
+    },
+    {
+      $lookup: {
+        from: "projectmembers",
+        localField: "_id",
+        foreignField: "projectId",
+        as: "projectMembers"
+      }
+    },
+    {
+      $addFields: {
+        totalTasks: { $size: "$projectTasks" },
+        // Đếm số task DONE
+        doneTasks: {
+          $size: {
+            $filter: {
+              input: "$projectTasks",
+              as: "task",
+              cond: { 
+                $in: ["$$task.status", ["DONE", "Completed", "Done"]] 
+              }
+            }
+          }
+        },
+        activeMemberCount: {
+          $size: {
+            $filter: {
+              input: "$projectMembers",
+              as: "member",
+              cond: { $eq: ["$$member.status", "ACTIVE"] }
+            }
+          }
+        }
+      }
+    },
+    {
+      $addFields: {
+        progress: {
+          $cond: {
+            if: { $eq: ["$totalTasks", 0] },
+            then: 0,
+            else: { 
+              $round: [
+                { $multiply: [{ $divide: ["$doneTasks", "$totalTasks"] }, 100] }, 
+                0 
+              ] 
+            }
+          }
+        },
+        memberCount: "$activeMemberCount"
+      }
+    },
 
-  const page = parseInt(filters.page) || 1;
-  const limit = parseInt(filters.limit) || 20;
-  const skip = (page - 1) * limit;
+    // Populate Creator info 
+    {
+      $lookup: {
+        from: "users",
+        localField: "createdBy",
+        foreignField: "_id",
+        as: "creator"
+      }
+    },
+    {
+      $unwind: {
+        path: "$creator",
+        preserveNullAndEmptyArrays: true
+      }
+    },
 
-  const projects = await Project.find(query)
-    .populate('createdBy', 'name email')
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        description: 1,
+        status: 1,
+        deadline: 1,
+        createdAt: 1,
+        isArchived: 1,
+        progress: 1,     
+        memberCount: 1,   
+        totalTasks: 1,
+        doneTasks: 1,
+        createdBy: { _id: "$creator._id", name: "$creator.name", email: "$creator.email" }
+      }
+    },
 
-  // Thêm memberCount và members cho mỗi project
-  const projectsWithMembers = await Promise.all(
-    projects.map(async (project) => {
-      const members = await ProjectMember.find({ 
-        projectId: project._id,
-        status: 'ACTIVE'
-      })
-        .populate('userId', 'name email role avatar _id')
-        .lean();
+    // Sort & Pagination
+    { $sort: { createdAt: -1 } },
+    { $skip: skip },
+    { $limit: limit }
+  ]);
 
-      return {
-        ...project,
-        memberCount: members.length,
-        members: members.map(m => ({
-          _id: m._id,
-          user: m.userId,
-          role: m.roleInProject,
-          status: m.status,
-          joinedAt: m.createdAt
-        }))
-      };
-    })
-  );
-
-  const total = await Project.countDocuments(query);
+  // Count total documents for pagination info
+  const total = await Project.countDocuments(matchStage);
 
   return {
-    projects: projectsWithMembers,
+    projects,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };
 };
@@ -192,31 +261,13 @@ export const getProjectById = async (projectId, currentOrganizationId) => {
     deletedAt: null
   })
     .populate('createdBy', 'name email')
-    .lean();
+    //.populate('members.user', 'name email role avatar');
 
   if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Thêm members và memberCount
-  const members = await ProjectMember.find({ 
-    projectId: project._id,
-    status: 'ACTIVE'
-  })
-    .populate('userId', 'name email role avatar _id')
-    .lean();
-
-  return {
-    ...project,
-    memberCount: members.length,
-    members: members.map(m => ({
-      _id: m._id,
-      user: m.userId,
-      role: m.roleInProject,
-      status: m.status,
-      joinedAt: m.createdAt
-    }))
-  };
+  return project;
 };
 
 /**

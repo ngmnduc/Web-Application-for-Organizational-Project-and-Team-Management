@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     PlusIcon, 
-    UserPlusIcon,
     UsersIcon, 
     CalendarDaysIcon,
     ListBulletIcon,
@@ -14,67 +13,46 @@ import { LoaderOverlay } from '../components/LoaderOverlay';
 import { ErrorState } from '../components/ErrorState';
 import { EmptyState } from '../components/EmptyState';
 import NewProjectModal from '../components/NewProjectModal'; 
+import ProjectDetailDrawer from '../components/ProjectDetailDrawer';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-// --- Sub-component: Notification Banner ---
+// --- Sub-components (Định nghĩa ngay trong file để tránh lỗi import) ---
+
 const NotificationBanner = ({ message, type, onClose }) => {
     if (!message) return null;
-
     const bgColor = type === 'success' ? 'bg-green-50' : 'bg-red-50';
     const textColor = type === 'success' ? 'text-green-800' : 'text-red-800';
-    const borderColor = type === 'success' ? 'border-green-200' : 'border-red-200';
-    const Icon = type === 'success' ? CheckCircleIcon : ExclamationCircleIcon;
-
+    // --- FIX Z-INDEX HERE: Tăng lên z-[9999] ---
     return (
-        <div className={`fixed top-20 right-5 z-50 flex items-center p-4 mb-4 rounded-lg shadow-lg border ${bgColor} ${textColor} ${borderColor} animate-fade-in-down`}>
-            <Icon className="w-5 h-5 mr-3" />
+        <div className={`fixed top-20 right-5 z-[9999] flex items-center p-4 mb-4 rounded-lg shadow-lg border ${bgColor} ${textColor} border-opacity-50 animate-fade-in-down`}>
+            {type === 'success' ? <CheckCircleIcon className="w-5 h-5 mr-3" /> : <ExclamationCircleIcon className="w-5 h-5 mr-3" />}
             <div className="text-sm font-medium">{message}</div>
-            <button onClick={onClose} className="ml-4 hover:bg-black/5 rounded-full p-1">
-                <XMarkIcon className="w-4 h-4" />
-            </button>
+            <button onClick={onClose} className="ml-4 hover:bg-black/5 rounded-full p-1"><XMarkIcon className="w-4 h-4" /></button>
         </div>
     );
 };
 
-// --- Helper Functions ---
-const getHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('accessToken')}`
-});
-
-const formatDate = (dateString) => {
-    if (!dateString) return 'No deadline';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-};
-
-// --- Sub-components ---
 const StatusBadge = ({ status }) => {
-    let colors = '';
-    switch (status) {
-        case 'Completed': colors = 'bg-green-100 text-green-700'; break;
-        case 'Archived': colors = 'bg-gray-100 text-gray-600'; break;
-        default: colors = 'bg-blue-100 text-blue-700'; 
-    }
+    let colors = 'bg-blue-100 text-blue-700';
+    if (status === 'Completed') colors = 'bg-green-100 text-green-700';
+    if (status === 'Archived') colors = 'bg-gray-100 text-gray-600';
     return <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${colors}`}>{status || 'In Progress'}</span>;
 };
 
-const ProgressBar = ({ progress }) => (
+const ProgressBar = ({ progress = 0 }) => (
     <div className="w-full bg-gray-200 rounded-full h-1.5">
-        <div 
-            className="h-1.5 rounded-full" 
-            style={{ 
-                width: `${progress}%`,
-                backgroundColor: progress < 50 ? '#f97316' : (progress < 80 ? '#facc15' : '#22c55e') 
-            }}
-        ></div>
+        <div className="h-1.5 rounded-full" style={{ width: `${progress}%`, backgroundColor: progress < 50 ? '#f97316' : '#22c55e' }}></div>
     </div>
 );
 
-const ProjectCard = ({ project }) => {
+// --- Component Card ---
+const ProjectCard = ({ project, onClick }) => {
     return (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-5 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
+        <div 
+            onClick={() => onClick && onClick(project)}
+            className="bg-white rounded-xl shadow-lg border border-gray-100 p-5 flex flex-col justify-between hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1 duration-200"
+        >
             <div>
                 <div className="flex justify-between items-start mb-2">
                     <h3 className="text-base font-semibold text-gray-900 truncate" title={project.name}>{project.name}</h3>
@@ -94,52 +72,54 @@ const ProjectCard = ({ project }) => {
             <div className="mt-5 pt-4 border-t border-gray-100 flex justify-between text-sm text-gray-600">
                 <div className="flex items-center gap-1.5">
                     <UsersIcon className="w-4 h-4" />
-                    <span>{project.memberCount} members</span>
+                    <span>{project.memberCount || 0} members</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                     <CalendarDaysIcon className="w-4 h-4" />
-                    <span>{project.deadline ? formatDate(project.deadline) : 'No deadline'}</span>
+                    <span>{project.deadline ? new Date(project.deadline).toLocaleDateString() : 'No deadline'}</span>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- COMPONENT CHÍNH ---
+// --- Main Component ---
 const Projects = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);
     const [projects, setProjects] = useState([]);
     const [viewMode, setViewMode] = useState('grid'); 
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
-
-    // State thông báo
+    const [selectedProject, setSelectedProject] = useState(null);
     const [notification, setNotification] = useState({ message: '', type: '' });
 
-    const showNotification = (message, type = 'success') => {
-        setNotification({ message, type });
-        setTimeout(() => setNotification({ message: '', type: '' }), 3000);
+    // Lấy token an toàn
+    const getHeaders = () => {
+        const token = localStorage.getItem('token');
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+        };
     };
 
     const fetchProjects = useCallback(async () => {
         setIsLoading(true);
         setIsError(false);
         try {
-            const response = await fetch(`${API_BASE_URL}/projects`, {
-                headers: getHeaders()
-            });
-
+            const response = await fetch(`${API_BASE_URL}/projects`, { headers: getHeaders() });
+            
             if (!response.ok) throw new Error("Failed to fetch projects");
 
             const result = await response.json();
             const rawProjects = result.data || [];
-
+            
+            // Map dữ liệu an toàn
             const mappedProjects = rawProjects.map(p => ({
-                id: p._id,
-                name: p.name,
+                id: p._id || p.id,
+                name: p.name || 'Unnamed Project',
                 description: p.description,
-                status: 'In Progress', 
-                progress: Math.floor(Math.random() * 100), 
+                status: p.status || 'In Progress', 
+                progress: p.progress || Math.floor(Math.random() * 100), 
                 memberCount: p.members ? p.members.length : 1, 
                 deadline: p.deadline,
                 createdAt: p.createdAt
@@ -147,7 +127,7 @@ const Projects = () => {
 
             setProjects(mappedProjects);
         } catch (error) {
-            console.error(error);
+            console.error("Fetch Projects Error:", error);
             setIsError(true);
         } finally {
             setIsLoading(false);
@@ -158,86 +138,77 @@ const Projects = () => {
         fetchProjects();
     }, [fetchProjects]);
 
-    // Xử lý tạo dự án 
+    // Xử lý tạo dự án mới
     const handleAddProject = async (newProjectData) => {
         try {
             const response = await fetch(`${API_BASE_URL}/projects`, {
                 method: 'POST',
                 headers: getHeaders(),
-                body: JSON.stringify({
-                    name: newProjectData.name,
-                    description: newProjectData.description,
-                    // GỬI DỮ LIỆU LÊN SERVER
-                    deadline: newProjectData.deadline, 
-                    manager: newProjectData.manager 
-                })
+                body: JSON.stringify(newProjectData)
             });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Failed");
 
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.message || "Failed to create project");
-            }
-
-            showNotification("Project created successfully!", "success");
+            setNotification({ message: "Project created!", type: "success" });
             fetchProjects(); 
             setIsNewProjectModalOpen(false);
-
         } catch (error) {
-            showNotification(error.message, "error");
+            setNotification({ message: error.message, type: "error" });
         }
     };
 
+    // Hàm render nội dung chính
     const renderContent = () => {
-        if (isLoading) return <div className="h-64"><LoaderOverlay /></div>;
+        if (isLoading) return <div className="h-64 flex items-center justify-center"><LoaderOverlay /></div>;
+        
         if (isError) return <ErrorState message="Failed to load projects." onRetry={fetchProjects} />;
-        if (projects.length === 0) return <EmptyState title="No Projects Found" message="Get started by creating a new project." />;
+        
+        if (!projects || projects.length === 0) {
+            return <EmptyState title="No Projects Found" message="Get started by creating a new project." />;
+        }
         
         if (viewMode === 'grid') {
             return (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {projects.map(project => (
-                        <ProjectCard key={project.id} project={project} />
+                        <ProjectCard 
+                            key={project.id} 
+                            project={project} 
+                            onClick={setSelectedProject} // Truyền hàm set state trực tiếp
+                        />
                     ))}
                 </div>
             );
         }
         
-        if (viewMode === 'list') {
-            return (
-                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progress</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Members</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+        // List View
+        return (
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progress</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Members</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {projects.map(project => (
+                            <tr key={project.id} onClick={() => setSelectedProject(project)} className="hover:bg-gray-50 cursor-pointer transition-colors">
+                                <td className="px-6 py-4">
+                                    <div className="text-sm font-medium text-gray-900">{project.name}</div>
+                                    <div className="text-sm text-gray-500 truncate max-w-xs">{project.description}</div>
+                                </td>
+                                <td className="px-6 py-4"><StatusBadge status={project.status} /></td>
+                                <td className="px-6 py-4 w-48"><ProgressBar progress={project.progress} /></td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{project.memberCount} members</td>
                             </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {projects.map(project => (
-                                <tr key={project.id} className="hover:bg-gray-50 cursor-pointer">
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                                        <div className="text-sm text-gray-500 truncate max-w-xs">{project.description}</div>
-                                    </td>
-                                    <td className="px-6 py-4"><StatusBadge status={project.status} /></td>
-                                    <td className="px-6 py-4 w-48">
-                                        <div className="flex items-center">
-                                            <div className="w-full mr-3"><ProgressBar progress={project.progress} /></div>
-                                            <span className="text-sm font-medium text-gray-700">{project.progress}%</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">{project.memberCount} members</td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(project.createdAt)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            );
-        }
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
     };
 
     return (
@@ -283,6 +254,13 @@ const Projects = () => {
                 isOpen={isNewProjectModalOpen}
                 onClose={() => setIsNewProjectModalOpen(false)}
                 onAddProject={handleAddProject}
+            />
+
+            {/* Modal Detail Project */}
+            <ProjectDetailDrawer 
+                isOpen={!!selectedProject} 
+                onClose={() => setSelectedProject(null)} 
+                project={selectedProject} 
             />
         </div>
     );
