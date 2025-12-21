@@ -626,67 +626,6 @@ export async function resetPassword(req, res, next) {
 }
 
 export async function switchOrg(req, res, next) {
-<<<<<<< HEAD
-  try {
-    const { organizationId } = req.body;
-
-    if (!organizationId) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: "Organization ID is required",
-      });
-    }
-
-    // Switch organization using service
-    const result = await authService.switchOrganization(
-      req.user._id,
-      organizationId
-    );
-
-    return res.json({
-      success: true,
-      message: "Organization switched successfully",
-      data: {
-        token: result.token,
-        tokenType: "Bearer",
-        user: result.user,
-        organization: result.organization,
-      },
-    });
-  } catch (err) {
-    if (err.message === "NOT_ORGANIZATION_MEMBER") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "You are not a member of this organization",
-      });
-    }
-    if (err.message === "ORGANIZATION_INACTIVE") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "This organization has been deactivated. Please contact support.",
-      });
-    }
-    if (err.message === "ORGANIZATION_DELETED") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "This organization has been deleted.",
-      });
-    }
-    if (err.message === "USER_NOT_FOUND") {
-      return res.status(404).json({
-        success: false,
-        error: "NotFoundError",
-        message: "User not found",
-      });
-    }
-    next(err);
-  }
-}
-=======
     try {
         const { organizationId } = req.body;
     
@@ -746,4 +685,3 @@ export async function switchOrg(req, res, next) {
         next(err);
       }
 }
->>>>>>> 6067d3398960106dddd313942cf9441b611919bc
