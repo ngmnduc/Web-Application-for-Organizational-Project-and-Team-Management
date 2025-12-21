@@ -469,7 +469,7 @@ useEffect(() => {
     return {
       tooltip: { trigger: 'item' },
       series: [{
-        name: 'My Tasks', type: 'pie', radius: ['65%', '90%'], avoidLabelOverlap: false, label: { show: false },
+        name: 'My Tasks', type: 'pie', radius: ['60%', '90%'], avoidLabelOverlap: false, label: { show: false },
         data: validData.length ? validData : [{ value: 0, name: '', itemStyle: { color: '#f3f4f6' } }]
       }]
     };
@@ -708,7 +708,7 @@ useEffect(() => {
       )}
 
       {/* ================================================================================== */}
-      {/* 🔵 BLOCK 2: MANAGER DASHBOARD (Hiện cho Admin & Manager)                           */}
+      {/* 🔵 BLOCK 2: MANAGER DASHBOARD (Hiện cho Manager)                           */}
       {/* ================================================================================== */}
       {isManager && managerStats && (
         <section className="animate-in fade-in slide-in-from-top-4 duration-700 delay-100 ">
