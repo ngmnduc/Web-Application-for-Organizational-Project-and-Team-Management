@@ -1,6 +1,5 @@
 import Label from "../models/label.model.js";
 import Project from "../models/project.model.js";
-import Label from "../models/label.model.js"; // <--- Import Model Label
 import mongoose from "mongoose";
 
 // GET /projects/:id/labels

@@ -96,7 +96,7 @@ export const handleWebhook = async (req, res) => {
               console.log("User role updated to ADMIN");
           }
       } else {
-          console.error("⚠️ User not found or no Organization linked.");
+          console.error("User not found or no Organization linked.");
       }
 
     } catch (err) {
