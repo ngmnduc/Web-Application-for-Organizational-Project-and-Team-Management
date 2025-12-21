@@ -33,7 +33,7 @@ export async function signup(req, res, next) {
       });
     }
 
-    const { name, email, password, inviteCode } = req.body;
+    const { name, email, password, inviteCode, plan } = req.body;
 
     // 2.  CHECK INVITE CODE & VALIDATE PROJECT
     let projectToJoin = null;
@@ -137,18 +137,21 @@ export async function signup(req, res, next) {
           projectId: projectToJoin._id,
           organizationId: finalOrganizationId,
           roleInProject: "Member",
-          status: "ACTIVE"
+          status: "PENDING"
         }], { session }); 
       }
 
     } 
     //  CASE 2: CREATE NEW ORGANIZATION
     else {
+      const selectedPlan = (plan === "Admin" || plan === "PREMIUM") ? "PREMIUM" : "FREE";
+
       // Create default organization
       const [newOrg] = await Organization.create([{
         name: `${name}'s Organization`,
         ownerId: user._id,
         status: 'ACTIVE',
+        plan: selectedPlan, 
         allowedIps: [],
         attendanceSettings: {
           enableIpCheck: true,
@@ -194,7 +197,6 @@ export async function signup(req, res, next) {
       await sendWelcomeEmail(user.email, user.name);
     } catch (emailErr) {
       console.error("Failed to send welcome email:", emailErr);
-      // Không throw error vì transaction đã commit
     }
 
     // 6. Return response
@@ -303,7 +305,6 @@ export async function login(req, res, next) {
         }
     }
 
-    
     // Get organization info (optional)
    const tokenPayload = {
       sub: user._id.toString(),    
@@ -362,321 +363,325 @@ export async function login(req, res, next) {
   }
 }
 
-// POST /auth/google
 export async function handleGoogleLogin(req, res, next) {
-  try {
-    const { credential } = req.body;
-    if (!credential) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: "No credential provided",
-      });
-    }
-
-    // Handle Google auth using service
-    const result = await authService.handleGoogleAuth(credential);
-
-    return res.status(200).json({
-      success: true,
-      message: "Google login successful",
-      data: {
-        token: result.token,
-        tokenType: "Bearer",
-        user: result.user,
-      },
-    });
-  } catch (err) {
-    console.error("Google Auth Error:", err);
-    return res.status(400).json({
-      success: false,
-      error: "AuthenticationError",
-      message: "Google authentication failed",
-    });
-  }
+    try {
+        const { credential } = req.body;
+        if (!credential) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: "No credential provided",
+          });
+        }
+    
+        // Handle Google auth using service
+        const result = await authService.handleGoogleAuth(credential);
+    
+        return res.status(200).json({
+          success: true,
+          message: "Google login successful",
+          data: {
+            token: result.token,
+            tokenType: "Bearer",
+            user: result.user,
+          },
+        });
+      } catch (err) {
+        console.error("Google Auth Error:", err);
+        return res.status(400).json({
+          success: false,
+          error: "AuthenticationError",
+          message: "Google authentication failed",
+        });
+      }
 }
-// GET /auth/me
+
 export async function me(req, res, next) {
-  try {
-    // verifyToken middleware attaches req.user
-    const user = req.user;
-    if (!user) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
-    
-    // Format user response
-    const publicUser = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
-      status: user.status,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
-    
-    return res.json({ success: true, data: { user: publicUser } });
-  } catch (err) {
-    next(err);
-  }
+    try {
+        // verifyToken middleware attaches req.user
+        const user = req.user;
+        if (!user) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
+        
+        let organization = null;
+        if (user.currentOrganizationId) {
+            organization = await Organization.findById(user.currentOrganizationId)
+                .select('name ownerId status plan createdAt'); // Lấy trường Plan
+        }
+
+        // Format user response
+        const publicUser = {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+          status: user.status,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        };
+        
+        // Trả về cả User và Organization (chứa Plan mới nhất)
+        return res.json({ success: true, data: { user: publicUser, organization } });
+      } catch (err) {
+        next(err);
+      }
 }
 
-// PUT /auth/:id/role  (Admin only)
+
+// PUT /auth/:id/role
 export async function promoteRole(req, res, next) {
   try {
     const { id } = req.params;
     const { role } = req.body || {};
     const newRole = role || "Manager";
 
-    // validate role
-    if (!Array.isArray(User.schema.path("role").enumValues) || !User.schema.path("role").enumValues.includes(newRole)) {
-      // fallback: check common roles
-      const allowed = ["Admin", "Manager", "Member"];
-      if (!allowed.includes(newRole)) return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
+  
+    const allowed = ["Admin", "Manager", "Member"];
+    if (!allowed.includes(newRole)) {
+        return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
     }
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ success: false, error: "NotFoundError", message: "User not found" });
 
+    // 2. Update Role Hệ Thống
     user.role = newRole;
     await user.save();
 
+    // 3. === LOGIC ĐỒNG BỘ SANG PROJECT (AUTO-SYNC) ===
+    if (user.currentOrganizationId) {
+        // Map role hệ thống sang role dự án
+        // Hệ thống: Admin/Manager/Member -> Dự án: Admin/Manager/Member
+        let projectRole = newRole;
+
+        // Cập nhật tất cả dự án trong Org mà user này đang tham gia
+        await ProjectMember.updateMany(
+            { 
+                userId: user._id, 
+                organizationId: user.currentOrganizationId 
+            },
+            { 
+                $set: { roleInProject: projectRole } 
+            }
+        );
+        console.log(`[SYNC] Role synced: User ${user.email} is now ${projectRole} in all projects.`);
+    }
+    // ==================================================
+    
+    // Trả về data mới nhất
     const publicUser = {
       id: user._id,
       name: user.name,
       email: user.email,
-      avatar: user.avatar,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
+      role: user.role, // Role mới
       status: user.status,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
     };
 
-    return res.json({ success: true, message: "User role updated", data: { user: publicUser } });
+    return res.json({ success: true, message: "User role updated and synced", data: { user: publicUser } });
   } catch (err) {
     next(err);
   }
 }
 
-// POST /auth/change-password
 export async function changePassword(req, res, next) {
-  try {
-    // Validate input
-    const validation = authValidator.validateChangePassword(req.body);
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: validation.errors.join(", "),
-      });
-    }
-
-    const { currentPassword, newPassword } = req.body;
-
-    // Change password using service
-    await authService.changeUserPassword(
-      req.user._id,
-      currentPassword,
-      newPassword
-    );
-
-    return res.json({
-      success: true,
-      message: "Password changed successfully",
-    });
-  } catch (err) {
-    if (err.message === "USER_NOT_FOUND") {
-      return res.status(404).json({
-        success: false,
-        error: "NotFoundError",
-        message: "User not found",
-      });
-    }
-    if (err.message === "INVALID_PASSWORD") {
-      return res.status(401).json({
-        success: false,
-        error: "AuthenticationError",
-        message: "Current password is incorrect",
-      });
-    }
-    next(err);
-  }
+    try {
+        // Validate input
+        const validation = authValidator.validateChangePassword(req.body);
+        if (!validation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: validation.errors.join(", "),
+          });
+        }
+    
+        const { currentPassword, newPassword } = req.body;
+    
+        // Change password using service
+        await authService.changeUserPassword(
+          req.user._id,
+          currentPassword,
+          newPassword
+        );
+    
+        return res.json({
+          success: true,
+          message: "Password changed successfully",
+        });
+      } catch (err) {
+        if (err.message === "USER_NOT_FOUND") {
+          return res.status(404).json({
+            success: false,
+            error: "NotFoundError",
+            message: "User not found",
+          });
+        }
+        if (err.message === "INVALID_PASSWORD") {
+          return res.status(401).json({
+            success: false,
+            error: "AuthenticationError",
+            message: "Current password is incorrect",
+          });
+        }
+        next(err);
+      }
 }
 
-/**
- * @desc    Update user profile
- * @route   PATCH /auth/profile
- * @access  Private
- */
 export async function updateProfile(req, res, next) {
-  try {
-    // Validate input
-    const validation = authValidator.validateUpdateProfile(req.body);
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: validation.errors.join(", "),
-      });
-    }
-
-    // Update profile using service
-    const updatedUser = await authService.updateUserProfile(
-      req.user._id,
-      req.body
-    );
-
-    return res.json({
-      success: true,
-      message: "Profile updated successfully",
-      data: updatedUser,
-    });
-  } catch (err) {
-    if (err.message === "USER_NOT_FOUND") {
-      return res.status(404).json({
-        success: false,
-        error: "NotFoundError",
-        message: "User not found",
-      });
-    }
-    next(err);
-  }
+    try {
+        // Validate input
+        const validation = authValidator.validateUpdateProfile(req.body);
+        if (!validation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: validation.errors.join(", "),
+          });
+        }
+    
+        // Update profile using service
+        const updatedUser = await authService.updateUserProfile(
+          req.user._id,
+          req.body
+        );
+    
+        return res.json({
+          success: true,
+          message: "Profile updated successfully",
+          data: updatedUser,
+        });
+      } catch (err) {
+        if (err.message === "USER_NOT_FOUND") {
+          return res.status(404).json({
+            success: false,
+            error: "NotFoundError",
+            message: "User not found",
+          });
+        }
+        next(err);
+      }
 }
 
-/**
- * @desc    Forgot Password - Send reset email
- * @route   POST /auth/forgot-password
- * @access  Public
- */
 export async function forgotPassword(req, res, next) {
-  try {
-    // Validate input
-    const validation = authValidator.validateForgotPassword(req.body);
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: validation.errors.join(", "),
-      });
-    }
-
-    const { email } = req.body;
-
-    // Request password reset using service
-    await authService.requestPasswordReset(email);
-
-    // Always return success for security (don't reveal if user exists)
-    return res.json({
-      success: true,
-      message:
-        "If your email exists in our system, you will receive a password reset link shortly",
-    });
-  } catch (err) {
-    next(err);
-  }
+    try {
+        // Validate input
+        const validation = authValidator.validateForgotPassword(req.body);
+        if (!validation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: validation.errors.join(", "),
+          });
+        }
+    
+        const { email } = req.body;
+    
+        // Request password reset using service
+        await authService.requestPasswordReset(email);
+    
+        // Always return success for security (don't reveal if user exists)
+        return res.json({
+          success: true,
+          message:
+            "If your email exists in our system, you will receive a password reset link shortly",
+        });
+      } catch (err) {
+        next(err);
+      }
 }
 
-/**
- * @desc    Reset Password with token
- * @route   POST /auth/reset-password
- * @access  Public
- */
 export async function resetPassword(req, res, next) {
-  try {
-    // Validate input
-    const validation = authValidator.validateResetPassword(req.body);
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: validation.errors.join(", "),
-      });
-    }
-
-    const { token, newPassword } = req.body;
-
-    // Reset password using service
-    await authService.resetUserPassword(token, newPassword);
-
-    return res.json({
-      success: true,
-      message:
-        "Password reset successfully. You can now login with your new password",
-    });
-  } catch (err) {
-    if (err.message === "INVALID_TOKEN") {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: "Invalid or expired reset token",
-      });
-    }
-    next(err);
-  }
+    try {
+        // Validate input
+        const validation = authValidator.validateResetPassword(req.body);
+        if (!validation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: validation.errors.join(", "),
+          });
+        }
+    
+        const { token, newPassword } = req.body;
+    
+        // Reset password using service
+        await authService.resetUserPassword(token, newPassword);
+    
+        return res.json({
+          success: true,
+          message:
+            "Password reset successfully. You can now login with your new password",
+        });
+      } catch (err) {
+        if (err.message === "INVALID_TOKEN") {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: "Invalid or expired reset token",
+          });
+        }
+        next(err);
+      }
 }
-/**
- * @desc    Switch user's current organization
- * @route   POST /auth/switch-org
- * @access  Private
- */
+
 export async function switchOrg(req, res, next) {
-  try {
-    const { organizationId } = req.body;
-
-    if (!organizationId) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: "Organization ID is required",
-      });
-    }
-
-    // Switch organization using service
-    const result = await authService.switchOrganization(
-      req.user._id,
-      organizationId
-    );
-
-    return res.json({
-      success: true,
-      message: "Organization switched successfully",
-      data: {
-        token: result.token,
-        tokenType: "Bearer",
-        user: result.user,
-        organization: result.organization,
-      },
-    });
-  } catch (err) {
-    if (err.message === "NOT_ORGANIZATION_MEMBER") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "You are not a member of this organization",
-      });
-    }
-    if (err.message === "ORGANIZATION_INACTIVE") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "This organization has been deactivated. Please contact support.",
-      });
-    }
-    if (err.message === "ORGANIZATION_DELETED") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "This organization has been deleted.",
-      });
-    }
-    if (err.message === "USER_NOT_FOUND") {
-      return res.status(404).json({
-        success: false,
-        error: "NotFoundError",
-        message: "User not found",
-      });
-    }
-    next(err);
-  }
+    try {
+        const { organizationId } = req.body;
+    
+        if (!organizationId) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: "Organization ID is required",
+          });
+        }
+    
+        // Switch organization using service
+        const result = await authService.switchOrganization(
+          req.user._id,
+          organizationId
+        );
+    
+        return res.json({
+          success: true,
+          message: "Organization switched successfully",
+          data: {
+            token: result.token,
+            tokenType: "Bearer",
+            user: result.user,
+            organization: result.organization,
+          },
+        });
+      } catch (err) {
+        if (err.message === "NOT_ORGANIZATION_MEMBER") {
+          return res.status(403).json({
+            success: false,
+            error: "ForbiddenError",
+            message: "You are not a member of this organization",
+          });
+        }
+        if (err.message === "ORGANIZATION_INACTIVE") {
+          return res.status(403).json({
+            success: false,
+            error: "ForbiddenError",
+            message: "This organization has been deactivated. Please contact support.",
+          });
+        }
+        if (err.message === "ORGANIZATION_DELETED") {
+          return res.status(403).json({
+            success: false,
+            error: "ForbiddenError",
+            message: "This organization has been deleted.",
+          });
+        }
+        if (err.message === "USER_NOT_FOUND") {
+          return res.status(404).json({
+            success: false,
+            error: "NotFoundError",
+            message: "User not found",
+          });
+        }
+        next(err);
+      }
 }
