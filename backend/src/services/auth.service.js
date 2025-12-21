@@ -191,7 +191,7 @@ export const changeUserPassword = async (userId, currentPassword, newPassword) =
     throw new Error("INVALID_PASSWORD");
   }
 
-  // Update password
+  // Update  
   user.password = newPassword;
   await user.save();
 
