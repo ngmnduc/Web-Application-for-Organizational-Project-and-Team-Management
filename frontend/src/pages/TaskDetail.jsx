@@ -15,6 +15,47 @@ import { useAuth } from "../services/AuthContext"; // Import useAuth
 import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon, SparklesIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-toastify";
 import Swal from 'sweetalert2';
+import {MentionsInput, Mention} from 'react-mentions';
+
+const mentionInputStyle = {
+  control: {
+    backgroundColor: '#fff',
+    fontSize: 14,
+    fontWeight: 'normal',
+    lineHeight: 1.5,
+    minHeight: 60,
+    borderRadius: 12,
+    border: '1px solid #e5e7eb',
+  },
+  highlighter: {
+    padding: 9,
+    border: '1px solid transparent',
+  },
+  input: {
+    padding: 9,
+    outline: 'none',
+    border: 'none',
+    borderRadius: 12, 
+  },
+  suggestions: {
+    list: {
+      backgroundColor: 'white',
+      border: '1px solid rgba(0,0,0,0.15)',
+      fontSize: 14,
+      borderRadius: 8,
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+      zIndex: 9999,
+    },
+    item: {
+      padding: '8px 15px',
+      borderBottom: '1px solid rgba(0,0,0,0.05)',
+      '&focused': {
+        backgroundColor: '#eff6ff',
+        color: '#2563eb',
+      },
+    },
+  },
+};
 
 const TaskDetail = () => {
   const { taskId } = useParams();
@@ -61,6 +102,11 @@ const TaskDetail = () => {
   const [newAttachmentUrl, setNewAttachmentUrl] = useState("");
   const [newAttachmentTitle, setNewAttachmentTitle] = useState("");
   const attachmentInputRef = useRef(null); // Ref để focus vào ô input URL
+
+  const usersData = projectMembers.map(member => ({
+    id: member.id,
+    display: member.name
+  }));
 
   // tách fetchTask ra để reuse
   const fetchTask = useCallback(async () => {
@@ -549,23 +595,44 @@ const TaskDetail = () => {
                     {user?.name?.[0] || "U"}
                 </div>
                 <div className="flex-1">
-                    <textarea
-                        rows={2}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition"
-                        placeholder="Write a comment..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        disabled={isPostingComment}
-                    />
-                    <div className="mt-2 flex justify-end">
-                        <button
-                         className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
-                         onClick={handlePostComment}
-                          disabled={isPostingComment || !newComment.trim()}
-                         >
-                        {isPostingComment ? "Posting..." : "Post Comment"}
-                        </button>
+                   <MentionsInput
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            style={mentionInputStyle}
+            placeholder="Write a comment... (Type '@' to mention)"
+            className="w-full focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+            a11ySuggestionsListLabel={"Suggested mentions"}
+            disabled={isPostingComment}
+        >
+            <Mention
+                trigger="@"
+                data={usersData}
+                markup="@__display__" 
+                style={{
+                    backgroundColor: "#dbeafe", 
+                    color: "#2563eb",           
+                    fontWeight: "bold",
+                }}
+                renderSuggestion={(suggestion, search, highlightedDisplay) => (
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
+                            {suggestion.display.charAt(0)}
+                        </div>
+                        <span>{suggestion.display}</span>
                     </div>
+                )}
+            />
+        </MentionsInput>
+
+        <div className="mt-2 flex justify-end">
+            <button
+                className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                onClick={handlePostComment}
+                disabled={isPostingComment || !newComment.trim()}
+            >
+                {isPostingComment ? "Posting..." : "Post Comment"}
+            </button>
+        </div>
                 </div>
             </div>
 
