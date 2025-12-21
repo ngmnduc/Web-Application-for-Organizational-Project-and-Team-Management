@@ -28,7 +28,7 @@ const MainLayout = () => {
     if (path === '/tasks') {
       setHeaderData({
         title: 'My Tasks',
-        subtitle: 'Manage and track your assigned tasks across all projects',
+        subtitle: 'Manage and track your assigned tasks in projects',
       });
     }
     // ----- Task Detail (user) -----
@@ -77,7 +77,7 @@ const MainLayout = () => {
     else {
       setHeaderData({
         title: 'Dashboard',
-        subtitle: 'Welcome to your dashboard',
+        subtitle: 'You can check your working progress here',
       });
     }
   }, [location.pathname]);
