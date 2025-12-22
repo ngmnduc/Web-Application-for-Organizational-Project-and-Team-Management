@@ -1,9 +1,9 @@
+import { createServer } from "http";
+import { Server } from "socket.io";
 import { connectDB } from "./config/db.js";
 import app from "./app.js";
 import setupCronJobs from './services/cron.service.js';
 import { setupSocket } from "./socket/chat.handler.js";
-import {createSever} from "http";
-import { Server } from "socket.io";
 
 const PORT = process.env.PORT || 4000;
 
