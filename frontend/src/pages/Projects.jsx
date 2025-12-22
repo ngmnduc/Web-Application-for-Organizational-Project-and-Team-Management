@@ -23,7 +23,6 @@ const NotificationBanner = ({ message, type, onClose }) => {
     if (!message) return null;
     const bgColor = type === 'success' ? 'bg-green-50' : 'bg-red-50';
     const textColor = type === 'success' ? 'text-green-800' : 'text-red-800';
-    // --- FIX Z-INDEX HERE: Tăng lên z-[9999] ---
     return (
         <div className={`fixed top-20 right-5 z-[9999] flex items-center p-4 mb-4 rounded-lg shadow-lg border ${bgColor} ${textColor} border-opacity-50 animate-fade-in-down`}>
             {type === 'success' ? <CheckCircleIcon className="w-5 h-5 mr-3" /> : <ExclamationCircleIcon className="w-5 h-5 mr-3" />}

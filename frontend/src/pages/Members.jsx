@@ -193,7 +193,8 @@ const Avatar = ({ name, avatarUrl }) => {
 };
 
 // Role Select
-const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
+const RoleSelect = ({ currentRole, userId, onChange, canEdit, currentUserId }) => {
+    
     const getRoleStyle = (role) => {
         const r = role ? role.charAt(0).toUpperCase() + role.slice(1).toLowerCase() : 'Member';
         switch (r) {
@@ -205,16 +206,29 @@ const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
     
     const displayRole = currentRole ? currentRole.charAt(0).toUpperCase() + currentRole.slice(1).toLowerCase() : 'Member';
     const currentStyle = getRoleStyle(displayRole);
+    // --- Kiểm tra xem có phải chính mình không ---
+    const isSelf = currentUserId && String(userId) === String(currentUserId);
 
-    if (!canEdit) return <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${currentStyle}`}>{displayRole}</span>;
+    if (!canEdit || isSelf) {
+        return <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${currentStyle}`}>{displayRole}</span>;
+    }
     return (
         <div className="relative inline-block">
-            <select value={displayRole} onChange={(e) => onChange(userId, e.target.value)} className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-bold rounded-full border focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all ${currentStyle}`}>
-                <option value="Admin">Admin</option>
-                <option value="Manager">Manager</option>
-                <option value="Member">Member</option>
+            <select 
+                value={displayRole} 
+                onChange={(e) => onChange(userId, e.target.value)} 
+                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-bold rounded-full border focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all ${currentStyle}`}
+            >
+                {displayRole === 'Admin' && (
+                    <option value="Admin" className="bg-white text-gray-800">Admin</option>
+                )}
+                <option value="Manager" className="bg-white text-gray-800">Manager</option>
+                <option value="Member" className="bg-white text-gray-800">Member</option>
             </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"><svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg></div>
+            
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+            </div>
         </div>
     );
 };
@@ -255,6 +269,7 @@ const Members = () => {
     const [members, setMembers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentUserId, setCurrentUserId] = useState(null);
     
     // States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -283,7 +298,9 @@ const Members = () => {
     useEffect(() => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
+            const userObj = JSON.parse(userStr);
             setCurrentUserRole(JSON.parse(userStr).role || 'Member');
+            setCurrentUserId(userObj.id || userObj._id);
         }
     }, []);
 
@@ -554,7 +571,7 @@ const Members = () => {
                                     {filteredMembers.map((member) => (
                                         <tr key={member.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4"><div className="flex items-center gap-3"><Avatar name={member.name} avatarUrl={member.avatarUrl} /><div><div className="text-sm font-bold text-gray-900">{member.name}</div><div className="text-sm text-gray-500">{member.email}</div></div></div></td>
-                                            <td className="px-6 py-4"><RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={isAdmin && !isProjectView} /></td>
+                                            <td className="px-6 py-4"><RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={isAdmin && !isProjectView} currentUserId={currentUserId} /></td>
                                             {!isProjectView && <td className="px-6 py-4"><span className="px-2 py-1 text-xs bg-gray-100 rounded-full">{member.projects?.length || 0} Projects</span></td>}
                                             {(isAdmin || (isProjectView && currentUserRole === 'Manager')) && (
                                                 <td className="px-6 py-4 text-right">

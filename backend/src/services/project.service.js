@@ -121,7 +121,7 @@ export const listProjects = async (filters = {}, userId, userRole) => {
   if (filters.archived !== undefined) matchStage.isArchived = filters.archived === 'true';
 
   // 2. Authorization
-  if (userRole !== 'Admin' && userRole !== 'Manager') {
+  if (userRole !== 'Admin') {
       const activeMemberships = await ProjectMember.find({
           userId: userId,
           organizationId: filters.organizationId,
