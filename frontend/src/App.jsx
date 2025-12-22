@@ -28,6 +28,8 @@ function App() {
 
       {/* login */}
       <Route path="/login" element={<LoginPage />} />
+      {/* reset password */}
+      <Route path="/reset-password" element={<LoginPage />} />
       {/*signup*/}
       <Route path="/signup" element={<SignUpPage />} />
       {/* payment success */}
