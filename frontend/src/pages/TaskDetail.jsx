@@ -22,21 +22,28 @@ const mentionInputStyle = {
     backgroundColor: '#fff',
     fontSize: 14,
     fontWeight: 'normal',
-    lineHeight: 1.5,
+    lineHeight: "20px",
     minHeight: 60,
     borderRadius: 12,
     border: '1px solid #e5e7eb',
+    fontFamily: 'inherit',
   },
-  highlighter: {
-    padding: 9,
-    border: '1px solid transparent',
-  },
+
   input: {
     padding: 9,
     outline: 'none',
-    border: 'none',
-    borderRadius: 12, 
+    border: '1px solid transparent',
+    borderRadius: 12,
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+    height: '100%',
+    margin: 0,
+    fontFamily: 'inherit',
+    
+    color: '#111827', 
+    backgroundColor: 'transparent', 
   },
+
   suggestions: {
     list: {
       backgroundColor: 'white',
@@ -608,11 +615,11 @@ const TaskDetail = () => {
                 trigger="@"
                 data={usersData}
                 markup="@__display__" 
-                style={{
-                    backgroundColor: "#dbeafe", 
-                    color: "#2563eb",           
-                    fontWeight: "bold",
-                }}
+                style={{                 
+                  color: "transparent",       
+                  fontWeight: "bold",         
+                  padding: "1px 0",
+              }}
                 renderSuggestion={(suggestion, search, highlightedDisplay) => (
                     <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
