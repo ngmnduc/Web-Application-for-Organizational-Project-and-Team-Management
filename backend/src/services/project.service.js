@@ -238,7 +238,7 @@ export const listProjects = async (filters = {}, userId, userRole) => {
   const total = await Project.countDocuments(matchStage);
 
   return {
-    projects: projectsWithMembers,
+    projects,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };
 };
@@ -261,31 +261,13 @@ export const getProjectById = async (projectId, currentOrganizationId) => {
     deletedAt: null
   })
     .populate('createdBy', 'name email')
-    .lean();
+    //.populate('members.user', 'name email role avatar');
 
   if (!project) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // Thêm members và memberCount
-  const members = await ProjectMember.find({ 
-    projectId: project._id,
-    status: 'ACTIVE'
-  })
-    .populate('userId', 'name email role avatar _id')
-    .lean();
-
-  return {
-    ...project,
-    memberCount: members.length,
-    members: members.map(m => ({
-      _id: m._id,
-      user: m.userId,
-      role: m.roleInProject,
-      status: m.status,
-      joinedAt: m.createdAt
-    }))
-  };
+  return project;
 };
 
 /**

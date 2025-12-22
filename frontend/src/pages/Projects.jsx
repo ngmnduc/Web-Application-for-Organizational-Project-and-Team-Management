@@ -119,8 +119,8 @@ const Projects = () => {
                 name: p.name || 'Unnamed Project',
                 description: p.description,
                 status: p.status || 'In Progress', 
-                progress: p.progress || Math.floor(Math.random() * 100), 
-                memberCount: p.members ? p.members.length : 1, 
+                progress: p.progress ?? 0, 
+                memberCount: p.memberCount ?? 0,
                 deadline: p.deadline,
                 createdAt: p.createdAt
             }));
