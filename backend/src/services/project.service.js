@@ -114,7 +114,7 @@ export const listProjects = async (filters = {}, userId, userRole) => {
   // --- LOGIC MỚI: NẾU KHÔNG PHẢI ADMIN/MANAGER, CHỈ LẤY DỰ ÁN ĐÃ ACTIVE ---
   // Nếu là Admin/Manager của Org thì xem được hết 
   // Nếu là Member thường -> Phải check bảng ProjectMember xem đã ACTIVE chưa
-  if (userRole !== 'Admin' && userRole !== 'Manager') {
+  if (userRole !== 'Admin' ) {
       // 1. Tìm tất cả các project mà user này là thành viên ACTIVE
       const activeMemberships = await ProjectMember.find({
           userId: userId,
