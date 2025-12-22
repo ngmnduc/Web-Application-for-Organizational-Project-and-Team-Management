@@ -6,7 +6,9 @@ import {
   getMyAttendance,
   getMyCurrentIP,
   addWhitelistIP,
-  getWhitelistIPs
+  getWhitelistIPs,
+  updateWhitelistIP, 
+  removeWhitelistIP
 } from "../controllers/attendance.controller.js";
 import { verifyToken, checkRole, requireOrgAccess } from "../middlewares/auth.js";
 
@@ -82,6 +84,33 @@ router.get(
   verifyToken,
   checkRole("Admin", "Manager"),
   getWhitelistIPs
+);
+
+
+/**
+ * @route   PUT /attendance/whitelist-ip/:ipId
+ * @desc    Update IP config (Edit)
+ * @access  Private (Admin/Manager)
+ */
+router.put(
+  '/whitelist-ip/:ipId',
+  verifyToken,
+  requireOrgAccess, 
+  checkRole("Admin", "Manager"),
+  updateWhitelistIP
+);
+
+/**
+ * @route   DELETE /attendance/whitelist-ip/:ipId
+ * @desc    Remove IP from whitelist (Delete)
+ * @access  Private (Admin/Manager)
+ */
+router.delete(
+  '/whitelist-ip/:ipId',
+  verifyToken,
+  requireOrgAccess,
+  checkRole("Admin", "Manager"),
+  removeWhitelistIP
 );
 
 export default router;
