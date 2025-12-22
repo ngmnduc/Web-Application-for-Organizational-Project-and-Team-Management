@@ -724,7 +724,6 @@ useEffect(() => {
                       value={currentProjectId || ""}
                       onChange={(e) => setCurrentProjectId(e.target.value)}
                     >
-<<<<<<< HEAD
                       {/* Thêm logic filter trước khi map */}
                       {projects
                         ?.filter(p => {
@@ -733,10 +732,6 @@ useEffect(() => {
                         })
                         .map((p) => (
                           <option key={p._id} value={p._id}>{p.name}</option>
-=======
-                      {projects.map((p) => (
-                        <option key={p._id} value={p._id}>{p.name}</option>
->>>>>>> 812ff9e2055b8b27bfd1a27105b816bb7735e6b6
                       ))}
                     </select>
                     <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
