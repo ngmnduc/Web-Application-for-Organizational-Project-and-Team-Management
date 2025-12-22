@@ -117,11 +117,11 @@ export const listProjects = async (filters = {}, userId, userRole) => {
     deletedAt: null
   };
 
-  // --- LOGIC MỚI: NẾU KHÔNG PHẢI ADMIN/MANAGER, CHỈ LẤY DỰ ÁN ĐÃ ACTIVE ---
-  // Nếu là Admin/Manager của Org thì xem được hết 
-  // Nếu là Member thường -> Phải check bảng ProjectMember xem đã ACTIVE chưa
-  if (userRole !== 'Admin' ) {
-      // 1. Tìm tất cả các project mà user này là thành viên ACTIVE
+  if (filters.status) matchStage.status = filters.status;
+  if (filters.archived !== undefined) matchStage.isArchived = filters.archived === 'true';
+
+  // 2. Authorization
+  if (userRole !== 'Admin') {
       const activeMemberships = await ProjectMember.find({
           userId: userId,
           organizationId: filters.organizationId,
