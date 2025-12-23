@@ -236,7 +236,7 @@ export const getMyCurrentIP = async (req, res) => {
   try {
     const userRole = req.user.role;
     
-    if (userRole !== "Admin" && userRole !== "Manager") {
+    if (userRole !== "Admin" ) {
       return res.status(403).json({
         success: false,
         error: "ForbiddenError",
@@ -284,7 +284,7 @@ export const addWhitelistIP = async(req, res) => {
     const userId = req.user._id;
     const { ip, description } = req.body;
 
-    if (userRole !== "Admin" && userRole !== "Manager") {
+    if (userRole !== "Admin") {
       return res.status(403).json({
         success: false,
         error: "ForbiddenError",
@@ -400,7 +400,7 @@ export const getWhitelistIPs = async (req, res) => {
     const userRole = req.user.role;
     const userId = req.user._id;
 
-    if (userRole !== "Admin" && userRole !== "Manager") {
+    if (userRole !== "Admin") {
       return res.status(403).json({
         success: false,
         error: "ForbiddenError",
