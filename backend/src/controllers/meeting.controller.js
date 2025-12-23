@@ -1,36 +1,7 @@
 import mongoose from "mongoose";
 import Meeting from "../models/meeting.model.js";
 import Project from "../models/project.model.js";
-
-/**
- * @desc    Check for time conflicts in meetings
- * @param   {ObjectId} projectId
- * @param   {Date} startTime
- * @param   {Date} endTime
- * @param   {ObjectId} excludeMeetingId - Optional, for update operations
- * @returns {Boolean} true if conflict exists
- */
-const hasTimeConflict = async (projectId, startTime, endTime, excludeMeetingId = null) => {
-  const query = {
-    projectId,
-    deletedAt: null,
-    $or: [
-      // New meeting starts during existing meeting
-      { startTime: { $lte: startTime }, endTime: { $gt: startTime } },
-      // New meeting ends during existing meeting
-      { startTime: { $lt: endTime }, endTime: { $gte: endTime } },
-      // New meeting completely contains existing meeting
-      { startTime: { $gte: startTime }, endTime: { $lte: endTime } },
-    ],
-  };
-
-  if (excludeMeetingId) {
-    query._id = { $ne: excludeMeetingId };
-  }
-
-  const conflictingMeeting = await Meeting.findOne(query);
-  return !!conflictingMeeting;
-};
+import { createNotification } from "../services/notification.service.js";
 
 /**
  * @desc    Get all meetings for a project
@@ -217,7 +188,7 @@ export const createMeeting = async (req, res) => {
 
     // Create meeting
     const meeting = new Meeting({
-      organizationId: organizationId, // Add organizationId from user context
+      organizationId: organizationId,
       projectId,
       title,
       description: description || "",
@@ -229,6 +200,20 @@ export const createMeeting = async (req, res) => {
     });
 
     await meeting.save();
+
+    if (attendees && attendees.length > 0) {
+        const uniqueAttendees = [...new Set(attendees)];
+        for (const attendeeId of uniqueAttendees) {
+            if (attendeeId && attendeeId.toString() !== req.user._id.toString()) {
+                await createNotification({
+                    userId: attendeeId,
+                    type: 'MEETING_CREATED', 
+                    content: `New meeting: ${title} at ${start.toLocaleString()}`,
+                    relatedId: meeting._id
+                });
+            }
+        }
+    }
 
     // Populate before returning
     await meeting.populate("createdBy", "name email");
@@ -254,151 +239,151 @@ export const createMeeting = async (req, res) => {
  * @access  Private (Admin/Manager/Creator)
  */
 export const updateMeeting = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, description, startTime, endTime, location, attendees } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        error: "ValidationError",
-        message: "Invalid meeting ID format",
-      });
-    }
-
-    const meeting = await Meeting.findById(id);
-    if (!meeting || meeting.deletedAt) {
-      return res.status(404).json({
-        success: false,
-        error: "NotFoundError",
-        message: "Meeting not found",
-      });
-    }
-
-    // Check permissions (only creator, admin, or manager can update)
-    const userRole = req.user.role;
-    const isCreator = String(meeting.createdBy) === String(req.user._id);
-
-    if (!isCreator && userRole !== "Admin" && userRole !== "Manager") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "You don't have permission to update this meeting",
-      });
-    }
-
-    // Validate time if provided
-    if (startTime || endTime) {
-      const start = startTime ? new Date(startTime) : meeting.startTime;
-      const end = endTime ? new Date(endTime) : meeting.endTime;
-
-      if (start >= end) {
+    try {
+      const { id } = req.params;
+      const { title, description, startTime, endTime, location, attendees } = req.body;
+  
+      if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
           success: false,
           error: "ValidationError",
-          message: "Start time must be before end time",
+          message: "Invalid meeting ID format",
         });
       }
-
-      // Check for time conflicts (excluding current meeting)
-      const hasConflict = await hasTimeConflict(meeting.projectId, start, end, meeting._id);
-      if (hasConflict) {
-        return res.status(409).json({
+  
+      const meeting = await Meeting.findById(id);
+      if (!meeting || meeting.deletedAt) {
+        return res.status(404).json({
           success: false,
-          error: "ConflictError",
-          message: "Meeting time conflicts with an existing meeting in this project",
+          error: "NotFoundError",
+          message: "Meeting not found",
         });
       }
-
-      meeting.startTime = start;
-      meeting.endTime = end;
+  
+      // Check permissions (only creator, admin, or manager can update)
+      const userRole = req.user.role;
+      const isCreator = String(meeting.createdBy) === String(req.user._id);
+  
+      if (!isCreator && userRole !== "Admin" && userRole !== "Manager") {
+        return res.status(403).json({
+          success: false,
+          error: "ForbiddenError",
+          message: "You don't have permission to update this meeting",
+        });
+      }
+  
+      // Validate time if provided
+      if (startTime || endTime) {
+        const start = startTime ? new Date(startTime) : meeting.startTime;
+        const end = endTime ? new Date(endTime) : meeting.endTime;
+  
+        if (start >= end) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: "Start time must be before end time",
+          });
+        }
+  
+        // Check for time conflicts (excluding current meeting)
+        const hasConflict = await hasTimeConflict(meeting.projectId, start, end, meeting._id);
+        if (hasConflict) {
+          return res.status(409).json({
+            success: false,
+            error: "ConflictError",
+            message: "Meeting time conflicts with an existing meeting in this project",
+          });
+        }
+  
+        meeting.startTime = start;
+        meeting.endTime = end;
+      }
+  
+      // Update fields
+      if (title) meeting.title = title;
+      if (description !== undefined) meeting.description = description;
+      if (location !== undefined) {
+        if (!location || !location.trim()) {
+          return res.status(400).json({
+            success: false,
+            error: "ValidationError",
+            message: "Meeting location is required",
+          });
+        }
+        meeting.location = location.trim();
+      }
+      if (attendees) meeting.attendees = attendees;
+  
+      await meeting.save();
+  
+      // Populate before returning
+      await meeting.populate("createdBy", "name email");
+      await meeting.populate("attendees", "name email");
+  
+      res.json({
+        success: true,
+        message: "Meeting updated successfully",
+        data: meeting,
+      });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        error: "ServerError",
+        message: err.message,
+      });
     }
-
-    // Update fields
-    if (title) meeting.title = title;
-    if (description !== undefined) meeting.description = description;
-    if (location !== undefined) {
-      if (!location || !location.trim()) {
+  };
+  
+  /**
+   * @desc    Delete meeting (soft delete)
+   * @route   DELETE /meetings/:id
+   * @access  Private (Admin/Manager/Creator)
+   */
+  export const deleteMeeting = async (req, res) => {
+    try {
+      const { id } = req.params;
+  
+      if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
           success: false,
           error: "ValidationError",
-          message: "Meeting location is required",
+          message: "Invalid meeting ID format",
         });
       }
-      meeting.location = location.trim();
-    }
-    if (attendees) meeting.attendees = attendees;
-
-    await meeting.save();
-
-    // Populate before returning
-    await meeting.populate("createdBy", "name email");
-    await meeting.populate("attendees", "name email");
-
-    res.json({
-      success: true,
-      message: "Meeting updated successfully",
-      data: meeting,
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: "ServerError",
-      message: err.message,
-    });
-  }
-};
-
-/**
- * @desc    Delete meeting (soft delete)
- * @route   DELETE /meetings/:id
- * @access  Private (Admin/Manager/Creator)
- */
-export const deleteMeeting = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
+  
+      const meeting = await Meeting.findById(id);
+      if (!meeting || meeting.deletedAt) {
+        return res.status(404).json({
+          success: false,
+          error: "NotFoundError",
+          message: "Meeting not found",
+        });
+      }
+  
+      // Check permissions
+      const userRole = req.user.role;
+      const isCreator = String(meeting.createdBy) === String(req.user._id);
+  
+      if (!isCreator && userRole !== "Admin" && userRole !== "Manager") {
+        return res.status(403).json({
+          success: false,
+          error: "ForbiddenError",
+          message: "You don't have permission to delete this meeting",
+        });
+      }
+  
+      meeting.deletedAt = new Date();
+      await meeting.save();
+  
+      res.json({
+        success: true,
+        message: "Meeting deleted successfully",
+      });
+    } catch (err) {
+      res.status(500).json({
         success: false,
-        error: "ValidationError",
-        message: "Invalid meeting ID format",
+        error: "ServerError",
+        message: err.message,
       });
     }
-
-    const meeting = await Meeting.findById(id);
-    if (!meeting || meeting.deletedAt) {
-      return res.status(404).json({
-        success: false,
-        error: "NotFoundError",
-        message: "Meeting not found",
-      });
-    }
-
-    // Check permissions
-    const userRole = req.user.role;
-    const isCreator = String(meeting.createdBy) === String(req.user._id);
-
-    if (!isCreator && userRole !== "Admin" && userRole !== "Manager") {
-      return res.status(403).json({
-        success: false,
-        error: "ForbiddenError",
-        message: "You don't have permission to delete this meeting",
-      });
-    }
-
-    meeting.deletedAt = new Date();
-    await meeting.save();
-
-    res.json({
-      success: true,
-      message: "Meeting deleted successfully",
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: "ServerError",
-      message: err.message,
-    });
-  }
-};
+  };

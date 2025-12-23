@@ -69,6 +69,12 @@ router.delete("/projects/:id", verifyToken, checkRole("Admin", "Manager"), delet
 router.patch("/projects/:id/archive", verifyToken, checkRole("Admin", "Manager"), toggleArchive);
 
 /**
+ * @route   POST /projects/:id/members
+ * @desc    Add a member to project manually
+ */
+router.post("/projects/:id/members", verifyToken, checkRole("Admin", "Manager"), addMember);
+
+/**
  * @route   GET /projects/:id/members
  * @desc    Get project members
  */
