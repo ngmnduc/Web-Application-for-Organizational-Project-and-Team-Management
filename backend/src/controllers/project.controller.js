@@ -1,5 +1,6 @@
 import * as projectValidator from "../validators/project.validator.js";
 import * as projectService from "../services/project.service.js";
+import { createNotification } from "../services/notification.service.js";
 import User from "../models/user.model.js"; 
 import { signToken } from "../utils/jwt.js"; 
 
@@ -660,5 +661,44 @@ export const joinProjectByCode = async (req, res) => {
       error: "ServerError",
       message: err.message || "Failed to join project"
     });
+  }
+};
+
+// POST /projects/:id/members
+export const addMember = async (req, res) => {
+  try {
+    const { id } = req.params; 
+    const { userId: targetUserId, role } = req.body; 
+    const currentOrgId = req.user.currentOrganizationId;
+
+    if (!targetUserId) {
+        return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    const project = await projectService.addMember(id, targetUserId, role, currentOrgId);
+
+    if (targetUserId.toString() !== req.user._id.toString()) {
+        await createNotification({
+            userId: targetUserId, 
+            type: 'PROJECT_ADD',
+            content: `You have been added to project: "${project.name}" as ${role || 'Member'}`,
+            relatedId: project._id
+        });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Member added successfully", 
+      data: project 
+    });
+
+  } catch (err) {
+    if (err.message === 'USER_ALREADY_MEMBER') {
+        return res.status(409).json({ success: false, message: "User is already a member of this project" });
+    }
+    if (err.message === 'USER_NOT_BELONG_TO_ORGANIZATION') {
+        return res.status(403).json({ success: false, message: "User does not belong to this organization" });
+    }
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
