@@ -141,7 +141,6 @@ export const updateTask = async (req, res) => {
         const newAssigneeId = updatedTask.assigneeId?.toString();
         const oldAssigneeId = oldTask?.assigneeId?.toString();
         const actorId = req.user._id.toString();
-
         if (newAssigneeId && newAssigneeId !== oldAssigneeId && newAssigneeId !== actorId) {
              await createNotification({
                 userId: newAssigneeId,

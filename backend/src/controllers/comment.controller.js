@@ -54,11 +54,10 @@ export const createComment = async (req, res) => {
     
     if (mentions.length > 0) {
       const uniqueNames = [...new Set(mentions)];
-      uniqueNames.forEach(async (name) => {
+      for (const name of uniqueNames) {
         const mentionedUser = await User.findOne({ 
             name: { $regex: new RegExp(`^${name}$`, "i") } 
         });
-
         if (mentionedUser && String(mentionedUser._id) !== String(currentUser._id)) {
            await createNotification({
             userId: mentionedUser._id,
@@ -67,7 +66,7 @@ export const createComment = async (req, res) => {
             relatedId: task._id
           });
         }
-      });
+      }
     }
 
     try {
