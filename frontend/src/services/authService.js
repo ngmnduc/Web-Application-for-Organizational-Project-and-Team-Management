@@ -154,4 +154,21 @@ export const initAuth = () => {
   }
 };
 
+// Hàm gửi yêu cầu quên mật khẩu (Gửi email)
+export const requestPasswordReset = async (email) => {
+  // Thay đổi đường dẫn '/auth/forgot-password' tùy theo route BE của bạn
+  const response = await axiosInstance.post('/auth/forgot-password', { email });
+  return response.data;
+};
+
+// Hàm đặt lại mật khẩu mới (khi đã có token)
+export const resetPassword = async (token, newPassword) => {
+  // Thay đổi đường dẫn '/auth/reset-password' tùy theo route BE của bạn
+  const response = await axiosInstance.post('/auth/reset-password', { 
+    token, 
+    newPassword 
+  });
+  return response.data;
+};
+
 initAuth();

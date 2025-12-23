@@ -13,6 +13,56 @@ import {
 } from "../services/taskService";
 import { useAuth } from "../services/AuthContext"; // Import useAuth
 import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon, SparklesIcon } from "@heroicons/react/24/solid";
+import { toast } from "react-toastify";
+import Swal from 'sweetalert2';
+import {MentionsInput, Mention} from 'react-mentions';
+
+const mentionInputStyle = {
+  control: {
+    backgroundColor: '#fff',
+    fontSize: 14,
+    fontWeight: 'normal',
+    lineHeight: "20px",
+    minHeight: 60,
+    borderRadius: 12,
+    border: '1px solid #e5e7eb',
+    fontFamily: 'inherit',
+  },
+
+  input: {
+    padding: 9,
+    outline: 'none',
+    border: '1px solid transparent',
+    borderRadius: 12,
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+    height: '100%',
+    margin: 0,
+    fontFamily: 'inherit',
+    
+    color: '#111827', 
+    backgroundColor: 'transparent', 
+  },
+
+  suggestions: {
+    list: {
+      backgroundColor: 'white',
+      border: '1px solid rgba(0,0,0,0.15)',
+      fontSize: 14,
+      borderRadius: 8,
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+      zIndex: 9999,
+    },
+    item: {
+      padding: '8px 15px',
+      borderBottom: '1px solid rgba(0,0,0,0.05)',
+      '&focused': {
+        backgroundColor: '#eff6ff',
+        color: '#2563eb',
+      },
+    },
+  },
+};
 
 const TaskDetail = () => {
   const { taskId } = useParams();
@@ -53,6 +103,17 @@ const TaskDetail = () => {
   const [editForm, setEditForm] = useState({
     title: "", description: "", assigneeId: "", priority: "MEDIUM", status: "TODO", dueDate: ""
   });
+
+  // state cho attachment 
+  const [isAttachmentInputOpen, setIsAttachmentInputOpen] = useState(false);
+  const [newAttachmentUrl, setNewAttachmentUrl] = useState("");
+  const [newAttachmentTitle, setNewAttachmentTitle] = useState("");
+  const attachmentInputRef = useRef(null); // Ref để focus vào ô input URL
+
+  const usersData = projectMembers.map(member => ({
+    id: member.id,
+    display: member.name
+  }));
 
   // tách fetchTask ra để reuse
   const fetchTask = useCallback(async () => {
@@ -145,7 +206,7 @@ const TaskDetail = () => {
      
     } catch (err) {
       console.error("Create subtask error:", err);
-      alert("Không tạo được sub-task: " + (err.message || "Lỗi server"));
+      toast.error("Cannot create sub-task: " + (err.message || "Server error"));
       setError("Failed to create sub-task");
     } finally {
       setIsCreatingSubtask(false);
@@ -165,7 +226,18 @@ const TaskDetail = () => {
   };
 
   const handleDeleteSubtask = async (subtaskId) => {
-    if (!window.confirm("Delete this sub-task?")) return;
+    const result = await Swal.fire({
+      title: 'Delete this sub-task?',
+      text: "This action cannot be undone.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'OK',
+      cancelButtonText: 'Cancel'
+  });
+    if (!result.isConfirmed) return;
+    
     try {
       await deleteSubtask(taskId, subtaskId);
       const updatedTask = await getTaskById(taskId);
@@ -208,7 +280,7 @@ const TaskDetail = () => {
       const newSubtasks = await generateAiSubtasks(taskId);
       
       if (!newSubtasks || newSubtasks.length === 0) {
-        alert("AI returned no subtasks.");
+        toast.error("AI returned no subtasks.");
         return;
       }
       
@@ -219,18 +291,18 @@ const TaskDetail = () => {
       
       //  Set cooldown sau khi thành công
       setCooldownSeconds(5);
-      alert(` AI created ${newSubtasks.length} subtasks!`);
+      toast.success(` AI created ${newSubtasks.length} subtasks!`);
       
     } catch (err) {
       console.error("❌ AI Error:", err);
       
       //  Xử lý lỗi cụ thể
       if (err.response?.status === 429 || err.message?.includes("quota")) {
-        alert("⚠️ AI quota exceeded. Please try again later (quota resets daily).");
+        toast.error("⚠️ AI quota exceeded. Please try again later (quota resets daily).");
       } else if (err.message?.includes("timeout")) {
-        alert("⏱️ AI request timed out. Please try again.");
+        toast.error("⏱️ AI request timed out. Please try again.");
       } else {
-        alert("❌ AI Error: " + (err.message || "Cannot create subtasks"));
+        toast.error("❌ AI Error: " + (err.message || "Cannot create subtasks"));
       }
       
     } finally {
@@ -280,12 +352,52 @@ const TaskDetail = () => {
         }));
         
         setIsEditOpen(false);
-        alert("Task updated successfully!"); // Báo thành công
+        toast.success("Task updated successfully!"); // Báo thành công
     } catch (err) {
         console.error("Update task failed", err);
         // Hiển thị chi tiết lỗi từ backend nếu có
-        alert("Failed to update task: " + (err.message || JSON.stringify(err)));
+        toast.error("Failed to update task: " + (err.message || JSON.stringify(err)));
     }
+  };
+
+  // ====== HANDLERS: ATTACHMENTS ======
+  const handleOpenAttachmentInput = () => {
+    setIsAttachmentInputOpen(true);
+    // Focus vào input sau khi mở
+    setTimeout(() => {
+        if (attachmentInputRef.current) {
+            attachmentInputRef.current.focus();
+        }
+    }, 100);
+  };
+
+  const handleAddAttachment = async () => {
+    if (!newAttachmentUrl.trim()) {
+        toast.error("URL cannot be empty.");
+        return;
+    }
+    
+    // --- START: Thay thế logic giả lập bằng API thực ---
+    
+    // Giả lập thêm vào UI và đóng input
+    const mockAttachment = {
+        _id: Date.now(),
+        url: newAttachmentUrl.trim(),
+        title: newAttachmentTitle.trim() || newAttachmentUrl.trim(),
+    };
+    
+    setTask(prev => ({
+        ...prev,
+        attachments: [...(prev.attachments || []), mockAttachment]
+    }));
+    
+    setNewAttachmentUrl("");
+    setNewAttachmentTitle("");
+    setIsAttachmentInputOpen(false);
+    
+    // --- END: Thay thế logic giả lập này bằng API thực ---
+
+    toast.success("Attachment added (Mock Success). Remember to implement API call!");
   };
 
  // ========== RENDER GUARDS ==========
@@ -490,23 +602,44 @@ const TaskDetail = () => {
                     {user?.name?.[0] || "U"}
                 </div>
                 <div className="flex-1">
-                    <textarea
-                        rows={2}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition"
-                        placeholder="Write a comment..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        disabled={isPostingComment}
-                    />
-                    <div className="mt-2 flex justify-end">
-                        <button
-                         className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
-                         onClick={handlePostComment}
-                          disabled={isPostingComment || !newComment.trim()}
-                         >
-                        {isPostingComment ? "Posting..." : "Post Comment"}
-                        </button>
+                   <MentionsInput
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            style={mentionInputStyle}
+            placeholder="Write a comment... (Type '@' to mention)"
+            className="w-full focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+            a11ySuggestionsListLabel={"Suggested mentions"}
+            disabled={isPostingComment}
+        >
+            <Mention
+                trigger="@"
+                data={usersData}
+                markup="@__display__" 
+                style={{                 
+                  color: "transparent",       
+                  fontWeight: "bold",         
+                  padding: "1px 0",
+              }}
+                renderSuggestion={(suggestion, search, highlightedDisplay) => (
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
+                            {suggestion.display.charAt(0)}
+                        </div>
+                        <span>{suggestion.display}</span>
                     </div>
+                )}
+            />
+        </MentionsInput>
+
+        <div className="mt-2 flex justify-end">
+            <button
+                className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                onClick={handlePostComment}
+                disabled={isPostingComment || !newComment.trim()}
+            >
+                {isPostingComment ? "Posting..." : "Post Comment"}
+            </button>
+        </div>
                 </div>
             </div>
 
@@ -593,8 +726,52 @@ const TaskDetail = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             <div className="flex justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Attachments</h2>
-              {canManage && <button className="text-xs text-blue-600 font-medium hover:underline">+ Add</button>}
+              {canManage && (
+                 <button 
+                    onClick={handleOpenAttachmentInput} 
+                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                 >
+                    + Add File
+                 </button>
+              )}
             </div>
+            
+            {/* INPUT ĐỂ THÊM ATTACHMENT MỚI */}
+            {canManage && isAttachmentInputOpen && (
+                <div className="flex flex-col gap-2 mb-4 p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                    <input
+                        ref={attachmentInputRef}
+                        type="url"
+                        value={newAttachmentUrl}
+                        onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                        placeholder="Link URL (required)"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+                        required
+                    />
+                    <input
+                        type="text"
+                        value={newAttachmentTitle}
+                        onChange={(e) => setNewAttachmentTitle(e.target.value)}
+                        placeholder="File Title (optional)"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+                    />
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={() => setIsAttachmentInputOpen(false)}
+                            className="px-3 py-1 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200 transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleAddAttachment}
+                            disabled={!newAttachmentUrl.trim()}
+                            className="px-3 py-1 rounded-lg bg-[var(--color-brand)] text-white text-xs font-medium disabled:opacity-50 hover:bg-blue-700 transition"
+                        >
+                            Add Attachment
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {attachments.length === 0 ? (
               <p className="text-xs text-gray-400 italic">

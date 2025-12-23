@@ -724,8 +724,14 @@ useEffect(() => {
                       value={currentProjectId || ""}
                       onChange={(e) => setCurrentProjectId(e.target.value)}
                     >
-                      {projects.map((p) => (
-                        <option key={p._id} value={p._id}>{p.name}</option>
+                      {/* Thêm logic filter trước khi map */}
+                      {projects
+                        ?.filter(p => {
+                            const currentUserId = user?._id || user?.uid; 
+                            return p.ownerId === currentUserId || p.members?.includes(currentUserId);
+                        })
+                        .map((p) => (
+                          <option key={p._id} value={p._id}>{p.name}</option>
                       ))}
                     </select>
                     <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />

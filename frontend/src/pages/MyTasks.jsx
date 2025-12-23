@@ -118,7 +118,7 @@ const MyTasks = () => {
   };
 
   const roleUpper = (currentUser.role || '').toUpperCase();
-  const isManagerOrAdmin = ['ADMIN', 'MANAGER', 'SUPER ADMIN'].includes(roleUpper);
+  const isManagerOrAdmin = ['ADMIN', 'MANAGER'].includes(roleUpper);
   const canManageTasks = isManagerOrAdmin;
 
   const canDragTask = (task) => {
@@ -172,7 +172,7 @@ const MyTasks = () => {
     const fetchProjects = async () => {
       try {
         const projects = await getProjects();
-        console.log("🔥 Danh sách Projects:", projects); 
+        console.log(" Danh sách Projects:", projects); 
         
         // Lưu danh sách dự án vào state để render dropdown
         setProjectsList(projects || []);
@@ -180,10 +180,10 @@ const MyTasks = () => {
         if (projects && projects.length > 0) {
           // Lấy ID của dự án đầu tiên làm mặc định
           const firstProjectId = projects[0]._id;
-          console.log("👉 Auto-select Project ID:", firstProjectId);
+          console.log(" Auto-select Project ID:", firstProjectId);
           setCurrentProjectId(firstProjectId);
         } else {
-          console.warn("⚠️ Không tìm thấy dự án nào.");
+          console.warn(" Không tìm thấy dự án nào.");
           // Có thể set null hoặc xử lý trạng thái Empty State cho toàn trang
           setIsEmpty(true);
         }
@@ -404,7 +404,7 @@ const MyTasks = () => {
   const openTaskDetail = (task) => {
     if (!task?.id) return;
     const role = (currentUser.role || "").toUpperCase();
-    const isAdminRole = role === "ADMIN" || role === "SUPER ADMIN"; 
+    const isAdminRole = role === "ADMIN"; 
     const basePath = isAdminRole ? "/admin/tasks" : "/tasks";
     navigate(`${basePath}/${task.id}`, { state: { task } });
   };
@@ -431,7 +431,7 @@ const MyTasks = () => {
           
           {/* --- [MỚI] PROJECT SELECTOR --- */}
           {/* Thay vì hardcode, ta cho phép user chọn dự án tại đây */}
-          {canManageTasks &&(
+          
           <div className="relative">
             <FolderIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <select
@@ -452,7 +452,7 @@ const MyTasks = () => {
             </select>
             <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
           </div>
-          )}
+          
 
           
 
