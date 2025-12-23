@@ -19,7 +19,8 @@ class DashboardService {
       totalMembers,
       completedProjects, 
       allTasksCount,
-      doneTasksCount
+      doneTasksCount,
+      tasksByPriority
     ] = await Promise.all([
       Project.countDocuments({ organizationId: currentOrganizationId, deletedAt: null }),
       Project.countDocuments({ organizationId: currentOrganizationId, status: "active", deletedAt: null }),
@@ -60,7 +61,26 @@ class DashboardService {
           } 
         },
         { $count: "count" }
-      ]).then(res => res[0]?.count || 0)
+      ]).then(res => res[0]?.count || 0),
+
+      Task.aggregate([
+        {
+          $lookup: {
+            from: "projects",
+            localField: "projectId",
+            foreignField: "_id",
+            as: "project"
+          }
+        },
+        { $unwind: "$project" },
+        { $match: { "project.organizationId": new mongoose.Types.ObjectId(currentOrganizationId), "project.deletedAt": null, deletedAt: null } },
+        { 
+          $group: { 
+            _id: "$priority", // Group theo priority (HIGH, MEDIUM, LOW...)
+            count: { $sum: 1 } 
+          } 
+        }
+      ])
     ]);
 
     const avgProgress = allTasksCount > 0 
@@ -83,19 +103,39 @@ class DashboardService {
     .sort({ deadline: 1 })
     .limit(5);
 
+    const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
+    tasksByPriority.forEach(item => {
+      const key = item._id ? item._id.toUpperCase() : "MEDIUM";
+      if (priorityMap.hasOwnProperty(key)) priorityMap[key] = item.count;
+    });
+
+    const priorityChartData = Object.keys(priorityMap).map(key => ({
+      name: key.charAt(0) + key.slice(1).toLowerCase(), 
+      value: priorityMap[key]
+    }));
+
     return {
-      kpi: {
-        totalProjects,
-        totalMembers,
-        completedProjects, 
-        avgProgress
-      },
-      charts: {
-        projectStatus: projectStatusDistribution
-      },
-      lists: {
-        upcomingDeadlines: upcomingDeadlineProjects
-      }
+      success: true, // Nên thêm success flag
+             
+        kpi: {
+            totalProjects,
+            totalMembers,
+            completedProjects, 
+            avgProgress
+        },
+        charts: {
+            projectStatus: projectStatusDistribution,
+            priorityDistribution: priorityChartData,
+            progress: {
+                total: allTasksCount,   // 3. SỬA TÊN BIẾN (totalTasks -> allTasksCount)
+                done: doneTasksCount,   // 3. SỬA TÊN BIẾN (tasksCompleted -> doneTasksCount)
+                percent: avgProgress
+            }
+        },
+        lists: {
+            upcomingDeadlines: upcomingDeadlineProjects
+        }
+      
     };
   }
 
@@ -103,17 +143,52 @@ class DashboardService {
     if (!userId) throw new Error("USER_ID_REQUIRED");
     const now = new Date();
 
-    const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks] = await Promise.all([
+    const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, priorityStatsRaw] = await Promise.all([
       Task.countDocuments({ assigneeId: userId, deletedAt: null }),
       Task.countDocuments({ assigneeId: userId, status: "TODO", deletedAt: null }),
       Task.countDocuments({ assigneeId: userId, status: "DOING", deletedAt: null }),
       Task.countDocuments({ assigneeId: userId, status: "DONE", deletedAt: null }),
-      Task.countDocuments({ assigneeId: userId, deletedAt: null, dueDate: { $lt: now }, status: { $ne: "DONE" } })
+      Task.countDocuments({ assigneeId: userId, deletedAt: null, dueDate: { $lt: now }, status: { $ne: "DONE" } }),
+      // Aggregation để nhóm theo Priority
+      Task.aggregate([
+        {
+          $match: {
+            assigneeId: new mongoose.Types.ObjectId(userId),
+            deletedAt: null
+          }
+        },
+        {
+          $group: {
+            _id: "$priority", // Group theo priority (HIGH, MEDIUM, LOW)
+            count: { $sum: 1 }
+          }
+        }
+      ])
     ]);
+    
+    // 🔵 THÊM: Xử lý mapping priority
+    const priority = { high: 0, medium: 0, low: 0 };
+    if (priorityStatsRaw && Array.isArray(priorityStatsRaw)) {
+        priorityStatsRaw.forEach(item => {
+            if (item._id) {
+                const key = item._id.toLowerCase(); // 'HIGH' -> 'high'
+                if (priority[key] !== undefined) {
+                    priority[key] = item.count;
+                } else {
+                    // Fallback nếu có priority lạ (ví dụ CRITICAL map vào high hoặc medium tuỳ logic)
+                    priority['medium'] += item.count;
+                }
+            } else {
+                priority['medium'] += item.count; // Null priority
+            }
+        });
+    }
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    
 
     const stats = await Task.aggregate([
       {
@@ -149,7 +224,8 @@ class DashboardService {
 
     return {
       kpi: { totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks },
-      charts: { last7DaysActivity: activityChart }
+      charts: { last7DaysActivity: activityChart },
+      priority
     };
   }
 

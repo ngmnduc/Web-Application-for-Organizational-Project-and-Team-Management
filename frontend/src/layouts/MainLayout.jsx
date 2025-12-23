@@ -77,7 +77,7 @@ const MainLayout = () => {
     else {
       setHeaderData({
         title: 'Dashboard',
-        subtitle: 'Welcome to your dashboard',
+        subtitle: 'You can check your working progress here',
       });
     }
   }, [location.pathname]);

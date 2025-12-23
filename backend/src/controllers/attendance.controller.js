@@ -177,7 +177,7 @@ export const checkIn = async (req, res) => {
         const isAllowed = isIPAllowed(clientIp, organization.allowedIps);
         
         // Chặn nếu không đúng IP (Trừ khi là Dev env)
-        if (!isAllowed && process.env.NODE_ENV === 'production') {
+        if (!isAllowed) {
             return res.status(403).json({
                 success: false,
                 error: "ForbiddenError",
@@ -310,8 +310,8 @@ export const addWhitelistIP = async(req, res) => {
       });
     }
 
-    const user = await User.findById(userId).select("organizationId");
-    if (!user || !user.organizationId) {
+    const user = await User.findById(userId).select("currentOrganizationId");
+    if (!user || !user.currentOrganizationId) {
       return res.status(400).json({
         success: false,
         error: "ValidationError",
@@ -319,7 +319,7 @@ export const addWhitelistIP = async(req, res) => {
       });
     }
 
-    const organization = await Organization.findById(user.organizationId);
+    const organization = await Organization.findById(user.currentOrganizationId);
     if (!organization) {
       return res.status(404).json({
         success: false,
@@ -328,7 +328,7 @@ export const addWhitelistIP = async(req, res) => {
       });
     }
 
-    // ✅ Check if IP already exists in whitelist
+    //  Check if IP already exists in whitelist
     const normalizedInputIP = normalizeIP(trimmedIP);
 
     const existingIP = organization.allowedIps.find(
@@ -408,7 +408,7 @@ export const getWhitelistIPs = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId).select("organizationId");
+    const user = await User.findById(userId).select("currentOrganizationId");
     if (!user || !user.organizationId) {
       return res.status(400).json({
         success: false,
@@ -417,7 +417,7 @@ export const getWhitelistIPs = async (req, res) => {
       });
     }
 
-    const organization = await Organization.findById(user.organizationId)
+    const organization = await Organization.findById(user.currentOrganizationId)
       .populate('allowedIps.addedBy', 'name email');
 
     if (!organization) {
@@ -617,5 +617,95 @@ export const getMyAttendance = async (req, res) => {
       error: "ServerError",
       message: err.message,
     });
+  }
+};
+
+
+/**
+ * @desc    Update IP config (Edit IP, Description, Active Status)
+ * @route   PUT /attendance/whitelist-ip/:ipId
+ * @access  Private (Admin/Manager)
+ */
+export const updateWhitelistIP = async (req, res) => {
+  try {
+    const { ipId } = req.params;
+    const { ip, description, isActive } = req.body; 
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    // 1. Check quyền
+    if (userRole !== "Admin" && userRole !== "Manager") {
+      return res.status(403).json({ success: false, error: "ForbiddenError", message: "Forbidden" });
+    }
+
+    // 2. Lấy Organization
+    const user = await User.findById(userId).select("currentOrganizationId");
+    if (!user || !user.currentOrganizationId) {
+        return res.status(400).json({ success: false, error: "ValidationError", message: "User not in Organization" });
+    }
+
+    const organization = await Organization.findById(user.currentOrganizationId);
+    if (!organization) {
+        return res.status(404).json({ success: false, error: "NotFoundError", message: "Organization not found" });
+    }
+
+    // 3. Tìm IP sub-document trong mảng
+    const whitelistItem = organization.allowedIps.id(ipId);
+
+    if (!whitelistItem) {
+        return res.status(404).json({ success: false, error: "NotFoundError", message: "IP Config not found" });
+    }
+
+    // 4. Update các trường 
+    if (ip) whitelistItem.ip = ip; // Lưu ý: Nên validate format IP ở đây nếu kỹ
+    if (description) whitelistItem.description = description;
+    if (typeof isActive === 'boolean') whitelistItem.isActive = isActive;
+
+    await organization.save();
+
+    res.json({ 
+        success: true, 
+        message: "IP updated successfully", 
+        data: whitelistItem 
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+  }
+};
+
+/**
+ * @desc    Remove IP from whitelist
+ * @route   DELETE /attendance/whitelist-ip/:ipId
+ * @access  Private (Admin/Manager)
+ */
+export const removeWhitelistIP = async (req, res) => {
+  try {
+    const { ipId } = req.params; // ID của dòng IP cần xóa
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    // 1. Check quyền
+    if (userRole !== "Admin" && userRole !== "Manager") {
+      return res.status(403).json({ success: false, error: "ForbiddenError", message: "Forbidden" });
+    }
+
+    // 2. Lấy Organization
+    const user = await User.findById(userId).select("currentOrganizationId");
+    if (!user || !user.currentOrganizationId) {
+        return res.status(400).json({ success: false, error: "ValidationError", message: "User not in Organization" });
+    }
+
+    const organization = await Organization.findById(user.currentOrganizationId);
+    
+    // 3. Xóa IP khỏi mảng allowedIps
+    organization.allowedIps.pull({ _id: ipId });
+    
+    await organization.save();
+
+    res.json({ success: true, message: "IP removed successfully" });
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };

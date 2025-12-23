@@ -193,7 +193,8 @@ const Avatar = ({ name, avatarUrl }) => {
 };
 
 // Role Select
-const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
+const RoleSelect = ({ currentRole, userId, onChange, canEdit, currentUserId }) => {
+    
     const getRoleStyle = (role) => {
         const r = role ? role.charAt(0).toUpperCase() + role.slice(1).toLowerCase() : 'Member';
         switch (r) {
@@ -205,16 +206,29 @@ const RoleSelect = ({ currentRole, userId, onChange, canEdit }) => {
     
     const displayRole = currentRole ? currentRole.charAt(0).toUpperCase() + currentRole.slice(1).toLowerCase() : 'Member';
     const currentStyle = getRoleStyle(displayRole);
+    // --- Kiểm tra xem có phải chính mình không ---
+    const isSelf = currentUserId && String(userId) === String(currentUserId);
 
-    if (!canEdit) return <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${currentStyle}`}>{displayRole}</span>;
+    if (!canEdit || isSelf) {
+        return <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${currentStyle}`}>{displayRole}</span>;
+    }
     return (
         <div className="relative inline-block">
-            <select value={displayRole} onChange={(e) => onChange(userId, e.target.value)} className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-bold rounded-full border focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all ${currentStyle}`}>
-                <option value="Admin">Admin</option>
-                <option value="Manager">Manager</option>
-                <option value="Member">Member</option>
+            <select 
+                value={displayRole} 
+                onChange={(e) => onChange(userId, e.target.value)} 
+                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-xs font-bold rounded-full border focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all ${currentStyle}`}
+            >
+                {displayRole === 'Admin' && (
+                    <option value="Admin" className="bg-white text-gray-800">Admin</option>
+                )}
+                <option value="Manager" className="bg-white text-gray-800">Manager</option>
+                <option value="Member" className="bg-white text-gray-800">Member</option>
             </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"><svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg></div>
+            
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+            </div>
         </div>
     );
 };
@@ -255,7 +269,8 @@ const Members = () => {
     const [members, setMembers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [myProjectRole, setMyProjectRole] = useState(null);
     // States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -283,7 +298,9 @@ const Members = () => {
     useEffect(() => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
+            const userObj = JSON.parse(userStr);
             setCurrentUserRole(JSON.parse(userStr).role || 'Member');
+            setCurrentUserId(userObj.id || userObj._id);
         }
     }, []);
 
@@ -307,14 +324,19 @@ const Members = () => {
     }, []);
 
     // 2. Fetch Members
+// 2. Fetch Members
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
+            // Lấy User ID chuẩn từ LocalStorage để so sánh
             const userStr = localStorage.getItem('user');
-            const userRole = userStr ? JSON.parse(userStr).role : 'Member';
+            const userObj = userStr ? JSON.parse(userStr) : {};
+            const myId = userObj.id || userObj._id;
+            const mySystemRole = userObj.role;
+
             const targetProjectId = projectId || (selectedProjectId !== 'all' ? selectedProjectId : null);
 
-            // A: View 1 Project
+            // CASE A: Xem chi tiết 1 Project
             if (targetProjectId) {
                 const res = await fetch(`${API_BASE_URL}/projects/${targetProjectId}/members`, { headers: getHeaders() });
                 if (!res.ok) throw new Error('Access denied');
@@ -324,44 +346,46 @@ const Members = () => {
                     id: m.user.id || m.user._id,
                     name: m.user.name,
                     email: m.user.email,
-                    role: m.role, // Project Role
+                    role: m.role, // Role dự án (Admin/Manager/Member)
                     systemRole: m.user.role, 
                     avatarUrl: m.user.avatar,
                     createdAt: m.createdAt,
                     projects: [],
-                    membershipId: m._id // QUAN TRỌNG: ID để xóa khỏi dự án
+                    membershipId: m._id 
                 }));
 
-                // --- ĐÃ SỬA: Lọc bỏ Admin ra khỏi danh sách hiển thị ---
-                const visibleMembers = mapped.filter(m => m.role !== 'Admin');
-                setMembers(visibleMembers);
-                // -----------------------------------------------------
-            }
-            // B: View All (Admin)
-            else if (userRole === 'Admin') {
-                const [usersRes, projectsRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/users`, { headers: getHeaders() }),
-                    fetch(`${API_BASE_URL}/projects`, { headers: getHeaders() })
-                ]);
+                // 1. Tìm xem mình là ai trong dự án này để set quyền nút bấm
+                const meInProject = mapped.find(m => String(m.id) === String(myId));
+                setMyProjectRole(meInProject ? meInProject.role : null);
 
+                // 2. Lọc bỏ Admin hệ thống ra khỏi danh sách hiển thị (để đỡ rối)
+                const visibleMembers = mapped.filter(m => m.systemRole !== 'Admin');
+                setMembers(visibleMembers);
+            }
+            // CASE B: Xem tất cả (Admin Mode)
+            else if (mySystemRole === 'Admin') {
+                const usersRes = await fetch(`${API_BASE_URL}/users`, { headers: getHeaders() });
                 if (!usersRes.ok) throw new Error('Failed');
                 const usersData = await usersRes.json();
-                const projectsData = await projectsRes.json();
-                const allProjects = projectsData.data || [];
 
                 const mapped = (usersData.data || []).map(u => {
-                    const uid = u._id || u.id;
-                    const joined = allProjects.filter(p => p.members?.some(m => String(m.user._id || m.user) === String(uid)));
+                    // [LOGIC MỚI] Ép hiển thị: Nếu không phải Admin thì coi là Member hết
+                    let displaySystemRole = u.role;
+                    if (u.role !== 'Admin') displaySystemRole = 'Member';
+
                     return {
-                        id: uid,
+                        id: u._id || u.id,
                         name: u.name,
                         email: u.email,
-                        role: u.role, 
+                        role: displaySystemRole, // Ép hiển thị Member
+                        realRole: u.role,        // Lưu role gốc nếu cần dùng
                         createdAt: u.createdAt,
-                        projects: joined,
+                        projectCount: u.projectCount || 0,
                         membershipId: null 
                     };
                 });
+                
+                setMyProjectRole(null); // Không ở trong project nào
                 setMembers(mapped);
             }
         } catch (error) { 
@@ -372,38 +396,50 @@ const Members = () => {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const handleChangeRole = async (userId, newRole) => { 
-        try {
-            // 1. Gọi API update role
-            const res = await fetch(`${API_BASE_URL}/auth/${userId}/role`, {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify({ role: newRole })
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                showNotification(`Updated role to ${newRole}`, "success");
-                
-                // 2. Cập nhật ngay UI mà không cần F5
-                setMembers(prevMembers => prevMembers.map(member => {
-                    if (member.id === userId) {
-                        return { 
-                            ...member, 
-                            role: newRole,        // Update role hiển thị
-                            systemRole: newRole   // Update role hệ thống
-                        };
-                    }
-                    return member;
-                }));
-            } else {
-                showNotification(data.message || "Failed to update role", "error");
-            }
-        } catch (error) {
-            console.error("Change role error:", error);
-            showNotification("Error updating role", "error");
+    try {
+        let url;
+        let method = 'PUT';
+        
+        //Phân biệt đang sửa role Hệ thống hay role Dự án
+        if (selectedProjectId !== 'all' || projectId) {
+            // Đang ở trong Project -> Gọi API sửa role dự án
+            const pId = projectId || selectedProjectId;
+            url = `${API_BASE_URL}/projects/${pId}/members/${userId}`;
+        } else {
+            // Đang ở Admin View -> Gọi API sửa role hệ thống
+            url = `${API_BASE_URL}/auth/${userId}/role`;
         }
-    };
+
+        const res = await fetch(url, {
+            method: method,
+            headers: getHeaders(),
+            body: JSON.stringify({ role: newRole })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            showNotification(`Updated role to ${newRole}`, "success");
+            // Update UI
+            setMembers(prevMembers => prevMembers.map(member => {
+                if (member.id === userId) {
+                    return { 
+                        ...member, 
+                        role: newRole, 
+                        // Nếu đang ở Admin view thì update cả systemRole, còn project view thì thôi
+                        ...(selectedProjectId === 'all' && !projectId ? { systemRole: newRole } : {})
+                    };
+                }
+                return member;
+            }));
+        } else {
+            showNotification(data.message || "Failed to update role", "error");
+        }
+    } catch (error) {
+        console.error("Change role error:", error);
+        showNotification("Error updating role", "error");
+    }
+};
 
     // --- FIX: REMOVE MEMBER (Tìm đúng ID để xóa) ---
     const handleRemoveClick = (member) => {
@@ -494,6 +530,7 @@ const Members = () => {
 
     const isAdmin = currentUserRole === 'Admin';
     const isProjectView = selectedProjectId !== 'all' || projectId; 
+    const canManage = isAdmin || (isProjectView && (myProjectRole === 'Manager' || myProjectRole === 'Admin'));
     const canInvite = isProjectView && (isAdmin || currentUserRole === 'Manager');
 
     return (
@@ -554,9 +591,9 @@ const Members = () => {
                                     {filteredMembers.map((member) => (
                                         <tr key={member.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4"><div className="flex items-center gap-3"><Avatar name={member.name} avatarUrl={member.avatarUrl} /><div><div className="text-sm font-bold text-gray-900">{member.name}</div><div className="text-sm text-gray-500">{member.email}</div></div></div></td>
-                                            <td className="px-6 py-4"><RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={isAdmin && !isProjectView} /></td>
-                                            {!isProjectView && <td className="px-6 py-4"><span className="px-2 py-1 text-xs bg-gray-100 rounded-full">{member.projects?.length || 0} Projects</span></td>}
-                                            {(isAdmin || (isProjectView && currentUserRole === 'Manager')) && (
+                                            <td className="px-6 py-4"><RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={canManage} currentUserId={currentUserId} /></td>
+                                            {!isProjectView && <td className="px-6 py-4"><span className="px-2 py-1 text-xs bg-gray-100 rounded-full">{member.projectCount || 0} Projects</span></td>}
+                                            {canManage && (
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end items-center gap-2">
                                                         <button onClick={() => handleInfo(member)} className="text-gray-400 hover:text-blue-600 p-1 rounded-full hover:bg-blue-50"><InformationCircleIcon className="w-5 h-5" /></button>
