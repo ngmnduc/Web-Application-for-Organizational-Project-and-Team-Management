@@ -246,7 +246,7 @@ export const getMyCurrentIP = async (req, res) => {
 
     const clientIp = getClientIp(req);
     
-    // ✅ Detailed IP information for debugging
+    // Detailed IP information for debugging
     const ipInfo = {
       ip: clientIp,
       normalizedIp: normalizeIP(clientIp),
