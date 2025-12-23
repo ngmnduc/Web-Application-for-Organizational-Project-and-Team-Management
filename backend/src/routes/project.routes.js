@@ -14,7 +14,8 @@ import {
   getPendingRequests,
   toggleArchive,
   removeProjectMember,
-  updateMemberRole
+  updateMemberRole,
+  addMember
 } from "../controllers/project.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
 
