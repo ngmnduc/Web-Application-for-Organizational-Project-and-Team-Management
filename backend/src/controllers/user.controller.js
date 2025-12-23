@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import OrganizationMember from "../models/organizationMember.model.js";
+import ProjectMember from "../models/projectMember.model.js";
 
 // GET /users (admin only)
 export const listUsers = async (req, res) => {
@@ -28,7 +29,23 @@ export const listUsers = async (req, res) => {
       .select("name email role status avatar createdAt updatedAt organizations currentOrganizationId")
       .sort({ createdAt: -1 });
 
-    res.json({ success: true, count: users.length, data: users });
+    // 5. Đếm số project của từng user
+    const usersWithProjectCount = await Promise.all(
+      users.map(async (user) => {
+        const projectCount = await ProjectMember.countDocuments({
+          userId: user._id,
+          organizationId: currentOrgId,
+          status: "ACTIVE"
+        });
+
+        return {
+          ...user.toObject(),
+          projectCount
+        };
+      })
+    );
+
+    res.json({ success: true, count: usersWithProjectCount.length, data: usersWithProjectCount });
   } catch (err) {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }

@@ -356,26 +356,20 @@ const Members = () => {
             }
             // B: View All (Admin)
             else if (userRole === 'Admin') {
-                const [usersRes, projectsRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/users`, { headers: getHeaders() }),
-                    fetch(`${API_BASE_URL}/projects`, { headers: getHeaders() })
-                ]);
+                const usersRes = await fetch(`${API_BASE_URL}/users`, { headers: getHeaders() });
 
                 if (!usersRes.ok) throw new Error('Failed');
                 const usersData = await usersRes.json();
-                const projectsData = await projectsRes.json();
-                const allProjects = projectsData.data || [];
 
                 const mapped = (usersData.data || []).map(u => {
                     const uid = u._id || u.id;
-                    const joined = allProjects.filter(p => p.members?.some(m => String(m.user._id || m.user) === String(uid)));
                     return {
                         id: uid,
                         name: u.name,
                         email: u.email,
                         role: u.role, 
                         createdAt: u.createdAt,
-                        projects: joined,
+                        projectCount: u.projectCount || 0, // Sử dụng projectCount từ backend
                         membershipId: null 
                     };
                 });
@@ -572,7 +566,7 @@ const Members = () => {
                                         <tr key={member.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4"><div className="flex items-center gap-3"><Avatar name={member.name} avatarUrl={member.avatarUrl} /><div><div className="text-sm font-bold text-gray-900">{member.name}</div><div className="text-sm text-gray-500">{member.email}</div></div></div></td>
                                             <td className="px-6 py-4"><RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={isAdmin && !isProjectView} currentUserId={currentUserId} /></td>
-                                            {!isProjectView && <td className="px-6 py-4"><span className="px-2 py-1 text-xs bg-gray-100 rounded-full">{member.projects?.length || 0} Projects</span></td>}
+                                            {!isProjectView && <td className="px-6 py-4"><span className="px-2 py-1 text-xs bg-gray-100 rounded-full">{member.projectCount || 0} Projects</span></td>}
                                             {(isAdmin || (isProjectView && currentUserRole === 'Manager')) && (
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end items-center gap-2">
