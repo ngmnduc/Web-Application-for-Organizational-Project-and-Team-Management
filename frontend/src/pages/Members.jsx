@@ -10,7 +10,8 @@ import { useParams } from 'react-router-dom';
 import { LoaderOverlay } from '../components/LoaderOverlay';
 import AddMemberModal from '../components/AddMemberModal';
 import AssignToProjectModal from '../components/AssignToProjectModal';
-
+import { useProject } from '../context/ProjectContext';
+import { getProjects } from '../services/projectService'; // ⚠️ THÊM IMPORT NÀY
 const API_BASE_URL = 'http://localhost:4000/api'; 
 
 // --- Helper Functions ---
@@ -264,8 +265,10 @@ const UserInfoModal = ({ isOpen, onClose, user }) => {
 };
 
 // --- MAIN COMPONENT ---
-const Members = () => {
-    const { id: projectId } = useParams(); 
+const Members = () => { 
+    const { selectedProjectId, switchProject } = useProject(); // ✅ LẤY ĐÚNG TỪ CONTEXT
+    //  THÊM STATE CHO DANH SÁCH PROJECTS
+    const [availableProjects, setAvailableProjects] = useState([]);
     const [members, setMembers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -282,9 +285,6 @@ const Members = () => {
     
     // Auth & Filter
     const [currentUserRole, setCurrentUserRole] = useState('Member');
-    const [availableProjects, setAvailableProjects] = useState([]); 
-    const [selectedProjectId, setSelectedProjectId] = useState('all'); 
-
     // Action States
     const [deleteUserModal, setDeleteUserModal] = useState(null); 
     const [removeProjectConfirm, setRemoveProjectConfirm] = useState(null); 
@@ -304,24 +304,7 @@ const Members = () => {
         }
     }, []);
 
-    // 1. Fetch Projects for Filter
-    useEffect(() => {
-        const fetchProjects = async () => {
-            try {
-                const res = await fetch(`${API_BASE_URL}/projects`, { headers: getHeaders() });
-                const data = await res.json();
-                if (data.success) {
-                    setAvailableProjects(data.data || []);
-                    const userStr = localStorage.getItem('user');
-                    const userRole = userStr ? JSON.parse(userStr).role : 'Member';
-                    if(userRole !== 'Admin' && data.data && data.data.length > 0) {
-                        setSelectedProjectId(data.data[0]._id);
-                    }
-                }
-            } catch (err) { console.error(err); }
-        };
-        fetchProjects();
-    }, []);
+    // 1. Fetch Projects for Filte
 
     // 2. Fetch Members
 // 2. Fetch Members
@@ -334,8 +317,7 @@ const Members = () => {
             const myId = userObj.id || userObj._id;
             const mySystemRole = userObj.role;
 
-            const targetProjectId = projectId || (selectedProjectId !== 'all' ? selectedProjectId : null);
-
+            const targetProjectId = selectedProjectId !== 'all' ? selectedProjectId : null;
             // CASE A: Xem chi tiết 1 Project
             if (targetProjectId) {
                 const res = await fetch(`${API_BASE_URL}/projects/${targetProjectId}/members`, { headers: getHeaders() });
@@ -391,7 +373,7 @@ const Members = () => {
         } catch (error) { 
             console.error(error); 
         } finally { setIsLoading(false); }
-    }, [projectId, selectedProjectId]);
+    }, [selectedProjectId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -401,9 +383,8 @@ const Members = () => {
         let method = 'PUT';
         
         //Phân biệt đang sửa role Hệ thống hay role Dự án
-        if (selectedProjectId !== 'all' || projectId) {
-            // Đang ở trong Project -> Gọi API sửa role dự án
-            const pId = projectId || selectedProjectId;
+       if (selectedProjectId !== 'all') {
+            const pId = selectedProjectId;
             url = `${API_BASE_URL}/projects/${pId}/members/${userId}`;
         } else {
             // Đang ở Admin View -> Gọi API sửa role hệ thống
@@ -427,7 +408,7 @@ const Members = () => {
                         ...member, 
                         role: newRole, 
                         // Nếu đang ở Admin view thì update cả systemRole, còn project view thì thôi
-                        ...(selectedProjectId === 'all' && !projectId ? { systemRole: newRole } : {})
+                        ...(selectedProjectId === 'all' ? { systemRole: newRole } : {})
                     };
                 }
                 return member;
@@ -529,7 +510,7 @@ const Members = () => {
     );
 
     const isAdmin = currentUserRole === 'Admin';
-    const isProjectView = selectedProjectId !== 'all' || projectId; 
+    const isProjectView = selectedProjectId !== 'all'; 
     const canManage = isAdmin || (isProjectView && (myProjectRole === 'Manager' || myProjectRole === 'Admin'));
     const canInvite = isProjectView && (isAdmin || currentUserRole === 'Manager');
 
@@ -553,11 +534,18 @@ const Members = () => {
                         {availableProjects.length > 0 && (
                             <div className="relative">
                                 <FunnelIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                <select className="pl-10 pr-8 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none bg-white text-sm font-medium text-gray-700 cursor-pointer" value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}>
+                                <select 
+                                    className="pl-10 pr-8 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none bg-white text-sm font-medium text-gray-700 cursor-pointer" 
+                                    value={selectedProjectId} 
+                                    onChange={(e) => {
+                                        const project = availableProjects.find(p => p._id === e.target.value);
+                                        switchProject(e.target.value, project?.name || 'Unknown');
+                                    }}
+                                >
                                     {isAdmin && <option value="all">All Members</option>}
-                                    <optgroup label="Select a Project">
-                                        {availableProjects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                                    </optgroup>
+                                    {availableProjects.map(p => (
+                                        <option key={p._id} value={p._id}>{p.name}</option>
+                                    ))}
                                 </select>
                             </div>
                         )}
@@ -611,8 +599,13 @@ const Members = () => {
                 </div>
             </div>
 
-            <InviteModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} projectId={selectedProjectId !== 'all' ? selectedProjectId : projectId} showNotification={showNotification} />
-            <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddMember={() => { setIsAddModalOpen(false); fetchData(); showNotification("Member added", "success"); }} />
+    <InviteModal 
+        isOpen={isInviteModalOpen} 
+        onClose={() => setIsInviteModalOpen(false)} 
+        projectId={selectedProjectId !== 'all' ? selectedProjectId : null} 
+        showNotification={showNotification} 
+    />       
+     <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddMember={() => { setIsAddModalOpen(false); fetchData(); showNotification("Member added", "success"); }} />
             <AssignToProjectModal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} user={selectedUser} onAssignSuccess={() => { fetchData(); showNotification("Assigned successfully", "success"); }} />
             <UserInfoModal isOpen={isInfoModalOpen} onClose={() => setIsInfoModalOpen(false)} user={selectedUser} />
         </div>
