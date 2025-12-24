@@ -9,7 +9,9 @@ import {
    deleteSubtask,
    updateTask,
    getProjectMembers,
-   generateAiSubtasks
+   generateAiSubtasks,
+   addAttachment,
+   removeAttachment
 } from "../services/taskService";
 import { useAuth } from "../services/AuthContext"; // Import useAuth
 import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon, SparklesIcon } from "@heroicons/react/24/solid";
@@ -371,33 +373,42 @@ const TaskDetail = () => {
     }, 100);
   };
 
+  // --- THAY THẾ TOÀN BỘ HÀM handleAddAttachment CŨ BẰNG ĐOẠN NÀY ---
   const handleAddAttachment = async () => {
+    // 1. Validate
     if (!newAttachmentUrl.trim()) {
         toast.error("URL cannot be empty.");
         return;
     }
-    
-    // --- START: Thay thế logic giả lập bằng API thực ---
-    
-    // Giả lập thêm vào UI và đóng input
-    const mockAttachment = {
-        _id: Date.now(),
-        url: newAttachmentUrl.trim(),
-        title: newAttachmentTitle.trim() || newAttachmentUrl.trim(),
-    };
-    
-    setTask(prev => ({
-        ...prev,
-        attachments: [...(prev.attachments || []), mockAttachment]
-    }));
-    
-    setNewAttachmentUrl("");
-    setNewAttachmentTitle("");
-    setIsAttachmentInputOpen(false);
-    
-    // --- END: Thay thế logic giả lập này bằng API thực ---
 
-    toast.success("Attachment added (Mock Success). Remember to implement API call!");
+    try {
+        // 2. Chuẩn bị payload (map title -> name theo yêu cầu Backend)
+        const payload = {
+            url: newAttachmentUrl.trim(),
+            name: newAttachmentTitle.trim() || newAttachmentUrl.trim(), 
+        };
+
+        // 3. Gọi API thật
+        const addedAttachment = await addAttachment(taskId, payload);
+
+        // 4. Cập nhật State
+        setTask(prev => ({
+            ...prev,
+            attachments: [...(prev.attachments || []), addedAttachment]
+        }));
+        
+        // 5. Reset form
+        setNewAttachmentUrl("");
+        setNewAttachmentTitle("");
+        setIsAttachmentInputOpen(false);
+        
+        toast.success("Attachment added successfully!");
+
+    } catch (err) {
+        console.error("Add attachment error:", err);
+        // Hiển thị lỗi chi tiết từ backend trả về
+        toast.error(err.response?.data?.message || "Failed to add attachment");
+    }
   };
 
  // ========== RENDER GUARDS ==========
@@ -787,12 +798,44 @@ const TaskDetail = () => {
                       rel="noreferrer"
                       className="text-blue-600 hover:underline truncate max-w-[150px]"
                     >
-                      {a.title || a.url}
+                      {a.name || a.title || a.url}
                     </a>
                     {canManage && (
-                      <button className="text-xs text-red-500 hover:text-red-700">
-                        ✕
-                      </button>
+                      <button 
+                      className="text-xs text-red-500 hover:text-red-700 p-1"
+                      onClick={async () => {
+                         // 1. Thay window.confirm bằng Swal.fire giống hệt subtask
+                         const result = await Swal.fire({
+                            title: 'Delete this attachment?',
+                            text: "This action cannot be undone.",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'OK',
+                            cancelButtonText: 'Cancel'
+                         });
+                  
+                         // 2. Nếu người dùng không bấm OK thì dừng
+                         if (!result.isConfirmed) return;
+                  
+                         // 3. Thực hiện xóa
+                         try {
+                             await removeAttachment(taskId, a.id || a._id);
+                             
+                             setTask(prev => ({
+                                 ...prev,
+                                 attachments: prev.attachments.filter(item => (item.id || item._id) !== (a.id || a._id))
+                             }));
+                             toast.success("Attachment removed");
+                         } catch (err) {
+                             console.error(err);
+                             toast.error("Failed to remove attachment");
+                         }
+                      }}
+                    >
+                      ✕
+                    </button>
                     )}
                   </li>
                 ))}
