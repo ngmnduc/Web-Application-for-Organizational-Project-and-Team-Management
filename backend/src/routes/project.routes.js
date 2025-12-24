@@ -14,7 +14,8 @@ import {
   getPendingRequests,
   toggleArchive,
   removeProjectMember,
-  updateMemberRole
+  updateMemberRole,
+  addMember
 } from "../controllers/project.controller.js";
 import { verifyToken, checkRole } from "../middlewares/auth.js";
 
@@ -67,6 +68,12 @@ router.delete("/projects/:id", verifyToken, checkRole("Admin", "Manager"), delet
  * @desc    Archive or Unarchive a project
  */
 router.patch("/projects/:id/archive", verifyToken, checkRole("Admin", "Manager"), toggleArchive);
+
+/**
+ * @route   POST /projects/:id/members
+ * @desc    Add a member to project manually
+ */
+router.post("/projects/:id/members", verifyToken, checkRole("Admin", "Manager"), addMember);
 
 /**
  * @route   GET /projects/:id/members
