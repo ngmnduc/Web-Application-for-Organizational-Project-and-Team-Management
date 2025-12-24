@@ -1,9 +1,9 @@
 import Comment from "../models/comment.model.js";
 import User from "../models/user.model.js";
-import Notification from "../models/notification.model.js";
 import Task from "../models/task.model.js";
 import ProjectMember from "../models/projectMember.model.js";
 import ActivityLog from "../models/activityLog.model.js";
+import { createNotification } from "../services/notification.service.js";
 
 /**
  * @desc    Create a new comment & trigger mentions
@@ -15,12 +15,14 @@ export const createComment = async (req, res) => {
     const { taskId } = req.params;
     const { content } = req.body;
     const currentUser = req.user;
+
     if (!content) {
       return res.status(400).json({ 
         success: false, 
         message: "Content is required" 
       });
     }
+
     // Validate existence
     const task = await Task.findById(taskId);
     if (!task) {
@@ -29,14 +31,18 @@ export const createComment = async (req, res) => {
         message: "Task not found" 
       });
     }
+
     // Check permission
     const isMember = await ProjectMember.findOne({ 
       projectId: task.projectId, 
       userId: currentUser._id 
     });
+    
     if (currentUser.role !== "Admin" && !isMember) {
         return res.status(403).json({ success: false, message: "You are not a member of this project" });
     }
+
+    // Create Comment
     const comment = new Comment({
       taskId,
       userId: currentUser._id,
@@ -45,24 +51,24 @@ export const createComment = async (req, res) => {
     await comment.save();
     
     const mentions = [...content.matchAll(/@([A-Za-zÀ-ỹ0-9_]+)/gi)].map((m) => m[1]);
+    
     if (mentions.length > 0) {
       const uniqueNames = [...new Set(mentions)];
-      const notificationPromises = uniqueNames.map(async (name) => {
+      for (const name of uniqueNames) {
         const mentionedUser = await User.findOne({ 
             name: { $regex: new RegExp(`^${name}$`, "i") } 
         });
         if (mentionedUser && String(mentionedUser._id) !== String(currentUser._id)) {
-           return Notification.create({
+           await createNotification({
             userId: mentionedUser._id,
             type: "MENTION",
-            taskId: task._id,
-            payload: `${currentUser.name} mentioned you in task "${task.title}"`,
-            read: false
+            content: `${currentUser.name} mentioned you in task "${task.title}"`,
+            relatedId: task._id
           });
         }
-      });
-      await Promise.all(notificationPromises);
+      }
     }
+
     try {
       await ActivityLog.create({
         projectId: task.projectId,
@@ -72,7 +78,9 @@ export const createComment = async (req, res) => {
         content: `commented on task "${task.title}"`
       });
     } catch (e) { console.error("Logging failed:", e.message); }
+
     await comment.populate("userId", "name email role");
+    
     res.status(201).json({
       success: true,
       message: "Comment created successfully",

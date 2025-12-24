@@ -1,4 +1,5 @@
 import Notification from "../models/notification.model.js";
+import { markAllAsRead as markAllAsReadService } from "../services/notification.service.js";
 
 /**
  * @desc    Get notifications for current user
@@ -23,7 +24,7 @@ export const getNotifications = async (req, res) => {
 };
 
 /**
- * @desc    Mark notification as read
+ * @desc    Mark single notification as read
  * @route   PATCH /notifications/:id/read
  * @access  Private
  */
@@ -49,6 +50,24 @@ export const markAsRead = async (req, res) => {
       success: true,
       message: "Marked as read",
       data: notification,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Mark ALL notifications as read
+ * @route   PATCH /notifications/read-all
+ * @access  Private
+ */
+export const markAllAsRead = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    await markAllAsReadService(userId);
+    res.status(200).json({
+      success: true,
+      message: "All notifications marked as read",
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

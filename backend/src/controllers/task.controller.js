@@ -1,6 +1,7 @@
 import * as taskService from "../services/task.service.js";
 import mongoose from "mongoose";
 import Task from "../models/task.model.js"; 
+import { createNotification } from "../services/notification.service.js";
 
 /**
  * @desc    Get all tasks in a project
@@ -83,6 +84,7 @@ export const createTask = async (req, res) => {
             message: "Invalid Project ID. Please select a project first." 
         });
     }
+
     const task = await taskService.createTask(
       req.body,
       userId,
@@ -90,6 +92,15 @@ export const createTask = async (req, res) => {
       currentOrgId
     );
     
+    if (task.assigneeId && task.assigneeId.toString() !== userId.toString()) {
+        await createNotification({
+            userId: task.assigneeId, 
+            type: 'TASK_ASSIGN',
+            content: `You have been assigned to a new task: "${task.title}"`,
+            relatedId: task._id
+        });
+    }
+
     res.status(201).json({
       success: true,
       message: "Task created successfully",
@@ -119,11 +130,27 @@ export const createTask = async (req, res) => {
 */
 export const updateTask = async (req, res) => {
   try {
+    const oldTask = await Task.findById(req.params.id);
     const updatedTask = await taskService.updateTask(
       req.params.id,
       req.body,
       req.user
     );
+
+    if (updatedTask && req.body.assigneeId) {
+        const newAssigneeId = updatedTask.assigneeId?.toString();
+        const oldAssigneeId = oldTask?.assigneeId?.toString();
+        const actorId = req.user._id.toString();
+        if (newAssigneeId && newAssigneeId !== oldAssigneeId && newAssigneeId !== actorId) {
+             await createNotification({
+                userId: newAssigneeId,
+                type: 'TASK_ASSIGN',
+                content: `You have been assigned to task: "${updatedTask.title}"`,
+                relatedId: updatedTask._id
+            });
+        }
+    }
+
     res.status(200).json({
       success: true,
       message: "Task updated successfully",

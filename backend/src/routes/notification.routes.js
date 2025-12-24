@@ -1,5 +1,9 @@
 import express from "express";
-import { getNotifications, markAsRead } from "../controllers/notification.controller.js";
+import { 
+    getNotifications, 
+    markAsRead, 
+    markAllAsRead
+} from "../controllers/notification.controller.js";
 import { verifyToken } from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -10,6 +14,13 @@ const router = express.Router();
  * @access  Private
  */
 router.get("/notifications", verifyToken, getNotifications);
+
+/**
+ * @route   PATCH /notifications/read-all
+ * @desc    Mark ALL notifications as read
+ * @access  Private
+ */
+router.patch("/notifications/read-all", verifyToken, markAllAsRead);
 
 /**
  * @route   PATCH /notifications/:id/read
