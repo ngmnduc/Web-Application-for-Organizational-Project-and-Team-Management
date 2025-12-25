@@ -803,8 +803,7 @@ const TaskDetail = () => {
                     {canManage && (
                       <button 
                       className="text-xs text-red-500 hover:text-red-700 p-1"
-                      onClick={async () => {
-                         // 1. Thay window.confirm bằng Swal.fire giống hệt subtask
+                      onClick={async () => {                        
                          const result = await Swal.fire({
                             title: 'Delete this attachment?',
                             text: "This action cannot be undone.",
@@ -816,10 +815,8 @@ const TaskDetail = () => {
                             cancelButtonText: 'Cancel'
                          });
                   
-                         // 2. Nếu người dùng không bấm OK thì dừng
                          if (!result.isConfirmed) return;
                   
-                         // 3. Thực hiện xóa
                          try {
                              await removeAttachment(taskId, a.id || a._id);
                              
@@ -845,7 +842,7 @@ const TaskDetail = () => {
         </div>
 
       </div>
-      {/* === EDIT TASK MODAL (Thêm mới đoạn này vào cuối) === */}
+      {/* === EDIT TASK MODAL === */}
       {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
