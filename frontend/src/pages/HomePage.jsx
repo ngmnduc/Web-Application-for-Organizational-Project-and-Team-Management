@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -19,6 +19,95 @@ import {
 // 🔵 THÊM MỚI: Import Service Dashboard (đã tạo ở bước trước)
 import dashboardService from "../services/dashboardService";
 import { useProject } from '../context/ProjectContext';
+// ==================================================================================
+// 🔵 DRAGGABLE FAB COMPONENT (DESKTOP ONLY)
+// ==================================================================================
+const DraggableFAB = ({ onClick, isOpen }) => {
+    // Vị trí mặc định: Cách đáy 24px, cách trái 24px (Bottom-Left)
+    const [position, setPosition] = useState({ 
+        x: 24, 
+        y: window.innerHeight - 90 
+    });
+    const [isDragging, setIsDragging] = useState(false);
+    const offset = useRef({ x: 0, y: 0 });
+    const dragStartTime = useRef(0);
+
+    // --- MOUSE EVENTS ONLY (Desktop) ---
+    const handleMouseDown = (e) => {
+        setIsDragging(true);
+        dragStartTime.current = Date.now();
+        const rect = e.currentTarget.getBoundingClientRect();
+        offset.current = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const newX = e.clientX - offset.current.x;
+            const newY = e.clientY - offset.current.y;
+            
+            // Giới hạn không cho kéo ra ngoài màn hình
+            const maxX = window.innerWidth - 60; // 60 là width nút
+            const maxY = window.innerHeight - 60;
+
+            setPosition({
+                x: Math.min(Math.max(0, newX), maxX),
+                y: Math.min(Math.max(0, newY), maxY)
+            });
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+        };
+
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
+
+    const handleClick = () => {
+        // Nếu thời gian nhấn < 200ms thì coi là Click, ngược lại là Drag
+        if (Date.now() - dragStartTime.current < 200) {
+            onClick();
+        }
+    };
+
+    return (
+        <button
+            onMouseDown={handleMouseDown}
+            onClick={handleClick}
+            style={{ 
+                left: position.x, 
+                top: position.y,
+                position: 'fixed',
+                zIndex: 9999,
+                cursor: isDragging ? 'grabbing' : 'grab' // Icon bàn tay nắm/mở
+            }}
+            className={`p-4 rounded-full shadow-xl transition-transform duration-100 active:scale-95 group ring-4 ring-white/50 flex items-center justify-center
+                ${isOpen 
+                    ? 'bg-gray-800 text-white' 
+                    : 'bg-gradient-to-r from-[#3b064d] to-[#f35640] text-white hover:shadow-2xl'
+                }`}
+            title="AI Daily Brief"
+        >
+            {isOpen ? (
+                 <XMarkIcon className="w-6 h-6" />
+            ) : (
+                 <SparklesIcon className="w-6 h-6 text-yellow-300 group-hover:animate-pulse" />
+            )}
+        </button>
+    );
+};
 // ==================================================================================
 // 🔵 AI DAILY WIDGET COMPONENT
 // ==================================================================================
@@ -204,6 +293,14 @@ const HomePage = () => {
         }
         if (user.role === 'Member'){
             promises.push(dashboardService.getMemberStats().then(data => ({ type: 'MEMBER', data })));
+        }
+        try {
+            const res = await axiosInstance.get('/projects');
+            if (res.data.success) {
+                setProjects(res.data.data || []);
+            }
+        } catch (err) {
+            console.error("Fetch Projects Error:", err);
         }
         
 
@@ -938,18 +1035,11 @@ const HomePage = () => {
         <AIDailyWidget onClose={() => setShowAIBrief(false)} />
       )}
 
-      {/* Floating Action Button (Giữ nguyên) */}
-      <button
-        onClick={() => setShowAIBrief(!showAIBrief)}
-        className="fixed bottom-6 left-6 z-50 p-5 bg-gradient-to-r from-[#3b064d] to-[#f35640] text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 group ring-4 ring-white/50"
-        title="AI Daily Brief"
-      >
-        {showAIBrief ? (
-             <XMarkIcon className="w-6 h-6" />
-        ) : (
-             <SparklesIcon className="w-6 h-6 text-yellow-300 group-hover:animate-pulse" />
-        )}
-      </button>
+      {/* 🔵 DRAGGABLE FAB REPLACES FIXED BUTTON */}
+      <DraggableFAB 
+        onClick={() => setShowAIBrief(!showAIBrief)} 
+        isOpen={showAIBrief} 
+      />
 
     </div>
   );
