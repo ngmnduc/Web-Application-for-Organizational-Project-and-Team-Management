@@ -213,7 +213,8 @@ const MyTasks = () => {
 
             const formattedMembers = members.map(m => ({
                 id: m.user?._id || m.user || m._id, 
-                name: m.user?.name || m.name || 'Unnamed Member'
+                name: m.user?.name || m.name || 'Unnamed Member',
+                role: m.role || 'Member'
             }));
             setProjectMembers(formattedMembers);
             setProjectLabels(labels); // Lưu labels vào state
@@ -365,7 +366,7 @@ const MyTasks = () => {
       assigneeId: currentUser.id, 
       assigneeName: currentUser.name, // ✅ SỬA: Dùng currentUser thay vì user trực tiếp
       priority: 'MEDIUM', 
-      status: STATUS_API_MAP[statusColumn] || 'TODO', 
+      status: 'TODO', 
       dueDate: '', 
       labels: '',
     });
@@ -593,7 +594,9 @@ const MyTasks = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
                   <select className="w-full border appearance-none border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.assigneeId} onChange={(e) => setNewTaskForm((f) => ({ ...f, assigneeId: e.target.value }))}>
                     <option value="">Unassigned</option>
-                    {projectMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    {projectMembers
+                      .filter(m => m.role !== 'Admin')
+                      .map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -606,15 +609,13 @@ const MyTasks = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select className="w-full border appearance-none border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.status} onChange={(e) => setNewTaskForm((f) => ({ ...f, status: e.target.value }))}>
-                    <option value="BACKLOG">Backlog</option>
-                    <option value="TODO">Todo</option>
-                    <option value="DOING">In Progress</option>
-                    <option value="DONE">Done</option>
-                  </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                {/* Hiển thị box xám, không cho click chọn */}
+                <div className="w-full border border-gray-200 bg-gray-100 text-gray-500 rounded-lg px-3 py-2 text-sm cursor-not-allowed">
+                  Backlog
                 </div>
+              </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
                   <input type="date" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.dueDate} onChange={(e) => setNewTaskForm((f) => ({ ...f, dueDate: e.target.value }))} />
