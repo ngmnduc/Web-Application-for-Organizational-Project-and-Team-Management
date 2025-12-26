@@ -322,7 +322,8 @@ const TaskDetail = () => {
         assigneeId: task.assigneeId?._id || task.assigneeId || "",
         priority: task.priority || "MEDIUM",
         status: task.status || "TODO", // Lưu ý: map đúng value với backend (TODO/DOING/DONE)
-        dueDate: task.dueDate ? task.dueDate.split('T')[0] : "" // Format YYYY-MM-DD cho input date
+        dueDate: task.dueDate ? task.dueDate.split('T')[0] : "", // Format YYYY-MM-DD cho input date
+        labels: task.labels ? task.labels.map(l => l.name || l).join(', ') : ""
     });
     setIsEditOpen(true);
   };
@@ -337,6 +338,8 @@ const TaskDetail = () => {
           assigneeId: editForm.assigneeId ? editForm.assigneeId : null, 
           // Đảm bảo priority viết hoa đúng chuẩn backend nếu cần
           priority: editForm.priority.toUpperCase(),
+          // Chuyển labels từ chuỗi sang mảng
+          labels: editForm.labels.split(',').map(l => l.trim()).filter(l => l !== ""),
         };
         // Gọi API update 
         const updated = await updateTask(taskId, payload);
@@ -726,7 +729,7 @@ const TaskDetail = () => {
                 </span>
                 <div className="flex flex-wrap gap-1">
                     {(task.labels && task.labels.length > 0) ? task.labels.map((l, i) => (
-                         <span key={i} className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">{l}</span>
+                         <span key={i} className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">{l.name || l}</span>
                     )) : <span className="text-gray-400 italic">None</span>}
                 </div>
               </div>
@@ -923,6 +926,17 @@ const TaskDetail = () => {
                     onChange={(e) => setEditForm({...editForm, dueDate: e.target.value})} 
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Labels</label>
+                <input 
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                    placeholder="e.g. Frontend, Bug (comma separated)"
+                    value={editForm.labels || ""} 
+                    onChange={(e) => setEditForm({...editForm, labels: e.target.value})} 
+                />
+                <p className="text-xs text-gray-400 mt-1">Separate multiple labels with commas.</p>
               </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 mt-2">

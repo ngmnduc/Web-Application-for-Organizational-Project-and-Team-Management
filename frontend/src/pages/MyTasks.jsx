@@ -57,13 +57,26 @@ const KanbanCard = ({ task, onOpenDetail }) => {
       onClick={() => onOpenDetail(task)}
       className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition"
     >
+      {/* --- PHẦN HEADER: Đưa Priority và Project Name lên đây --- */}
       <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {/* 1. Badge Priority */}
         <PriorityBadge level={task.priority} />
+
+        {/* 2. Badge Project Name (Đưa từ dưới lên và bỏ giới hạn chiều rộng) */}
+        {task.project && (
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 font-medium">
+                {task.project}
+            </span>
+        )}
+
+        {/* 3. Badge Labels (Nếu có thật sự) */}
         {task.labels && task.labels.map((lbl, idx) => (
           <span key={idx} className="text-xs px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
             {lbl}
           </span>
         ))}
+
+        {/* 4. Badge Due Soon */}
         {task.dueSoon && (
           <span className="text-xs px-2 py-0.5 rounded-md bg-orange-100 text-orange-700">
             Due soon
@@ -71,11 +84,13 @@ const KanbanCard = ({ task, onOpenDetail }) => {
         )}
       </div>
 
-      <h4 className="font-semibold text-gray-800 leading-snug line-clamp-2">
+      {/* Title */}
+      <h4 className="font-semibold text-gray-800 leading-snug line-clamp-2 mb-3">
         {task.title}
       </h4>
 
-      <div className="mt-3 flex items-center justify-between text-sm">
+      {/* --- PHẦN FOOTER: Chỉ còn Date và Avatar --- */}
+      <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-3 text-gray-500">
           <div className="flex items-center gap-1" title="Due Date">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -83,12 +98,7 @@ const KanbanCard = ({ task, onOpenDetail }) => {
             </svg>
             <span>{task.due}</span>
           </div>
-          {task.project && (
-            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 max-w-[100px] truncate">
-                <span className="w-2 h-2 rounded-full bg-current opacity-60 flex-shrink-0" />
-                {task.project}
-            </span>
-          )}
+          {/* Đã xóa phần Project ở đây để đưa lên trên */}
         </div>
         
         {/* Avatar Assignee */}
@@ -267,7 +277,7 @@ const MyTasks = () => {
                 assignee: assigneeName,
                 assigneeId: assigneeId,
                 dueSoon: isDueSoon,
-                labels: t.labels || [], 
+                labels: (t.labels || []).map(l => l.name || l),
                 position: t.orderIndex || 0,
             };
         });
@@ -610,6 +620,18 @@ const MyTasks = () => {
                   <input type="date" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newTaskForm.dueDate} onChange={(e) => setNewTaskForm((f) => ({ ...f, dueDate: e.target.value }))} />
                 </div>
               </div>
+                {/* Input Labels */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Labels</label>
+                  <input 
+                    type="text" 
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" 
+                    placeholder="e.g. Design, Frontend, Bug (comma separated)"
+                    value={newTaskForm.labels} 
+                    onChange={(e) => setNewTaskForm((f) => ({ ...f, labels: e.target.value }))} 
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Separate multiple labels with commas.</p>
+                </div>
               <div className="pt-3 flex justify-end gap-3 border-t border-gray-100">
                 <button type="button" onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
                 <button type="submit" className="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand)] text-white">Create Task</button>
