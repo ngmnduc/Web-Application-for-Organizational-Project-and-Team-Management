@@ -398,5 +398,7 @@ function toPublicUser(u) {
     status: u.status,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
+    currentOrganizationId: u.currentOrganizationId, 
+    organizations: u.organizations
   };
 }
