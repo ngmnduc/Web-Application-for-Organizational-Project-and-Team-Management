@@ -1,6 +1,12 @@
 /**
  * Auth Service Layer
  * Business logic for authentication
+ * 
+ * REFACTORED (26/12/2025):
+ * - Password hashing: Chỉ dùng bcrypt (qua User model pre-save hook)
+ * - Login optimization: Chỉ update DB khi currentOrganizationId thực sự thay đổi
+ * - Removed: Import bcrypt thừa (model đã tự động hash)
+ * - Fixed: createUser() bug với session parameter không tồn tại
  */
 
 import User from "../models/user.model.js";
@@ -10,7 +16,6 @@ import { signToken } from "../utils/jwt.js";
 import crypto from "crypto";
 import { sendPasswordResetEmail, sendWelcomeEmail } from "./email.service.js";
 import { OAuth2Client } from "google-auth-library";
-import bcrypt from "bcrypt";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -28,13 +33,8 @@ export const createUser = async (name, email, password) => {
   const count = await User.countDocuments();
   const role = count === 0 ? "Admin" : "Member";
 
-  // Create user
-    let user;
-  if (session) {
-    [user] = await User.create([{ name, email, password, role }], { session });
-  } else {
-    user = await User.create({ name, email, password, role });
-  }
+  // Create user (Model pre-save hook sẽ tự động hash password bằng bcrypt)
+  const user = await User.create({ name, email, password, role });
 
   // Generate token (no organizationId for first user/admin)
   const token = signToken({ 
@@ -96,11 +96,17 @@ export const loginUser = async (email, password) => {
       throw new Error("ORGANIZATION_DELETED");
     }
 
-    // Update user's currentOrganizationId
-    user.currentOrganizationId = currentOrganization._id;
-    await user.save();
+    // CHỈ update currentOrganizationId nếu THỰC SỰ THAY ĐỔI (tránh query DB thừa)
+    const newOrgId = currentOrganization._id;
+    const currentOrgIdStr = user.currentOrganizationId?.toString();
+    const newOrgIdStr = newOrgId.toString();
     
-    organizationId = currentOrganization._id.toString();
+    if (currentOrgIdStr !== newOrgIdStr) {
+      user.currentOrganizationId = newOrgId;
+      await user.save();
+    }
+    
+    organizationId = newOrgIdStr;
   }
 
   // Generate token with organizationId
@@ -122,12 +128,11 @@ export const loginUser = async (email, password) => {
       : null,
   };
 };
-
 /**
  * Handle Google OAuth login
  */
 export const handleGoogleAuth = async (credential) => {
-  // Verify Google token
+  // 1. Verify Google Token
   const ticket = await client.verifyIdToken({
     idToken: credential,
     audience: process.env.GOOGLE_CLIENT_ID,
@@ -136,32 +141,39 @@ export const handleGoogleAuth = async (credential) => {
   const payload = ticket.getPayload();
   const { email, name, picture } = payload;
 
-  // Find or create user
+  // 2. Tìm User trong DB
   let user = await User.findOne({ email });
   let isNewUser = false;
 
   if (!user) {
+    //  USER MỚI 
+    isNewUser = true;
+    
     const randomPassword = crypto.randomBytes(16).toString("hex");
 
+    // Tạo User mới với organid là null
     user = await User.create({
       name,
       email,
       password: randomPassword,
       avatar: picture,
-      role: "Member",
+      role: "Member", 
+      status: "ACTIVE",
+      currentOrganizationId: null, // Chưa thuộc về nơi nào
+      organizations: []
     });
 
-    isNewUser = true;
-
-    // Send welcome email (don't fail if email fails)
+    // Gửi email chào mừng (Optional)
     try {
       await sendWelcomeEmail(user.email, user.name);
-    } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError);
+    } catch (err) {
+      console.error("Email error:", err.message);
     }
   }
 
-  // Generate token (no organizationId for new Google users)
+  //  Generate Token
+  // Nếu user mới, organizationId sẽ là null. 
+
   const token = signToken({ 
     sub: user._id.toString(), 
     role: user.role,
@@ -170,7 +182,14 @@ export const handleGoogleAuth = async (credential) => {
 
   return {
     token,
-    user: toPublicUser(user),
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      role: user.role,
+      currentOrganizationId: user.currentOrganizationId, // Trả về để FE check
+    },
     isNewUser,
   };
 };
@@ -385,5 +404,7 @@ function toPublicUser(u) {
     status: u.status,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
+    currentOrganizationId: u.currentOrganizationId, 
+    organizations: u.organizations
   };
 }
