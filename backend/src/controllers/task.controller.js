@@ -115,7 +115,10 @@ export const createTask = async (req, res) => {
             userId: task.assigneeId, 
             type: 'TASK_ASSIGN',
             content: `You have been assigned to a new task: "${task.title}"`,
-            relatedId: task._id
+            metadata: {
+                taskId: task._id,
+                projectId: task.projectId
+            }
         });
     }
 
@@ -159,12 +162,17 @@ export const updateTask = async (req, res) => {
         const newAssigneeId = updatedTask.assigneeId?.toString();
         const oldAssigneeId = oldTask?.assigneeId?.toString();
         const actorId = req.user._id.toString();
+        
+        // Only notify if assignee changed and actor is not the assignee
         if (newAssigneeId && newAssigneeId !== oldAssigneeId && newAssigneeId !== actorId) {
              await createNotification({
                 userId: newAssigneeId,
                 type: 'TASK_ASSIGN',
                 content: `You have been assigned to task: "${updatedTask.title}"`,
-                relatedId: updatedTask._id
+                metadata: {
+                    taskId: updatedTask._id,
+                    projectId: updatedTask.projectId
+                }
             });
         }
     }

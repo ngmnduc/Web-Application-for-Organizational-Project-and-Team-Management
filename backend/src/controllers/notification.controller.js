@@ -2,21 +2,38 @@ import Notification from "../models/notification.model.js";
 import { markAllAsRead as markAllAsReadService } from "../services/notification.service.js";
 
 /**
- * @desc    Get notifications for current user
- * @route   GET /notifications
+ * @desc    Get notifications with PAGINATION
+ * @route   GET /notifications?page=1&limit=20
  * @access  Private
  */
 export const getNotifications = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const notifications = await Notification.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(20);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20; 
+    const skip = (page - 1) * limit;
+
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find({ userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Notification.countDocuments({ userId }), 
+      Notification.countDocuments({ userId, read: false }) 
+    ]);
 
     res.status(200).json({
       success: true,
       data: notifications,
+      unreadCount,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

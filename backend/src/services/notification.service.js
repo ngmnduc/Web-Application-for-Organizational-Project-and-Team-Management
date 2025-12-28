@@ -1,24 +1,26 @@
 import Notification from "../models/notification.model.js";
+import { sendNotification } from "./socket.service.js";
 
-export const createNotification = async ({ userId, type, content, relatedId, link }) => {
+export const createNotification = async ({ userId, type, content, metadata = {} }) => {
   try {
     if (!userId || !type || !content) {
       console.warn("[NotificationService] Missing info:", { userId, type });
       return;
     }
     
-    const notificationData = {
+    const newNoti = await Notification.create({
       userId,
       type,
-      payload: content, 
+      content,
+      metadata,
       read: false
-    };
+    });
 
-    if (relatedId && (type === 'TASK_ASSIGN' || type === 'TASK_UPDATE')) {
-        notificationData.taskId = relatedId;
+    if (newNoti) {
+        sendNotification(userId, newNoti);
     }
 
-    await Notification.create(notificationData);
+    return newNoti;
 
   } catch (error) {
     console.error("[NotificationService] Error creating notification:", error.message);
