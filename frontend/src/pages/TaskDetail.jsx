@@ -9,13 +9,16 @@ import {
    deleteSubtask,
    updateTask,
    getProjectMembers,
-   generateAiSubtasks
+   generateAiSubtasks,
+   addAttachment,
+   removeAttachment
 } from "../services/taskService";
 import { useAuth } from "../services/AuthContext"; // Import useAuth
 import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon, SparklesIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-toastify";
 import Swal from 'sweetalert2';
 import {MentionsInput, Mention} from 'react-mentions';
+import { useProject } from '../context/ProjectContext'; 
 
 const mentionInputStyle = {
   control: {
@@ -68,17 +71,34 @@ const TaskDetail = () => {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth(); // Lấy thông tin user hiện tại
+  const { user } = useAuth();
+  const { selectedProjectId, currentProjectRole } = useProject(); // ✅ THÊM
 
-  //Ref cho ô imput Subtask
   const subtaskInputRef = useRef(null);
   const isGeneratingRef = useRef(false);
-  const lastGenerateTime = useRef(0); //  Track thời gian lần cuối gọi AI
-  const COOLDOWN_MS = 5000; //5 giây cooldown
+  const lastGenerateTime = useRef(0);
+  const COOLDOWN_MS = 5000;
 
-  // Lấy role của user để phân quyền
-  const currentUserRole = (user?.role || "Member");
-  const canManage = ["Manager", "Admin"].includes(currentUserRole);
+  // ✅ FIX: Tính toán quyền giống MyTasks
+  const systemRole = user?.role || 'Member';
+  const isSystemAdmin = systemRole === 'Admin';
+  const projectRole = currentProjectRole || 'Member';
+  const effectiveRole = isSystemAdmin ? 'Admin' : projectRole;
+  
+  // ✅ FIX: Check quyền quản lý
+  const canManage = ['Admin', 'Manager'].includes(effectiveRole);
+
+  // ✅ DEBUG: Log khi component mount
+  useEffect(() => {
+    console.log('🔍 [TaskDetail] Permission:', {
+      systemRole,
+      projectRole,
+      effectiveRole,
+      canManage,
+      selectedProjectId,
+      taskId
+    });
+  }, [systemRole, projectRole, effectiveRole, canManage, selectedProjectId, taskId]);
 
   // Data có thể được truyền qua navigate state (từ màn hình danh sách)
   const taskFromState = location.state?.task || null;
@@ -320,7 +340,8 @@ const TaskDetail = () => {
         assigneeId: task.assigneeId?._id || task.assigneeId || "",
         priority: task.priority || "MEDIUM",
         status: task.status || "TODO", // Lưu ý: map đúng value với backend (TODO/DOING/DONE)
-        dueDate: task.dueDate ? task.dueDate.split('T')[0] : "" // Format YYYY-MM-DD cho input date
+        dueDate: task.dueDate ? task.dueDate.split('T')[0] : "", // Format YYYY-MM-DD cho input date
+        labels: task.labels ? task.labels.map(l => l.name || l).join(', ') : ""
     });
     setIsEditOpen(true);
   };
@@ -335,6 +356,8 @@ const TaskDetail = () => {
           assigneeId: editForm.assigneeId ? editForm.assigneeId : null, 
           // Đảm bảo priority viết hoa đúng chuẩn backend nếu cần
           priority: editForm.priority.toUpperCase(),
+          // Chuyển labels từ chuỗi sang mảng
+          labels: editForm.labels.split(',').map(l => l.trim()).filter(l => l !== ""),
         };
         // Gọi API update 
         const updated = await updateTask(taskId, payload);
@@ -371,33 +394,42 @@ const TaskDetail = () => {
     }, 100);
   };
 
+  // --- THAY THẾ TOÀN BỘ HÀM handleAddAttachment CŨ BẰNG ĐOẠN NÀY ---
   const handleAddAttachment = async () => {
+    // 1. Validate
     if (!newAttachmentUrl.trim()) {
         toast.error("URL cannot be empty.");
         return;
     }
-    
-    // --- START: Thay thế logic giả lập bằng API thực ---
-    
-    // Giả lập thêm vào UI và đóng input
-    const mockAttachment = {
-        _id: Date.now(),
-        url: newAttachmentUrl.trim(),
-        title: newAttachmentTitle.trim() || newAttachmentUrl.trim(),
-    };
-    
-    setTask(prev => ({
-        ...prev,
-        attachments: [...(prev.attachments || []), mockAttachment]
-    }));
-    
-    setNewAttachmentUrl("");
-    setNewAttachmentTitle("");
-    setIsAttachmentInputOpen(false);
-    
-    // --- END: Thay thế logic giả lập này bằng API thực ---
 
-    toast.success("Attachment added (Mock Success). Remember to implement API call!");
+    try {
+        // 2. Chuẩn bị payload (map title -> name theo yêu cầu Backend)
+        const payload = {
+            url: newAttachmentUrl.trim(),
+            name: newAttachmentTitle.trim() || newAttachmentUrl.trim(), 
+        };
+
+        // 3. Gọi API thật
+        const addedAttachment = await addAttachment(taskId, payload);
+
+        // 4. Cập nhật State
+        setTask(prev => ({
+            ...prev,
+            attachments: [...(prev.attachments || []), addedAttachment]
+        }));
+        
+        // 5. Reset form
+        setNewAttachmentUrl("");
+        setNewAttachmentTitle("");
+        setIsAttachmentInputOpen(false);
+        
+        toast.success("Attachment added successfully!");
+
+    } catch (err) {
+        console.error("Add attachment error:", err);
+        // Hiển thị lỗi chi tiết từ backend trả về
+        toast.error(err.response?.data?.message || "Failed to add attachment");
+    }
   };
 
  // ========== RENDER GUARDS ==========
@@ -426,6 +458,7 @@ const TaskDetail = () => {
           Back to tasks
         </button>
 
+        {/*  Dùng canManage thay vì currentUserRole */}
         {canManage && (
           <div className="flex gap-2">
             <button 
@@ -715,7 +748,7 @@ const TaskDetail = () => {
                 </span>
                 <div className="flex flex-wrap gap-1">
                     {(task.labels && task.labels.length > 0) ? task.labels.map((l, i) => (
-                         <span key={i} className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">{l}</span>
+                         <span key={i} className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">{l.name || l}</span>
                     )) : <span className="text-gray-400 italic">None</span>}
                 </div>
               </div>
@@ -787,12 +820,41 @@ const TaskDetail = () => {
                       rel="noreferrer"
                       className="text-blue-600 hover:underline truncate max-w-[150px]"
                     >
-                      {a.title || a.url}
+                      {a.name || a.title || a.url}
                     </a>
                     {canManage && (
-                      <button className="text-xs text-red-500 hover:text-red-700">
-                        ✕
-                      </button>
+                      <button 
+                      className="text-xs text-red-500 hover:text-red-700 p-1"
+                      onClick={async () => {                        
+                         const result = await Swal.fire({
+                            title: 'Delete this attachment?',
+                            text: "This action cannot be undone.",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'OK',
+                            cancelButtonText: 'Cancel'
+                         });
+                  
+                         if (!result.isConfirmed) return;
+                  
+                         try {
+                             await removeAttachment(taskId, a.id || a._id);
+                             
+                             setTask(prev => ({
+                                 ...prev,
+                                 attachments: prev.attachments.filter(item => (item.id || item._id) !== (a.id || a._id))
+                             }));
+                             toast.success("Attachment removed");
+                         } catch (err) {
+                             console.error(err);
+                             toast.error("Failed to remove attachment");
+                         }
+                      }}
+                    >
+                      ✕
+                    </button>
                     )}
                   </li>
                 ))}
@@ -802,7 +864,7 @@ const TaskDetail = () => {
         </div>
 
       </div>
-      {/* === EDIT TASK MODAL (Thêm mới đoạn này vào cuối) === */}
+      {/* === EDIT TASK MODAL === */}
       {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -883,6 +945,17 @@ const TaskDetail = () => {
                     onChange={(e) => setEditForm({...editForm, dueDate: e.target.value})} 
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Labels</label>
+                <input 
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                    placeholder="e.g. Frontend, Bug (comma separated)"
+                    value={editForm.labels || ""} 
+                    onChange={(e) => setEditForm({...editForm, labels: e.target.value})} 
+                />
+                <p className="text-xs text-gray-400 mt-1">Separate multiple labels with commas.</p>
               </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 mt-2">

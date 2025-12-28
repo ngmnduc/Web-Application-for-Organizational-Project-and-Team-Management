@@ -3,6 +3,25 @@ import Meeting from "../models/meeting.model.js";
 import Project from "../models/project.model.js";
 import { createNotification } from "../services/notification.service.js";
 
+// --- HELPER FUNCTION: CHECK TRÙNG LỊCH ---
+const hasTimeConflict = async (projectId, start, end, excludeMeetingId = null) => {
+    const query = {
+        projectId,
+        deletedAt: null,
+        $or: [
+            // Logic: Cuộc họp mới bắt đầu trước khi cuộc họp cũ kết thúc VÀ kết thúc sau khi cuộc họp cũ bắt đầu
+            { startTime: { $lt: end }, endTime: { $gt: start } }
+        ]
+    };
+
+    if (excludeMeetingId) {
+        query._id = { $ne: excludeMeetingId };
+    }
+
+    const count = await Meeting.countDocuments(query);
+    return count > 0;
+};
+
 /**
  * @desc    Get all meetings for a project
  * @route   GET /projects/:projectId/meetings
@@ -204,12 +223,16 @@ export const createMeeting = async (req, res) => {
     if (attendees && attendees.length > 0) {
         const uniqueAttendees = [...new Set(attendees)];
         for (const attendeeId of uniqueAttendees) {
-            if (attendeeId && attendeeId.toString() !== req.user._id.toString()) {
+            // Check valid ID and not send to self
+            if (attendeeId && mongoose.isValidObjectId(attendeeId) && attendeeId.toString() !== req.user._id.toString()) {
                 await createNotification({
                     userId: attendeeId,
                     type: 'MEETING_CREATED', 
-                    content: `New meeting: ${title} at ${start.toLocaleString()}`,
-                    relatedId: meeting._id
+                    content: `You have been invited to meeting: "${title}" starting at ${start.toLocaleString()}`,
+                    metadata: {
+                        meetingId: meeting._id,
+                        projectId: projectId
+                    }
                 });
             }
         }

@@ -237,7 +237,7 @@ class DashboardService {
   async getManagerStats(userId, currentOrganizationId, projectId = null) {
     if (!currentOrganizationId) throw new Error("ORGANIZATION_REQUIRED");
 
-    // 1. Lấy danh sách TOÀN BỘ project mà user quản lý
+    // 1. Lấy danh sách project quản lý
     const managedMemberships = await ProjectMember.find({
       userId: userId,
       organizationId: currentOrganizationId,
@@ -246,43 +246,65 @@ class DashboardService {
     }).select("projectId");
 
     if (!managedMemberships || managedMemberships.length === 0) {
-      return { /* ... return rỗng ... */ };
+      return {
+        kpi: { myProjects: 0, teamSize: 0, tasksCompleted: 0 },
+        charts: { priorityDistribution: [], progress: { total: 0, done: 0, percent: 0 } }
+      };
     }
 
     let projectIds = managedMemberships.map(m => m.projectId);
-    
-    // [FIX]: Lưu lại tổng số lượng project quản lý trước khi bị filter
-    const totalManagedProjectsCount = projectIds.length;
+    const totalManagedProjectsCount = projectIds.length; // Lưu tổng số project
 
-    // 2. Filter theo Project được chọn (để tính Task, Progress cho đúng ngữ cảnh)
+    // 2. Filter theo Project được chọn
     if (projectId && projectId !== 'all') {
         const selectedIdStr = projectId.toString();
         if (projectIds.some(id => id.toString() === selectedIdStr)) {
             projectIds = [new mongoose.Types.ObjectId(projectId)];
         } else {
-             return { /* ... return rỗng ... */ };
+             return {
+                kpi: { myProjects: 0, teamSize: 0, tasksCompleted: 0 },
+                charts: { priorityDistribution: [], progress: { total: 0, done: 0, percent: 0 } }
+            };
         }
     }
 
-   const [
-      teamSize,
-      totalTasks,
-      tasksCompleted,
-      tasksByPriority
-    ] = await Promise.all([
-      ProjectMember.distinct("userId", { projectId: { $in: projectIds }, status: "ACTIVE" }).then(res => res.length),
-      Task.countDocuments({ projectId: { $in: projectIds }, deletedAt: null }),
-      Task.countDocuments({ projectId: { $in: projectIds }, status: "DONE", deletedAt: null }),
+    // [FIX] Khai báo các biến còn thiếu
+    const now = new Date();
+    const baseMatch = { 
+        projectId: { $in: projectIds }, 
+        deletedAt: null 
+    };
+
+    // 3. Thực hiện query song song
+    // Tách phần lấy Team Size ra riêng để tránh nhầm lẫn
+    const teamSize = await ProjectMember.distinct("userId", { projectId: { $in: projectIds }, status: "ACTIVE" }).then(res => res.length);
+
+    // Lấy chi tiết Task & Priority (Dùng baseMatch đã khai báo)
+    const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, priorityStatsRaw] = await Promise.all([
+      Task.countDocuments(baseMatch),
+      Task.countDocuments({ ...baseMatch, status: "TODO" }),
+      Task.countDocuments({ ...baseMatch, status: "DOING" }),
+      Task.countDocuments({ ...baseMatch, status: "DONE" }),
+      Task.countDocuments({ ...baseMatch, dueDate: { $lt: now }, status: { $ne: "DONE" } }),
+      
       Task.aggregate([
-        { $match: { projectId: { $in: projectIds }, deletedAt: null } },
+        { $match: baseMatch },
         { $group: { _id: "$priority", count: { $sum: 1 } } }
       ])
     ]);
-const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
-    tasksByPriority.forEach(item => {
-      const key = item._id ? item._id.toUpperCase() : "MEDIUM";
-      if (priorityMap.hasOwnProperty(key)) priorityMap[key] = item.count;
-    });
+
+    // 4. Xử lý Priority Map
+    const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
+    if (priorityStatsRaw && Array.isArray(priorityStatsRaw)) {
+        priorityStatsRaw.forEach(item => {
+            const key = item._id ? item._id.toUpperCase() : "MEDIUM";
+            if (priorityMap.hasOwnProperty(key)) {
+                priorityMap[key] = item.count;
+            } else {
+                priorityMap['MEDIUM'] += item.count; // Fallback
+            }
+        });
+    }
 
     const priorityChartData = Object.keys(priorityMap).map(key => ({
       name: key.charAt(0) + key.slice(1).toLowerCase(), 
@@ -291,20 +313,22 @@ const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
 
     return {
       kpi: {
-        myProjects: totalManagedProjectsCount, // [FIX]: Dùng biến đã lưu thay vì projectIds.length
+        myProjects: totalManagedProjectsCount,
         teamSize: teamSize,
-        tasksCompleted: tasksCompleted
+        tasksCompleted: doneTasks, // Dùng doneTasks vừa query được
+        // Trả về thêm các field này để Frontend hiển thị TaskSummary
+        totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks
       },
       charts: {
         priorityDistribution: priorityChartData,
         progress: {
           total: totalTasks,
-          done: tasksCompleted,
-          percent: totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0
-        },
-    }
-  }
-  }
+          done: doneTasks,
+          percent: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+        }
+      }
+    };
+}
 }
 
 export default new DashboardService();

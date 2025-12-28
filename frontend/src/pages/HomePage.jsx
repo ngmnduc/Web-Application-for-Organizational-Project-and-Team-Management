@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import { formatDistanceToNow } from 'date-fns';
