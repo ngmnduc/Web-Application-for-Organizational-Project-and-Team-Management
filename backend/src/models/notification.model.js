@@ -9,23 +9,24 @@ const notificationSchema = new mongoose.Schema(
     },
     type: { 
       type: String, 
-      required: true 
+      required: true,
     },
-    taskId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Task",
-      required: false 
-    },
-    payload: { 
+    content: { 
       type: String, 
       required: true 
     },
     read: { 
       type: Boolean, 
       default: false 
+    },
+    metadata: { 
+      type: mongoose.Schema.Types.Mixed, 
+      default: {} 
     }
   },
   { timestamps: true }
 );
+
+notificationSchema.index({ userId: 1, createdAt: -1 });
 
 export default mongoose.model("Notification", notificationSchema);

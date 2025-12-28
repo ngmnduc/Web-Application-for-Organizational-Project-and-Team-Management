@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import Task from '../models/task.model.js';
-import Notification from '../models/notification.model.js';
+import { createNotification } from '../services/notification.service.js';
 
 const setupCronJobs = () => {
   // 1. Quét Task quá hạn (Chạy lúc 00:00 hàng ngày)
@@ -23,21 +23,23 @@ const setupCronJobs = () => {
         console.log(`Found ${overdueTasks.length} overdue tasks. Processing...`);
 
         for (const task of overdueTasks) {
-           // A. Tạo Notification thật vào DB
+           // A. Tạo Notification + Bắn Socket
            if (task.assigneeId) {
-             await Notification.create({
+             await createNotification({
                userId: task.assigneeId._id,
-               title: "Task Overdue Alert",
-               message: `Task "${task.title}" was due on ${new Date(task.dueDate).toLocaleDateString()}.`,
-               type: "WARNING",
-               isRead: false
+               type: 'TASK_OVERDUE',
+               content: `Warning: Task "${task.title}" is overdue since ${new Date(task.dueDate).toLocaleDateString()}.`,
+               metadata: {
+                   taskId: task._id,
+                   projectId: task.projectId 
+               }
              });
            }
 
            // B. Update cờ để không báo lại nữa
            task.isOverdueNotified = true;
            await task.save();
-           console.log(` -> Sent notification for task: "${task.title}"`);
+           console.log(` -> Sent alert for task: "${task.title}"`);
         }
       } else {
         console.log('No overdue tasks found today.');
