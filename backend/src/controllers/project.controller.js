@@ -4,7 +4,7 @@ import { createNotification } from "../services/notification.service.js";
 import User from "../models/user.model.js"; 
 import { signToken } from "../utils/jwt.js"; 
 import ProjectMember from "../models/projectMember.model.js";
-
+import Project from "../models/project.model.js";
 // POST /projects
 export const createProject = async (req, res) => {
   try {
@@ -97,11 +97,23 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id;
+    const userSystemRole = req.user.role;
     const currentOrgId = req.user.currentOrganizationId;
 
-    const project = await projectService.getProjectById(id, currentOrgId);
+    // Call service với đầy đủ params
+    const projectData = await projectService.getProjectById(
+      id, 
+      userId, 
+      userSystemRole, 
+      currentOrgId
+    );
 
-    res.json({ success: true, data: project });
+    res.json({
+      success: true,
+      data: projectData
+    });
+
   } catch (err) {
     if (err.message === 'INVALID_PROJECT_ID') {
       return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid project ID" });
@@ -112,7 +124,12 @@ export const getProject = async (req, res) => {
     if (err.message === 'PROJECT_NOT_FOUND') {
       return res.status(404).json({ success: false, error: "NotFoundError", message: "Project not found" });
     }
-    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+    console.error('getProject error:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError",
+      message: err.message 
+    });
   }
 };
 
