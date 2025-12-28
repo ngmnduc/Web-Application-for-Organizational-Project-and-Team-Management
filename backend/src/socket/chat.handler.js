@@ -27,7 +27,7 @@ export const setupSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id} | UserID: ${socket.user._id}`);
 
-    socket.join(userId);
+    socket.join(socket.user._id);
     
     // Join vào phòng Chat của Project
     socket.on("join_project", (projectId) => {
