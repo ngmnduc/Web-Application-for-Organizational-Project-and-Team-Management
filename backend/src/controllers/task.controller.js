@@ -163,7 +163,6 @@ export const updateTask = async (req, res) => {
         const oldAssigneeId = oldTask?.assigneeId?.toString();
         const actorId = req.user._id.toString();
         
-        // Only notify if assignee changed and actor is not the assignee
         if (newAssigneeId && newAssigneeId !== oldAssigneeId && newAssigneeId !== actorId) {
              await createNotification({
                 userId: newAssigneeId,
@@ -188,6 +187,10 @@ export const updateTask = async (req, res) => {
     }
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
+    }
+    //  Handle FORBIDDEN
+    if (err.message === 'FORBIDDEN') {
+      return res.status(403).json({ success: false, message: "You are not a member of this project" });
     }
     if (err.message === 'UNAUTHORIZED_ACCESS') {
       return res.status(403).json({ success: false, message: "You can only update your own tasks" });
@@ -220,6 +223,10 @@ export const updateTaskStatus = async (req, res) => {
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
+    // Handle FORBIDDEN
+    if (err.message === 'FORBIDDEN') {
+      return res.status(403).json({ success: false, message: "You are not a member of this project" });
+    }
     if (err.message === 'UNAUTHORIZED_ACCESS') {
       return res.status(403).json({ success: false, message: "Members can only update their own task status" });
     }
@@ -235,7 +242,21 @@ export const updateTaskStatus = async (req, res) => {
 export const reorderTask = async (req, res) => {
   try {
     const { taskId, newStatus, newPosition } = req.body;
-    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition, req.user);
+    
+    const currentUser = {
+      _id: req.user._id || req.user.id,
+      id: req.user._id || req.user.id,
+      role: req.user.role
+    };
+
+    console.log('[reorderTask Controller] Request:', {
+      taskId,
+      newStatus,
+      newPosition,
+      currentUserId: currentUser._id
+    });
+
+    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition, currentUser);
     
     res.json({ 
       success: true, 
@@ -243,15 +264,16 @@ export const reorderTask = async (req, res) => {
       data: updatedTask 
     });
   } catch (err) {
+    console.error('[reorderTask Controller] Error:', err.message);
+    
     if (err.message === 'MISSING_REQUIRED_FIELDS') {
       return res.status(400).json({ success: false, message: "Missing taskId or newPosition" });
     }
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
-    
     if (err.message === 'UNAUTHORIZED_ACCESS') {
-      return res.status(403).json({ success: false, message: "You can only reorder your own tasks" });
+      return res.status(403).json({ success: false, message: "You can only reorder tasks assigned to you" });
     }
     
     res.status(500).json({ success: false, error: "ServerError", message: err.message });

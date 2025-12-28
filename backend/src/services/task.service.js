@@ -106,8 +106,6 @@ export const getTaskById = async (taskId, userId, userRole) => {
   return task;
 };
 
-// ...existing code...
-
 export const createTask = async (taskData, userId, projectId, currentOrganizationId) => {
   const {
     title, description, priority, status, assigneeId,
@@ -172,30 +170,72 @@ export const updateTask = async (taskId, updateData, currentUser) => {
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');
 
-  if (currentUser.role === "Member") {
-    if (String(task.assigneeId) !== String(currentUser._id)) {
-      throw new Error('UNAUTHORIZED_ACCESS');
+  //  Check membership và lấy PROJECT ROLE
+  const projectId = task.projectId?._id || task.projectId;
+  const userId = currentUser._id || currentUser.id;
+  const userSystemRole = currentUser.role;
+
+  let projectRole = 'Member'; // Default
+
+  // System Admin bypass check membership nhưng vẫn có quyền cao nhất
+  if (userSystemRole !== 'Admin') {
+    const membership = await ProjectMember.findOne({
+      projectId: projectId,
+      userId: userId
+    });
+
+    if (!membership) {
+      console.error('[updateTask] No membership found');
+      throw new Error('FORBIDDEN');
     }
-    const allowedKeys = ["status"];
-    const invalid = Object.keys(updateData).some((key) => !allowedKeys.includes(key));
-    if (invalid) {
-      throw new Error('FORBIDDEN_FIELD_UPDATE');
+
+    if (membership.status && membership.status !== 'ACTIVE') {
+      console.error(' [updateTask] Membership not active');
+      throw new Error('FORBIDDEN');
     }
+
+    // LẤY PROJECT ROLE TỪ MEMBERSHIP
+    projectRole = membership.roleInProject || membership.role || 'Member';
+    
+    console.log('[updateTask] Permission check:', {
+      userId,
+      userSystemRole,
+      projectRole,
+      taskAssigneeId: task.assigneeId
+    });
+
+    // Check quyền dựa trên PROJECT ROLE
+    // Chỉ Member mới bị giới hạn chỉnh sửa
+    if (projectRole === 'Member') {
+      // Member chỉ được update task của mình
+      if (String(task.assigneeId) !== String(userId)) {
+        throw new Error('UNAUTHORIZED_ACCESS');
+      }
+      // Member chỉ được đổi status, không được đổi field khác
+      const allowedKeys = ["status"];
+      const invalidKeys = Object.keys(updateData).filter((key) => !allowedKeys.includes(key));
+      if (invalidKeys.length > 0) {
+        console.error('[updateTask] Member tried to update forbidden fields:', invalidKeys);
+        throw new Error('FORBIDDEN_FIELD_UPDATE');
+      }
+    }
+    // Manager và Admin có thể update mọi task trong project
+  } else {
+    projectRole = 'Admin'; // System Admin = Project Admin
+    console.log('[updateTask] System Admin, full access granted');
   }
 
+  // Handle labels
   if (updateData.labels && Array.isArray(updateData.labels)) {
     const labelIds = [];
     
     for (const labelName of updateData.labels) {
-        // 1. Tìm xem nhãn đã tồn tại trong Project này chưa
         let label = await Label.findOne({ 
             name: labelName, 
             projectId: task.projectId 
         });
 
-        // 2. Nếu chưa có thì tạo mới
         if (!label) {
-          // Ưu tiên lấy Org của Task, nếu Task cũ không có thì lấy Org của User đang sửa
           const orgId = task.organizationId || currentUser.currentOrganizationId || currentUser.organizationId;
           
           if (!orgId) {
@@ -205,27 +245,21 @@ export const updateTask = async (taskId, updateData, currentUser) => {
           label = await Label.create({ 
               name: labelName, 
               projectId: task.projectId,
-              
-              // --- SỬA THÀNH BIẾN orgId VỪA TÌM ĐƯỢC ---
               organizationId: orgId, 
-              // ------------------------------------------
-              
               color: "#" + Math.floor(Math.random()*16777215).toString(16) 
           });
       }
-        // 3. Đẩy ID của nhãn vào danh sách
         labelIds.push(label._id);
     }
-    // 4. Thay thế mảng chuỗi bằng mảng ID để lưu vào DB
     updateData.labels = labelIds;
-}
+  }
 
   const updatedTask = await Task.findByIdAndUpdate(taskId, updateData, { new: true });
 
   try {
     await ActivityLog.create({
       projectId: task.projectId,
-      userId: currentUser._id,
+      userId: userId,
       taskId: task._id,
       action: "UPDATE_TASK",
       content: `updated details for task "${updatedTask.title}"`
@@ -239,8 +273,32 @@ export const updateTaskStatus = async (taskId, status, currentUser) => {
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');
 
-  if (currentUser.role === "Member" && String(task.assigneeId) !== String(currentUser._id)) {
-    throw new Error('UNAUTHORIZED_ACCESS');
+  // Check membership
+  const projectId = task.projectId?._id || task.projectId;
+  const userId = currentUser._id || currentUser.id;
+  const userRole = currentUser.role;
+
+  // System Admin bypass
+  if (userRole !== 'Admin') {
+    const membership = await ProjectMember.findOne({
+      projectId: projectId,
+      userId: userId
+    });
+
+    if (!membership) {
+      console.error('[updateTaskStatus] No membership found');
+      throw new Error('FORBIDDEN');
+    }
+
+    if (membership.status && membership.status !== 'ACTIVE') {
+      console.error(' [updateTaskStatus] Membership not active');
+      throw new Error('FORBIDDEN');
+    }
+
+    // Member chỉ được update status của task mình
+    if (currentUser.role === "Member" && String(task.assigneeId) !== String(userId)) {
+      throw new Error('UNAUTHORIZED_ACCESS');
+    }
   }
 
   const oldStatus = task.status;
@@ -250,7 +308,7 @@ export const updateTaskStatus = async (taskId, status, currentUser) => {
   try {
     await ActivityLog.create({
       projectId: task.projectId,
-      userId: currentUser._id,
+      userId: userId,
       taskId: task._id,
       action: "UPDATE_STATUS",
       content: `updated status from ${oldStatus} to ${status}`
@@ -270,13 +328,19 @@ export const reorderTask = async (taskId, newStatus, newPosition, currentUser) =
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');  
 
-  if (currentUser.role === "Member") {
-      const currentUserId = String(currentUser._id || currentUser.id);
-      const assigneeId = task.assigneeId ? String(task.assigneeId) : null;
+  // Chỉ assignee của task mới được reorder
+  // Kể cả Admin/Manager cũng không được kéo task người khác
+  const currentUserId = String(currentUser._id || currentUser.id);
+  const assigneeId = task.assigneeId ? String(task.assigneeId) : null;
 
-      if (assigneeId !== currentUserId) {
-        throw new Error('UNAUTHORIZED_ACCESS');
-      }
+  console.log('[reorderTask] Permission check:', {
+    currentUserId,
+    assigneeId,
+    isMatch: assigneeId === currentUserId
+  });
+
+  if (assigneeId !== currentUserId) {
+    throw new Error('UNAUTHORIZED_ACCESS');
   }
 
   const updatedTask = await Task.findByIdAndUpdate(

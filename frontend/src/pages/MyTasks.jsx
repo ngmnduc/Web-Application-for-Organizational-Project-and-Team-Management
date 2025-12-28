@@ -188,7 +188,8 @@ const MyTasks = () => {
     ];
 
     const canDragTask = (task) => {
-        if (isManagerOrAdmin) return true;
+        const taskAssigneeId = task.assigneeId?.toString() || task.assigneeId;
+        const currentUserId = currentUser.id?.toString() || currentUser.id;
         return task.assigneeId === currentUser.id;
     };
 
