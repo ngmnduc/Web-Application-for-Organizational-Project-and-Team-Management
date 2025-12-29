@@ -34,7 +34,7 @@ router.get("/tasks", verifyToken, requireOrgAccess, getFilteredTasks);
  * @desc    Get task detail by ID
  * @access  Private (Project Member)
  */
-router.get("/tasks/:id", verifyToken, requireOrgAccess, requireProjectMember, getTasksById); 
+router.get("/tasks/:id", verifyToken, requireOrgAccess, getTasksById); 
 
 /**
  * @route   GET /projects/:id/tasks
@@ -50,21 +50,21 @@ router.get("/projects/:id/tasks", verifyToken, requireOrgAccess, requireProjectM
  */
 router.post("/projects/:id/tasks", verifyToken, requireOrgAccess, requireProjectManager, createTask);
 
-router.patch('/tasks/reorder', verifyToken, requireOrgAccess, requireProjectMember, reorderTask);
+router.patch('/tasks/reorder', verifyToken, requireOrgAccess, reorderTask);
 
 /**
  * @route   PUT /tasks/:id
  * @desc    Update task details (title, assignee, etc.)
  * @access  Private (Project Member)
  */
-router.put("/tasks/:id", verifyToken, requireOrgAccess, requireProjectMember, updateTask);
+router.put("/tasks/:id", verifyToken, requireOrgAccess, updateTask);
 
 /**
  * @route   PATCH /tasks/:id
  * @desc    Update task status (TODO → DOING → DONE)
  * @access  Private (Project Member)
  */
-router.patch("/tasks/:id", verifyToken, requireOrgAccess, requireProjectMember, updateTaskStatus);
+router.patch("/tasks/:id", verifyToken, requireOrgAccess, updateTaskStatus);
 
 /**
  * @route   DELETE /tasks/:id

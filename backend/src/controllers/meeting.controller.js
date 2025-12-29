@@ -223,12 +223,16 @@ export const createMeeting = async (req, res) => {
     if (attendees && attendees.length > 0) {
         const uniqueAttendees = [...new Set(attendees)];
         for (const attendeeId of uniqueAttendees) {
-            if (attendeeId && attendeeId.toString() !== req.user._id.toString()) {
+            // Check valid ID and not send to self
+            if (attendeeId && mongoose.isValidObjectId(attendeeId) && attendeeId.toString() !== req.user._id.toString()) {
                 await createNotification({
                     userId: attendeeId,
                     type: 'MEETING_CREATED', 
-                    content: `New meeting: ${title} at ${start.toLocaleString()}`,
-                    relatedId: meeting._id
+                    content: `You have been invited to meeting: "${title}" starting at ${start.toLocaleString()}`,
+                    metadata: {
+                        meetingId: meeting._id,
+                        projectId: projectId
+                    }
                 });
             }
         }
