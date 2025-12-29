@@ -328,34 +328,25 @@ export const reorderTask = async (taskId, newStatus, newPosition, currentUser) =
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');  
 
-  // Chỉ assignee của task mới được reorder
-  // Kể cả Admin/Manager cũng không được kéo task người khác
+  // check quyền kéo task
   const currentUserId = String(currentUser._id || currentUser.id);
   const assigneeId = task.assigneeId ? String(task.assigneeId) : null;
 
-  
+  console.log('[reorderTask] Permission check:', {
+    currentUserId,
+    assigneeId,
+    userSystemRole: currentUser.role,
+    isMatch: assigneeId === currentUserId
+  });
 
-  if (!isAllowed) {
-    if (currentUser.role === 'Admin') {
-        isAllowed = true;
-    } else {
-        // Check role trong Project
-        const member = await ProjectMember.findOne({
-            projectId: task.projectId,
-            userId: currentUserId
-        });
-        const roleInProject = member?.roleInProject || member?.role || 'Member';
-        
-        if (member && ["Admin", "Manager"].includes(roleInProject)) {
-            isAllowed = true;
-        }
-    }
-}
+  // Quy tắc: Chỉ người được assign task mới được kéo
+  // Admin/Manager cũng không được kéo task người khác
+  if (assigneeId !== currentUserId) {
+    console.error('[reorderTask] User not assignee of this task');
+    throw new Error('UNAUTHORIZED_ACCESS');
+  }
 
-if (!isAllowed) {
-  throw new Error('UNAUTHORIZED_ACCESS');
-}
-
+  // Cập nhật task
   const updatedTask = await Task.findByIdAndUpdate(
     taskId,
     {
@@ -368,6 +359,8 @@ if (!isAllowed) {
   );
 
   if (!updatedTask) throw new Error('TASK_NOT_FOUND');
+  
+  console.log('[reorderTask] Task reordered successfully');
   return updatedTask;
 };
 

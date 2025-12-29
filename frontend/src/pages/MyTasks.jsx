@@ -198,10 +198,20 @@ const MyTasks = () => {
     ];
 
     const canDragTask = (task) => {
-      if (canManageTasks) return true;
-        const taskAssigneeId = task.assigneeId?.toString() || task.assigneeId;
-        const currentUserId = currentUser.id?.toString() || currentUser.id;
-        return task.assigneeId === currentUser.id;
+      //   Chỉ so sánh assigneeId, không check role
+      const taskAssigneeId = String(task.assigneeId || '');
+      const currentUserId = String(currentUser.id || '');
+      
+      const canDrag = taskAssigneeId === currentUserId;
+      
+      console.log('[canDragTask] Check:', {
+          taskId: task.id,
+          taskAssigneeId,
+          currentUserId,
+          canDrag
+      });
+      
+      return canDrag;
     };
 
     const STATUS_COLUMN_MAP = {
