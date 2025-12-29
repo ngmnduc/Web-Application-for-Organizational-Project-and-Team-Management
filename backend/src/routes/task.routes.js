@@ -71,7 +71,7 @@ router.patch("/tasks/:id", verifyToken, requireOrgAccess, updateTaskStatus);
  * @desc    Soft delete a task (mark as deletedAt)
  * @access  Private (Project Admin/Manager)
  */
-router.delete("/tasks/:id", verifyToken, requireOrgAccess, requireProjectManager, deleteTask);
+router.delete("/tasks/:id", verifyToken, requireOrgAccess, deleteTask);
 
 /**
  * @route   POST /tasks/:taskId/subtasks
