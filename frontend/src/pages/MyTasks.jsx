@@ -404,7 +404,7 @@ const MyTasks = () => {
             assigneeId: currentUser.id, 
             assigneeName: currentUser.name,
             priority: 'MEDIUM', 
-            status: 'TODO', 
+            status: 'BACKLOG', 
             dueDate: '', 
             labels: '',
         });
