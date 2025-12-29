@@ -19,7 +19,7 @@ import { ChevronDownIcon, SparklesIcon,XMarkIcon,
   // 🔵 THÊM MỚI: Import Ant Design Components cho Dashboard Block mới
 import { Card, Row, Col, Statistic, Progress, List, Tag, Spin } from "antd";
 import { 
-  ProjectOutlined, TeamOutlined, CheckCircleOutlined as AntCheckCircleOutlined 
+  ProjectOutlined, TeamOutlined, CheckCircleOutlined as AntCheckCircleOutlined,  LoadingOutlined 
 } from "@ant-design/icons";
 // 🔵 THÊM MỚI: Import Service Dashboard (đã tạo ở bước trước)
 import dashboardService from "../services/dashboardService";
@@ -475,8 +475,11 @@ const HomePage = () => {
     ? formatTaskSummaryData(managerStats.kpi)
     : dynamicTasksSummary;  
 
-  if (dashboardLoading) return <div className="flex h-screen items-center justify-center"><Spin size="large" /></div>;
-
+  if (dashboardLoading) {
+      // 🔵 UPDATE: Tạo icon loading màu cam
+      const antIcon = <LoadingOutlined style={{ fontSize: 48, color: '#f35640' }} spin />;
+      return <div className="flex h-screen items-center justify-center"><Spin indicator={antIcon} /></div>;
+  }
 
   return (
     <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
