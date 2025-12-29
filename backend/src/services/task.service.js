@@ -333,15 +333,28 @@ export const reorderTask = async (taskId, newStatus, newPosition, currentUser) =
   const currentUserId = String(currentUser._id || currentUser.id);
   const assigneeId = task.assigneeId ? String(task.assigneeId) : null;
 
-  console.log('[reorderTask] Permission check:', {
-    currentUserId,
-    assigneeId,
-    isMatch: assigneeId === currentUserId
-  });
+  
 
-  if (assigneeId !== currentUserId) {
-    throw new Error('UNAUTHORIZED_ACCESS');
-  }
+  if (!isAllowed) {
+    if (currentUser.role === 'Admin') {
+        isAllowed = true;
+    } else {
+        // Check role trong Project
+        const member = await ProjectMember.findOne({
+            projectId: task.projectId,
+            userId: currentUserId
+        });
+        const roleInProject = member?.roleInProject || member?.role || 'Member';
+        
+        if (member && ["Admin", "Manager"].includes(roleInProject)) {
+            isAllowed = true;
+        }
+    }
+}
+
+if (!isAllowed) {
+  throw new Error('UNAUTHORIZED_ACCESS');
+}
 
   const updatedTask = await Task.findByIdAndUpdate(
     taskId,
@@ -359,29 +372,35 @@ export const reorderTask = async (taskId, newStatus, newPosition, currentUser) =
 };
 
 export const deleteTask = async (taskId, currentUser) => {
-  if (!["Admin", "Manager"].includes(currentUser.role)) {
-    throw new Error('PERMISSION_DENIED');
-  }
+  const task = await Task.findById(taskId);
+  if (!task) throw new Error('TASK_NOT_FOUND');
 
-  const deletedTask = await Task.findByIdAndUpdate(
-    taskId,
-    { deletedAt: new Date() },
-    { new: true }
-  );
+  if (currentUser.role !== 'Admin') {
+      const member = await ProjectMember.findOne({
+        projectId: task.projectId,
+        userId: currentUser._id || currentUser.id
+      });
 
-  if (!deletedTask) throw new Error('TASK_NOT_FOUND');
+      const roleInProject = member?.roleInProject || member?.role || 'Member';
+      if (!member || !["Admin", "Manager"].includes(currentUser.role)) {
+        throw new Error('PERMISSION_DENIED');
+      }
+  }    
+
+  task.deletedAt = new Date();
+  await task.save();
 
   try {
     await ActivityLog.create({
-      projectId: deletedTask.projectId,
+      projectId: task.projectId,
       userId: currentUser._id,
-      taskId: deletedTask._id,
+      taskId: task._id,
       action: "DELETE_TASK",
-      content: `deleted task "${deletedTask.title}"`
+      content: `deleted task "${task.title}"`
     });
   } catch (e) { console.error(e); }
 
-  return deletedTask;
+  return task;
 };
 
 export const createSubtask = async (taskId, title) => {
