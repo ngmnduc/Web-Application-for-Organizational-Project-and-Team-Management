@@ -5,6 +5,12 @@ import Task from "../models/task.model.js";
 import Attendance from "../models/attendance.model.js"; 
 
 class DashboardService {
+  _getDateRange(month, year) {
+    if (!month || !year) return null;
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+    return { $gte: start, $lte: end };
+  }
 
   _getMetaDate(month, year) {
     const now = new Date();
@@ -19,6 +25,7 @@ class DashboardService {
       year: y
     };
   }
+
   async _getDailyTaskStats(baseMatch, dateQuery) {
     const dailyData = await Task.aggregate([
       { 
@@ -145,6 +152,7 @@ class DashboardService {
         { $group: { _id: "$priority", count: { $sum: 1 } } }
       ]),
 
+      // Upcoming Deadlines
       Project.find({ ...projectBaseFilter, status: "active", deadline: { $gte: new Date() } })
         .select("name deadline status").sort({ deadline: 1 }).limit(5),
       
@@ -158,6 +166,7 @@ class DashboardService {
       }, dateMeta, true) 
     ]);
 
+    // Re-calculate daily stats specifically for Admin (Logic override from charts)
     const dailyChart = await Task.aggregate([
         { $lookup: { from: "projects", localField: "projectId", foreignField: "_id", as: "project" } },
         { $unwind: "$project" },
@@ -172,8 +181,8 @@ class DashboardService {
         finalChart.push({ name: `${d}/${dateMeta.month}`, value: f ? f.count : 0 });
     }
 
-
     const avgProgress = allTasksCount > 0 ? Math.round((doneTasksCount / allTasksCount) * 100) : 0;
+
     const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
     tasksByPriority.forEach(item => {
       const key = item._id ? item._id.toUpperCase() : "MEDIUM";
