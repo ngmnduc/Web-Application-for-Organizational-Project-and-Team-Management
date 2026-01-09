@@ -7,13 +7,13 @@ import {
   CheckCircleIcon as DoneSolid,
   ExclamationTriangleIcon as WarningSolid, 
 } from '@heroicons/react/24/solid';
-
+import Swal from 'sweetalert2';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 import TaskSummary from '../components/TaskSummary';
 import { getProjects, getProjectLabels } from '../services/projectService';
-import { getTasksByProject, updateTaskStatus, createTask, reorderTask, getProjectMembers } from '../services/taskService';
+import { getTasksByProject, updateTaskStatus, createTask, reorderTask, getProjectMembers, deleteTask } from '../services/taskService';
 import { useAuth } from '../services/AuthContext';
 import { useProject } from '../context/ProjectContext';
 
@@ -50,19 +50,32 @@ const PriorityBadge = ({ level }) => {
 };
 
 // ===== Kanban Card =====
-const KanbanCard = ({ task, onOpenDetail }) => {
+const KanbanCard = ({ task, onOpenDetail, onDelete }) => { 
   return (
     <div
       type="button"
       onClick={() => onOpenDetail(task)}
-      className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition"
+      className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition relative group" // <--- 2. Thêm relative group
     >
+      
+      {onDelete && (
+        <button
+            onClick={(e) => {
+                e.stopPropagation(); 
+                onDelete(task);
+            }}
+            className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all z-10"
+            title="Delete Task"
+        >
+            <XMarkIcon className="w-4 h-4" />
+        </button>
+      )}
       {/* --- PHẦN HEADER: Đưa Priority và Project Name lên đây --- */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        {/* 1. Badge Priority */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap pr-6n">
+        {/* Badge Priority */}
         <PriorityBadge level={task.priority} />
 
-        {/* 2. Badge Project Name (Đưa từ dưới lên và bỏ giới hạn chiều rộng) */}
+        {/* Badge Project Name */}
         {task.project && (
             <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 font-medium">
                 {task.project}
@@ -89,16 +102,13 @@ const KanbanCard = ({ task, onOpenDetail }) => {
         {task.title}
       </h4>
 
-      {/* --- PHẦN FOOTER: Chỉ còn Date và Avatar --- */}
+      {/* --- FOOTER: Date & Avatar --- */}
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-3 text-gray-500">
           <div className="flex items-center gap-1" title="Due Date">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+             <ClockSolid className="w-4 h-4" /> 
             <span>{task.due}</span>
           </div>
-          {/* Đã xóa phần Project ở đây để đưa lên trên */}
         </div>
         
         {/* Avatar Assignee */}
@@ -188,6 +198,7 @@ const MyTasks = () => {
     ];
 
     const canDragTask = (task) => {
+      if (canManageTasks) return true;
         const taskAssigneeId = task.assigneeId?.toString() || task.assigneeId;
         const currentUserId = currentUser.id?.toString() || currentUser.id;
         return task.assigneeId === currentUser.id;
@@ -393,7 +404,7 @@ const MyTasks = () => {
             assigneeId: currentUser.id, 
             assigneeName: currentUser.name,
             priority: 'MEDIUM', 
-            status: 'TODO', 
+            status: 'BACKLOG', 
             dueDate: '', 
             labels: '',
         });
@@ -454,6 +465,33 @@ const MyTasks = () => {
         const allLabels = tasks.flatMap(t => t.labels || []);
         return [...new Set(allLabels)].sort();
     }, [tasks]);
+
+    const handleDeleteTask = async (taskToDelete) => {
+      const result = await Swal.fire({
+          title: 'Delete Task?',
+          text: `Are you sure you want to delete "${taskToDelete.title}"?`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'OK'
+      });
+
+      if (!result.isConfirmed) return;
+
+      try {
+          // 1. Gọi API xóa
+          await deleteTask(taskToDelete.id);
+
+          // 2. Cập nhật State để task biến mất ngay lập tức
+          setTasks((prev) => prev.filter(t => t.id !== taskToDelete.id));
+
+          Swal.fire('Deleted!', 'The task has been deleted.', 'success');
+      } catch (err) {
+          console.error("Delete failed:", err);
+          Swal.fire('Error', 'Failed to delete task', 'error');
+      }
+    };
 
     // Loading state khi đang fetch project details
     if (isLoadingProject) {
@@ -581,7 +619,9 @@ const MyTasks = () => {
                                                                 <Draggable key={task.id} draggableId={task.id} index={index} isDragDisabled={disabled}>
                                                                     {(prov) => (
                                                                         <div ref={prov.innerRef} {...prov.draggableProps} {...(!disabled ? prov.dragHandleProps : {})}>
-                                                                            <KanbanCard task={task} onOpenDetail={openTaskDetail} />
+                                                                            <KanbanCard task={task}
+                                                                             onOpenDetail={openTaskDetail}
+                                                                             onDelete={canManageTasks ? handleDeleteTask : null} />
                                                                         </div>
                                                                     )}
                                                                 </Draggable>

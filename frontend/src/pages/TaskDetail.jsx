@@ -546,8 +546,7 @@ const TaskDetail = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             {/* --- HEADER CÓ NÚT AI --- */}
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>
-              {canManage && (
+              <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>              
                  <button 
                    onClick={handleMagicSubtasks}
                    disabled={isGenerating || cooldownSeconds > 0}
@@ -573,8 +572,7 @@ const TaskDetail = () => {
                        <span>AI Suggest</span>
                      </>
                    )}
-                 </button>
-              )} 
+                 </button>               
             </div>
 
             {/* input tạo subtask mới */}
@@ -759,18 +757,16 @@ const TaskDetail = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             <div className="flex justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Attachments</h2>
-              {canManage && (
                  <button 
                     onClick={handleOpenAttachmentInput} 
                     className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
                  >
                     + Add File
-                 </button>
-              )}
+                 </button>            
             </div>
             
             {/* INPUT ĐỂ THÊM ATTACHMENT MỚI */}
-            {canManage && isAttachmentInputOpen && (
+            {isAttachmentInputOpen && (
                 <div className="flex flex-col gap-2 mb-4 p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50">
                     <input
                         ref={attachmentInputRef}
@@ -822,7 +818,7 @@ const TaskDetail = () => {
                     >
                       {a.name || a.title || a.url}
                     </a>
-                    {canManage && (
+                    
                       <button 
                       className="text-xs text-red-500 hover:text-red-700 p-1"
                       onClick={async () => {                        
@@ -854,8 +850,7 @@ const TaskDetail = () => {
                       }}
                     >
                       ✕
-                    </button>
-                    )}
+                    </button>                   
                   </li>
                 ))}
               </ul>
