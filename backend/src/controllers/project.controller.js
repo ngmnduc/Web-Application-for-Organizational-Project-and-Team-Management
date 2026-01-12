@@ -1,6 +1,7 @@
 import * as projectValidator from "../validators/project.validator.js";
 import * as projectService from "../services/project.service.js";
 import { createNotification } from "../services/notification.service.js";
+import { emitForceLogoutProject } from "../services/socket.service.js";
 import User from "../models/user.model.js"; 
 import { signToken } from "../utils/jwt.js"; 
 import ProjectMember from "../models/projectMember.model.js";
@@ -500,7 +501,15 @@ export const removeProjectMember = async (req, res) => {
     const currentOrgId = req.user.currentOrganizationId;
     const requestorId = req.user._id;
     
+    // Get project info before removal for socket event
+    const project = await Project.findById(id).select('name');
+    
     await projectService.removeMember(id, memberId, requestorId, currentOrgId);
+
+    // Emit socket event to force logout the removed user from this project
+    if (project) {
+      emitForceLogoutProject(memberId, id, project.name);
+    }
 
     res.json({ success: true, message: "Member removed successfully" });
   } catch (err) {
@@ -546,5 +555,33 @@ export const updateMemberRole = async (req, res) => {
     res.json({ success: true, message: "Role updated successfully", data: updatedMember });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// GET /projects/:id/report/attendance
+export const exportAttendanceReport = async (req, res) => {
+  try {
+    const { id } = req.params; 
+    const { month, year } = req.query;
+    const currentOrgId = req.user.currentOrganizationId;
+    if (!month || !year) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Month and Year are required params" 
+      });
+    }
+    const csvData = await projectService.exportAttendanceCSV(id, parseInt(month), parseInt(year), currentOrgId);
+    const filename = `attendance_report_project_${id}_${month}_${year}.csv`;
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    res.status(200).send(csvData);
+
+  } catch (err) {
+    console.error("Export Error:", err);
+    res.status(500).json({ 
+      success: false, 
+      error: "ServerError", 
+      message: "Could not export report" 
+    });
   }
 };

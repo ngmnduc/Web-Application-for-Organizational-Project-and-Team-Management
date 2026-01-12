@@ -328,21 +328,25 @@ export const reorderTask = async (taskId, newStatus, newPosition, currentUser) =
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');  
 
-  // Chỉ assignee của task mới được reorder
-  // Kể cả Admin/Manager cũng không được kéo task người khác
+  // check quyền kéo task
   const currentUserId = String(currentUser._id || currentUser.id);
   const assigneeId = task.assigneeId ? String(task.assigneeId) : null;
 
   console.log('[reorderTask] Permission check:', {
     currentUserId,
     assigneeId,
+    userSystemRole: currentUser.role,
     isMatch: assigneeId === currentUserId
   });
 
+  // Quy tắc: Chỉ người được assign task mới được kéo
+  // Admin/Manager cũng không được kéo task người khác
   if (assigneeId !== currentUserId) {
+    console.error('[reorderTask] User not assignee of this task');
     throw new Error('UNAUTHORIZED_ACCESS');
   }
 
+  // Cập nhật task
   const updatedTask = await Task.findByIdAndUpdate(
     taskId,
     {
@@ -355,33 +359,41 @@ export const reorderTask = async (taskId, newStatus, newPosition, currentUser) =
   );
 
   if (!updatedTask) throw new Error('TASK_NOT_FOUND');
+  
+  console.log('[reorderTask] Task reordered successfully');
   return updatedTask;
 };
 
 export const deleteTask = async (taskId, currentUser) => {
-  if (!["Admin", "Manager"].includes(currentUser.role)) {
-    throw new Error('PERMISSION_DENIED');
-  }
+  const task = await Task.findById(taskId);
+  if (!task) throw new Error('TASK_NOT_FOUND');
 
-  const deletedTask = await Task.findByIdAndUpdate(
-    taskId,
-    { deletedAt: new Date() },
-    { new: true }
-  );
+  if (currentUser.role !== 'Admin') {
+      const member = await ProjectMember.findOne({
+        projectId: task.projectId,
+        userId: currentUser._id || currentUser.id
+      });
 
-  if (!deletedTask) throw new Error('TASK_NOT_FOUND');
+      const roleInProject = member?.roleInProject || member?.role || 'Member';
+      if (!member || !["Admin", "Manager"].includes(currentUser.role)) {
+        throw new Error('PERMISSION_DENIED');
+      }
+  }    
+
+  task.deletedAt = new Date();
+  await task.save();
 
   try {
     await ActivityLog.create({
-      projectId: deletedTask.projectId,
+      projectId: task.projectId,
       userId: currentUser._id,
-      taskId: deletedTask._id,
+      taskId: task._id,
       action: "DELETE_TASK",
-      content: `deleted task "${deletedTask.title}"`
+      content: `deleted task "${task.title}"`
     });
   } catch (e) { console.error(e); }
 
-  return deletedTask;
+  return task;
 };
 
 export const createSubtask = async (taskId, title) => {

@@ -60,6 +60,26 @@ export function verifyProjectAccess(...requiredProjectRoles) {
         });
       }
 
+      // Step 2.5: GHOST USER CHECK - Verify user still exists and is active
+      const User = (await import("../models/user.model.js")).default;
+      const user = await User.findById(userId).select('deletedAt status');
+      
+      if (!user || user.deletedAt !== null) {
+        return res.status(403).json({ 
+          success: false, 
+          error: "ForbiddenError",
+          message: "User account has been deleted" 
+        });
+      }
+      
+      if (user.status !== 'ACTIVE') {
+        return res.status(403).json({ 
+          success: false, 
+          error: "ForbiddenError",
+          message: "User account is not active" 
+        });
+      }
+
       // Step 3: Query ProjectMember table
       const projectMember = await ProjectMember.findOne({ 
         projectId, 
