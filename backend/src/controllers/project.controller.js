@@ -1,6 +1,7 @@
 import * as projectValidator from "../validators/project.validator.js";
 import * as projectService from "../services/project.service.js";
 import { createNotification } from "../services/notification.service.js";
+import { emitForceLogoutProject } from "../services/socket.service.js";
 import User from "../models/user.model.js"; 
 import { signToken } from "../utils/jwt.js"; 
 import ProjectMember from "../models/projectMember.model.js";
@@ -500,7 +501,15 @@ export const removeProjectMember = async (req, res) => {
     const currentOrgId = req.user.currentOrganizationId;
     const requestorId = req.user._id;
     
+    // Get project info before removal for socket event
+    const project = await Project.findById(id).select('name');
+    
     await projectService.removeMember(id, memberId, requestorId, currentOrgId);
+
+    // Emit socket event to force logout the removed user from this project
+    if (project) {
+      emitForceLogoutProject(memberId, id, project.name);
+    }
 
     res.json({ success: true, message: "Member removed successfully" });
   } catch (err) {
