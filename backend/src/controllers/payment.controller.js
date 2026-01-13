@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import dotenv from "dotenv";
+import Organization from "../models/organization.model.js";
 import User from "../models/user.model.js";
 import Organization from "../models/organization.model.js";
 import { createNotification } from "../services/notification.service.js";
@@ -45,10 +45,10 @@ export const createCheckoutSession = async (req, res) => {
       line_items: [
         {
           price_data: {
-            currency: selectedPlan.currency,
+            currency: "usd",
             product_data: {
-              name: selectedPlan.name,
-              description: selectedPlan.description,
+              name: "Premium Plan Subscription",
+              description: "Unlock unlimited projects and advanced features",
             },
             unit_amount: selectedPlan.amount, 
             recurring: {
@@ -58,8 +58,12 @@ export const createCheckoutSession = async (req, res) => {
           quantity: 1,
         },
       ],
-
+      mode: "subscription",
+      success_url: `${process.env.CLIENT_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CLIENT_URL}/billing/cancel`,
+      
       metadata: {
+        organizationId: currentOrganizationId.toString(),
         userId: userId.toString(), 
         organizationId: currentOrganizationId.toString(),
         targetPlan: planName 
@@ -69,14 +73,10 @@ export const createCheckoutSession = async (req, res) => {
       cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/cancel`,
     });
 
-    res.status(200).json({ 
-        success: true, 
-        url: session.url 
-    });
-
+    res.status(200).json({ sessionId: session.id, url: session.url });
   } catch (error) {
-    console.error("Stripe Session Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Stripe Checkout Error:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -86,12 +86,12 @@ export const handleWebhook = async (req, res) => {
 
   try {
     event = stripe.webhooks.constructEvent(
-      req.body, 
-      sig, 
+      req.body,
+      sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error(`Webhook Signature Error: ${err.message}`);
+    console.error(`Webhook Signature Verification Failed: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
   
@@ -220,7 +220,6 @@ export const handleWebhook = async (req, res) => {
         break;
     }
   }
-
   res.status(200).json({ received: true });
 };
 
