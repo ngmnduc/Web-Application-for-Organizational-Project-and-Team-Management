@@ -1,102 +1,155 @@
 import Stripe from "stripe";
-import Organization from "../models/organization.model.js";
-import User from "../models/user.model.js";
 import dotenv from "dotenv";
+import User from "../models/user.model.js";
+import Organization from "../models/organization.model.js"; 
 
 dotenv.config();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+const PLAN_CONFIG = {
+  'PREMIUM': {
+    name: "Premium Plan Upgrade",
+    description: "Unlock unlimited projects and AI features",
+    amount: 2000, 
+    currency: "usd" 
+  },
+};
+
+/**
+ * @desc    Create Stripe Checkout Session
+ * @route   POST /payment/session
+ * @access  Private
+ */
 export const createCheckoutSession = async (req, res) => {
   try {
-    const { plan } = req.body;
-    const { currentOrganizationId, _id: userId } = req.user;
+    const { _id: userId, email: userEmail, currentOrganizationId } = req.user;
+    const { planName = 'PREMIUM' } = req.body; 
 
+    // 1. Validate Org
     if (!currentOrganizationId) {
-      return res.status(400).json({ message: "Organization ID is required" });
+        return res.status(400).json({ 
+            success: false, 
+            message: "User does not belong to any organization" 
+        });
     }
 
-    if (plan !== "PREMIUM") {
-      return res.status(400).json({ message: "Invalid plan selected" });
+    // 2. Validate Plan
+    const selectedPlan = PLAN_CONFIG[planName];
+    if (!selectedPlan) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid plan name. Available plans: ${Object.keys(PLAN_CONFIG).join(', ')}` 
+      });
     }
 
+    // 3. Create Session (Mode Subscription)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
+      mode: "subscription", 
+      customer_email: userEmail,
+      
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: selectedPlan.currency,
             product_data: {
-              name: "Premium Plan Subscription",
-              description: "Unlock unlimited projects and advanced features",
+              name: selectedPlan.name,
+              description: selectedPlan.description,
             },
-            unit_amount: 2000,
+            unit_amount: selectedPlan.amount, 
             recurring: {
-              interval: "month",
+                interval: "month", 
             },
           },
           quantity: 1,
         },
       ],
-      mode: "subscription",
-      success_url: `${process.env.CLIENT_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CLIENT_URL}/billing/cancel`,
-      
+
       metadata: {
-        organizationId: currentOrganizationId.toString(),
         userId: userId.toString(), 
-        targetPlan: "PREMIUM"
+        organizationId: currentOrganizationId.toString(),
+        targetPlan: planName 
       },
+
+      success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/cancel`,
     });
 
-    res.status(200).json({ sessionId: session.id, url: session.url });
+    res.status(200).json({ 
+        success: true, 
+        url: session.url 
+    });
+
   } catch (error) {
-    console.error("Stripe Checkout Error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Stripe Session Error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
+/**
+ * @desc    Handle Stripe Webhook
+ * @route   POST /payment/webhook
+ * @access  Public
+ */
 export const handleWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
 
   try {
     event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
+      req.body, 
+      sig, 
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error(`Webhook Signature Verification Failed: ${err.message}`);
+    console.error(`Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
+  
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    const { organizationId, targetPlan } = session.metadata || {};
+    
+    // Lấy thông tin từ Metadata
+    const { organizationId, targetPlan = "PREMIUM", userId } = session.metadata || {};
 
-    console.log(`💰 Payment success for Org: ${organizationId}, Plan: ${targetPlan}`);
+    console.log(` Payment success. Org: ${organizationId}, User: ${userId}`);
 
     if (organizationId) {
-      try {
-        await Organization.findByIdAndUpdate(organizationId, {
-          plan: "PREMIUM",
-          subscriptionStatus: "ACTIVE", 
-          subscriptionId: session.subscription, 
-          updatedAt: new Date()
-        });
+        try {
+            // 1. Update Organization -> PREMIUM
+            await Organization.findByIdAndUpdate(organizationId, { 
+                plan: targetPlan,
+                subscriptionStatus: "ACTIVE",  
+                subscriptionId: session.subscription,
+                updatedAt: new Date()
+            });
+            console.log(` Organization ${organizationId} upgraded to ${targetPlan}`);
 
-        console.log(`Organization ${organizationId} upgraded to PREMIUM successfully.`);
-      } catch (dbError) {
-        console.error("Database Update Failed:", dbError);
-      }
+            // 2. Update user to admin
+            if (userId) {
+                await User.findByIdAndUpdate(userId, {
+                    role: 'Admin'
+                });
+                console.log(` User ${userId} promoted to ADMIN successfully.`);
+            }
+
+        } catch (err) {
+            console.error(" Database update failed:", err);
+        }
     } else {
-      console.error("Missing organizationId in session metadata!");
+        console.error(" Missing organizationId in session metadata!");
     }
   }
+
   res.status(200).json({ received: true });
 };
 
+/**
+ * @desc    Cancel Subscription (Downgrade to FREE)
+ * @route   POST /payment/cancel
+ * @access  Private
+ */
 export const cancelSubscription = async (req, res) => {
   try {
     const { currentOrganizationId } = req.user;
@@ -104,36 +157,44 @@ export const cancelSubscription = async (req, res) => {
     const organization = await Organization.findById(currentOrganizationId);
 
     if (!organization) {
-      return res.status(404).json({ message: "Organization not found" });
+      return res.status(404).json({ success: false, message: "Organization not found" });
     }
 
     if (!organization.subscriptionId) {
-      return res.status(400).json({ message: "No active subscription found to cancel" });
+      organization.plan = "FREE";
+      organization.subscriptionStatus = "INACTIVE";
+      await organization.save();
+      
+      return res.status(200).json({ 
+        success: true, 
+        message: "Plan reset to FREE (No active Stripe subscription found)." 
+      });
     }
 
-    // 1. Call Stripe to cancel
     try {
       await stripe.subscriptions.cancel(organization.subscriptionId);
     } catch (stripeError) {
       console.error("Stripe Cancel Error:", stripeError);
-      return res.status(500).json({ message: "Failed to cancel subscription with payment provider" });
+      if (stripeError.code !== 'resource_missing') {
+          return res.status(500).json({ success: false, message: "Failed to cancel with payment provider" });
+      }
     }
 
-    // 2. Update Database (Downgrade to FREE)
     organization.plan = "FREE";
-    organization.subscriptionStatus = "CANCELLED"; 
+    organization.subscriptionStatus = "CANCELLED";
     organization.subscriptionId = null; 
     organization.updatedAt = new Date();
     
     await organization.save();
 
-    res.status(200).json({ 
+    return res.status(200).json({
+      success: true,
       message: "Subscription cancelled successfully. Plan downgraded to FREE.",
-      plan: "FREE"
+      data: { plan: "FREE" }
     });
 
   } catch (error) {
     console.error("Cancel Subscription Error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

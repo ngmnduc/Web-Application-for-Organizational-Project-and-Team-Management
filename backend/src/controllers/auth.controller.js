@@ -33,8 +33,11 @@ export async function signup(req, res, next) {
       });
     }
 
-    const { name, email, password, inviteCode, plan } = req.body;
+    const { name, email, password, inviteCode } = req.body;
+    // Chuẩn hóa plan về chữ hoa, mặc định là FREE
+    const plan = req.body.plan ? req.body.plan.toUpperCase() : "FREE";
 
+    // 1. Logic Join Project (Giữ nguyên)
     let projectToJoin = null;
     if (inviteCode) {
       projectToJoin = await Project.findOne({
@@ -44,32 +47,19 @@ export async function signup(req, res, next) {
       
       if (!projectToJoin) {
         await session.abortTransaction();
-        return res.status(400).json({ 
-          success: false, 
-          error: "ValidationError", 
-          message: "Invalid or expired invite code" 
-        });
+        return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid or expired invite code" });
       }
-
       if (projectToJoin.isArchived) {
         await session.abortTransaction();
-        return res.status(400).json({ 
-          success: false, 
-          error: "ValidationError", 
-          message: "This project has been archived and cannot accept new members" 
-        });
+        return res.status(400).json({ success: false, error: "ValidationError", message: "This project has been archived" });
       }
-
       if (projectToJoin.status === "INACTIVE") {
         await session.abortTransaction();
-        return res.status(400).json({ 
-          success: false, 
-          error: "ValidationError", 
-          message: "This project is currently inactive" 
-        });
+        return res.status(400).json({ success: false, error: "ValidationError", message: "This project is currently inactive" });
       }
     }
 
+    // 2. Create User
     const result = await authService.createUserWithSession(name, email, password, session);
     const userId = result.user.id || result.user._id;
 
@@ -82,26 +72,14 @@ export async function signup(req, res, next) {
     let finalOrganizationId;
     let finalOrgObj;
 
+    // --- CASE A: JOIN EXISTING PROJECT ---
     if (projectToJoin) {
       finalOrganizationId = projectToJoin.organizationId;
       finalOrgObj = await Organization.findById(finalOrganizationId).session(session);
 
-      if (!finalOrgObj) {
+      if (!finalOrgObj || finalOrgObj.status === "INACTIVE") {
         await session.abortTransaction();
-        return res.status(404).json({ 
-          success: false, 
-          error: "NotFoundError", 
-          message: "Organization not found" 
-        });
-      }
-
-      if (finalOrgObj.status === "INACTIVE") {
-        await session.abortTransaction();
-        return res.status(403).json({ 
-          success: false, 
-          error: "ForbiddenError", 
-          message: "This organization is currently inactive" 
-        });
+        return res.status(403).json({ success: false, error: "ForbiddenError", message: "Organization invalid or inactive" });
       }
 
       user.currentOrganizationId = finalOrganizationId;
@@ -109,29 +87,17 @@ export async function signup(req, res, next) {
       user.role = "Member"; 
       await user.save({ session }); 
 
-      await OrganizationMember.create([{
-        userId: user._id,
-        organizationId: finalOrganizationId,
-        roleInOrganization: "ORG_MEMBER"
-      }], { session }); 
-
-      const existingPrjMem = await ProjectMember.findOne({ 
-        userId: user._id, 
-        projectId: projectToJoin._id 
-      }).session(session);
-
+      await OrganizationMember.create([{ userId: user._id, organizationId: finalOrganizationId, roleInOrganization: "ORG_MEMBER" }], { session }); 
+      
+      const existingPrjMem = await ProjectMember.findOne({ userId: user._id, projectId: projectToJoin._id }).session(session);
       if (!existingPrjMem) {
-        await ProjectMember.create([{
-          userId: user._id,
-          projectId: projectToJoin._id,
-          organizationId: finalOrganizationId,
-          roleInProject: "Member",
-          status: "PENDING"
-        }], { session }); 
+        await ProjectMember.create([{ userId: user._id, projectId: projectToJoin._id, organizationId: finalOrganizationId, roleInProject: "Member", status: "PENDING" }], { session }); 
       }
 
-    } else {
-      const initialPlan = "FREE"; 
+    } 
+    // --- CASE B: CREATE NEW ORGANIZATION ---
+    else {
+      const initialPlan = "FREE"; // Luôn tạo FREE trước
 
       const [newOrg] = await Organization.create([{
         name: `${name}'s Organization`,
@@ -140,13 +106,7 @@ export async function signup(req, res, next) {
         plan: initialPlan, 
         subscriptionStatus: 'INACTIVE',
         allowedIps: [],
-        attendanceSettings: {
-          enableIpCheck: true,
-          standardCheckInHour: 9,
-          standardCheckOutHour: 17,
-          allowLateCheckIn: true,
-          lateThresholdMinutes: 15
-        }
+        attendanceSettings: { enableIpCheck: true, standardCheckInHour: 9, standardCheckOutHour: 17, allowLateCheckIn: true, lateThresholdMinutes: 15 }
       }], { session }); 
 
       finalOrganizationId = newOrg._id;
@@ -157,21 +117,20 @@ export async function signup(req, res, next) {
       user.role = "Admin"; 
       await user.save({ session }); 
 
-      await OrganizationMember.create([{
-        userId: user._id,
-        organizationId: newOrg._id,
-        roleInOrganization: "ORG_ADMIN"
-      }], { session }); 
-
+      await OrganizationMember.create([{ userId: user._id, organizationId: newOrg._id, roleInOrganization: "ORG_ADMIN" }], { session }); 
     }
 
     await session.commitTransaction();
 
+    // 3. Logic Payment (Chạy sau khi commit transaction)
     let paymentUrl = null;
     if (!projectToJoin && plan === "PREMIUM") {
         try {
             const sessionStripe = await stripe.checkout.sessions.create({
                 payment_method_types: ["card"],
+                // [FIX] Thêm dòng này để Stripe tự điền email user
+                customer_email: email, 
+                
                 line_items: [
                     {
                         price_data: {
@@ -180,15 +139,16 @@ export async function signup(req, res, next) {
                                 name: "Premium Plan Subscription",
                                 description: "Unlock unlimited projects (Signup Upgrade)",
                             },
-                            unit_amount: 2900,
+                            // [FIX] Giá $29 (2900 cents) khớp với Pricing Page. Sửa thành 2000 nếu muốn $20.
+                            unit_amount: 2000, 
                             recurring: { interval: "month" },
                         },
                         quantity: 1,
                     },
                 ],
                 mode: "subscription",
-                success_url: `${process.env.CLIENT_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${process.env.CLIENT_URL}/billing/cancel`,
+                success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
                 metadata: {
                     organizationId: finalOrganizationId.toString(),
                     userId: user._id.toString(),
@@ -197,85 +157,53 @@ export async function signup(req, res, next) {
             });
             paymentUrl = sessionStripe.url;
         } catch (stripeError) {
-            console.error("Stripe Session Creation Failed during Signup:", stripeError);
+            console.error("Stripe Session Creation Failed:", stripeError);
+            // Không throw error để user vẫn đăng ký được (chỉ mất link thanh toán)
         }
     }
 
-    const tokenPayload = {
-      sub: user._id.toString(),     
-      email: user.email,
-      role: user.role,
-      organizationId: finalOrganizationId.toString() 
-    };
+    // 4. Response
+    const tokenPayload = { sub: user._id.toString(), email: user.email, role: user.role, organizationId: finalOrganizationId.toString() };
     const newToken = signToken(tokenPayload);
 
-    try {
-      await sendWelcomeEmail(user.email, user.name);
-    } catch (emailErr) {
-      console.error("Failed to send welcome email:", emailErr);
-    }
+    try { await sendWelcomeEmail(user.email, user.name); } catch (emailErr) { console.error("Failed to send welcome email:", emailErr); }
 
     return res.status(201).json({
       success: true,
-      message: projectToJoin 
-        ? "Joined project successfully" 
-        : "User and Organization created successfully",
-      paymentUrl,
+      message: projectToJoin ? "Joined project successfully" : "User created successfully",
+      paymentUrl, // Trả về link thanh toán
       data: {
         token: newToken,
         tokenType: "Bearer",
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          currentOrganizationId: finalOrganizationId,
-          organizations: user.organizations,
-          createdAt: user.createdAt,
+        user: { 
+            id: user._id, 
+            name: user.name, 
+            email: user.email, 
+            role: user.role, 
+            currentOrganizationId: finalOrganizationId, 
+            organizations: user.organizations, 
+            createdAt: user.createdAt 
         },
-        organization: {
-          id: finalOrgObj._id,
-          name: finalOrgObj.name,
-          ownerId: finalOrgObj.ownerId,
-          status: finalOrgObj.status,
-          plan: finalOrgObj.plan,
-          createdAt: finalOrgObj.createdAt
+        organization: { 
+            id: finalOrgObj._id, 
+            name: finalOrgObj.name, 
+            ownerId: finalOrgObj.ownerId, 
+            status: finalOrgObj.status, 
+            plan: finalOrgObj.plan, 
+            createdAt: finalOrgObj.createdAt 
         },
-        ...(projectToJoin && {
-          project: {
-            id: projectToJoin._id,
-            name: projectToJoin.name,
-            code: projectToJoin.code
-          }
-        })
+        ...(projectToJoin && { project: { id: projectToJoin._id, name: projectToJoin.name, code: projectToJoin.code } })
       },
     });
 
   } catch (err) {
     await session.abortTransaction();
-    
     console.error("[SIGNUP] Transaction failed:", err.message);
-
-    if (err.message === "EMAIL_EXISTS") {
-      return res.status(409).json({ 
-        success: false, 
-        error: "ConflictError", 
-        message: "Email already registered" 
-      });
-    }
-    if (err.message === "USER_CREATION_FAILED") {
-      return res.status(500).json({ 
-        success: false, 
-        error: "ServerError", 
-        message: "Failed to create user" 
-      });
-    }
     
-    return res.status(500).json({
-      success: false,
-      error: "ServerError",
-      message: err.message || "Signup failed. Please try again."
-    });
+    if (err.message === "EMAIL_EXISTS") return res.status(409).json({ success: false, error: "ConflictError", message: "Email already registered" });
+    if (err.message === "USER_CREATION_FAILED") return res.status(500).json({ success: false, error: "ServerError", message: "Failed to create user" });
+    
+    return res.status(500).json({ success: false, error: "ServerError", message: err.message || "Signup failed." });
   } finally {
     session.endSession();
   }
