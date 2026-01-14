@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import Organization from "../models/organization.model.js";
+import dotenv from "dotenv";
 import User from "../models/user.model.js";
 import Organization from "../models/organization.model.js";
 import { createNotification } from "../services/notification.service.js";
@@ -22,6 +22,7 @@ export const createCheckoutSession = async (req, res) => {
     const { _id: userId, email: userEmail, currentOrganizationId } = req.user;
     const { planName = 'PREMIUM' } = req.body; 
 
+    // 1. Validate Org
     if (!currentOrganizationId) {
         return res.status(400).json({ 
             success: false, 
@@ -37,6 +38,7 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
+    // 3. Create Session (Mode Subscription)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription", 
@@ -45,10 +47,10 @@ export const createCheckoutSession = async (req, res) => {
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: selectedPlan.currency,
             product_data: {
-              name: "Premium Plan Subscription",
-              description: "Unlock unlimited projects and advanced features",
+              name: selectedPlan.name,
+              description: selectedPlan.description,
             },
             unit_amount: selectedPlan.amount, 
             recurring: {
@@ -58,11 +60,9 @@ export const createCheckoutSession = async (req, res) => {
           quantity: 1,
         },
       ],
-      mode: "subscription",
-      success_url: `${process.env.CLIENT_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CLIENT_URL}/billing/cancel`,
-      
+
       metadata: {
+        userId: userId.toString(), 
         organizationId: currentOrganizationId.toString(),
         userId: userId.toString(), 
         organizationId: currentOrganizationId.toString(),
@@ -73,25 +73,34 @@ export const createCheckoutSession = async (req, res) => {
       cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/cancel`,
     });
 
-    res.status(200).json({ sessionId: session.id, url: session.url });
+    res.status(200).json({ 
+        success: true, 
+        url: session.url 
+    });
+
   } catch (error) {
-    console.error("Stripe Checkout Error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Stripe Session Error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
+/**
+ * @desc    Handle Stripe Webhook
+ * @route   POST /payment/webhook
+ * @access  Public
+ */
 export const handleWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
 
   try {
     event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
+      req.body, 
+      sig, 
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error(`Webhook Signature Verification Failed: ${err.message}`);
+    console.error(`Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
   
@@ -220,9 +229,15 @@ export const handleWebhook = async (req, res) => {
         break;
     }
   }
+
   res.status(200).json({ received: true });
 };
 
+/**
+ * @desc    Cancel Subscription (Downgrade to FREE)
+ * @route   POST /payment/cancel
+ * @access  Private
+ */
 export const cancelSubscription = async (req, res) => {
   try {
     const { currentOrganizationId } = req.user;

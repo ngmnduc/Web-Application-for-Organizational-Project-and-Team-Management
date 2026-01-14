@@ -114,7 +114,7 @@ export default function PricingPage() {
     }
   };
 
-  // --- LOGIC JOIN PROJECT ---
+  // --- 3. JOIN PROJECT ---
   const handleJoinProject = async () => {
       setJoinError('');
       if (!joinLink.trim()) {
@@ -131,7 +131,7 @@ export default function PricingPage() {
       
       // 1. Chưa login -> Chuyển sang SIGN UP (Kèm mã invite để xử lý sau)
       if (!token) {
-          navigate('/signup', { state: { from: 'pricing', action: 'join', code: inviteCode } });
+          navigate('/signup', { state: { action: 'join', code: inviteCode } });
           return;
       }
 
@@ -248,7 +248,7 @@ export default function PricingPage() {
               <div className="absolute -top-4 left-1/2 -translate-x-1/2"><div className="bg-orange-500 text-black px-4 py-1 rounded-full text-sm flex items-center gap-1 font-bold shadow-lg"><Crown className="w-4 h-4" /> Most Popular</div></div>
               <div className="mb-6">
                 <h3 className="text-2xl mb-2 font-bold">Admin Plan</h3>
-                <div className="flex items-baseline gap-2 mb-4"><span className="text-5xl text-orange-500 font-bold">$20</span><span className="text-gray-400">/month</span></div>
+                <div className="flex items-baseline gap-2 mb-4"><span className="text-5xl text-orange-500 font-bold">$29</span><span className="text-gray-400">/month</span></div>
                 <p className="text-gray-400">Unlock full power for your team.</p>
               </div>
               <div className="space-y-4 mb-8 flex-grow">
