@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const organizationSchema = new mongoose.Schema(
+const OrganizationSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -16,6 +16,16 @@ const organizationSchema = new mongoose.Schema(
       type: String,
       enum: ["FREE", "PREMIUM"],
       default: "FREE",
+    },
+    inviteCode: {
+      type: String,
+      unique: true, 
+      sparse: true, 
+      select: false, 
+    },
+    stripeCustomerId: {
+      type: String, 
+      select: false 
     },
     subscriptionStatus: {
       type: String,
@@ -34,8 +44,24 @@ const organizationSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // IP whitelist cho attendance
+    allowedIps: [{
+      ip: { type: String, required: true },
+      description: { type: String, default: "" },
+      isActive: { type: Boolean, default: true },
+      addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      addedAt: { type: Date, default: Date.now }
+    }],
+    // Attendance settings
+    attendanceSettings: {
+      enableIpCheck: { type: Boolean, default: true },
+      standardCheckInHour: { type: Number, default: 9 }, // 9 AM
+      standardCheckOutHour: { type: Number, default: 17 }, // 5 PM
+      allowLateCheckIn: { type: Boolean, default: true },
+      lateThresholdMinutes: { type: Number, default: 15 }
+    }
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Organization", organizationSchema);
+export default mongoose.model("Organization", OrganizationSchema);
