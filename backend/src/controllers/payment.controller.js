@@ -22,7 +22,6 @@ export const createCheckoutSession = async (req, res) => {
     const { _id: userId, email: userEmail, currentOrganizationId } = req.user;
     const { planName = 'PREMIUM' } = req.body; 
 
-    // 1. Validate Org
     if (!currentOrganizationId) {
         return res.status(400).json({ 
             success: false, 
@@ -38,7 +37,6 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // 3. Create Session (Mode Subscription)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription", 
@@ -84,11 +82,6 @@ export const createCheckoutSession = async (req, res) => {
   }
 };
 
-/**
- * @desc    Handle Stripe Webhook
- * @route   POST /payment/webhook
- * @access  Public
- */
 export const handleWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
@@ -233,11 +226,6 @@ export const handleWebhook = async (req, res) => {
   res.status(200).json({ received: true });
 };
 
-/**
- * @desc    Cancel Subscription (Downgrade to FREE)
- * @route   POST /payment/cancel
- * @access  Private
- */
 export const cancelSubscription = async (req, res) => {
   try {
     const { currentOrganizationId } = req.user;
