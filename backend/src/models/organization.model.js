@@ -36,9 +36,14 @@ const OrganizationSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    allowedIps: {
-      type: [String], 
-      default: [],
+    subscriptionExpiredAt: {
+      type: Date,
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ["ACTIVE", "INACTIVE", "SUSPENDED"],
+      default: "ACTIVE"
     },
     deletedAt: {
       type: Date,

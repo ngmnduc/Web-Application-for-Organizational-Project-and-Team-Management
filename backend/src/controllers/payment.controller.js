@@ -1,7 +1,8 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import User from "../models/user.model.js";
-import Organization from "../models/organization.model.js"; 
+import Organization from "../models/organization.model.js";
+import { createNotification } from "../services/notification.service.js";
 
 dotenv.config();
 
@@ -16,17 +17,11 @@ const PLAN_CONFIG = {
   },
 };
 
-/**
- * @desc    Create Stripe Checkout Session
- * @route   POST /payment/session
- * @access  Private
- */
 export const createCheckoutSession = async (req, res) => {
   try {
     const { _id: userId, email: userEmail, currentOrganizationId } = req.user;
     const { planName = 'PREMIUM' } = req.body; 
 
-    // 1. Validate Org
     if (!currentOrganizationId) {
         return res.status(400).json({ 
             success: false, 
@@ -34,7 +29,6 @@ export const createCheckoutSession = async (req, res) => {
         });
     }
 
-    // 2. Validate Plan
     const selectedPlan = PLAN_CONFIG[planName];
     if (!selectedPlan) {
       return res.status(400).json({ 
@@ -43,7 +37,6 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // 3. Create Session (Mode Subscription)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription", 
@@ -87,11 +80,6 @@ export const createCheckoutSession = async (req, res) => {
   }
 };
 
-/**
- * @desc    Handle Stripe Webhook
- * @route   POST /payment/webhook
- * @access  Public
- */
 export const handleWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
@@ -107,49 +95,135 @@ export const handleWebhook = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
   
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    
-    // Lấy thông tin từ Metadata
-    const { organizationId, targetPlan = "PREMIUM", userId } = session.metadata || {};
+  switch (event.type) {
+    case "checkout.session.completed": {
+        const session = event.data.object;
+        const { organizationId, targetPlan = "PREMIUM", userId } = session.metadata || {};
 
-    console.log(` Payment success. Org: ${organizationId}, User: ${userId}`);
-
-    if (organizationId) {
-        try {
-            // 1. Update Organization -> PREMIUM
-            await Organization.findByIdAndUpdate(organizationId, { 
-                plan: targetPlan,
-                subscriptionStatus: "ACTIVE",  
-                subscriptionId: session.subscription,
-                updatedAt: new Date()
-            });
-            console.log(` Organization ${organizationId} upgraded to ${targetPlan}`);
-
-            // 2. Update user to admin
-            if (userId) {
-                await User.findByIdAndUpdate(userId, {
-                    role: 'Admin'
+        if (organizationId) {
+            try {
+                await Organization.findByIdAndUpdate(organizationId, { 
+                    plan: targetPlan,
+                    subscriptionStatus: "ACTIVE",  
+                    subscriptionId: session.subscription,
+                    updatedAt: new Date()
                 });
-                console.log(` User ${userId} promoted to ADMIN successfully.`);
-            }
 
-        } catch (err) {
-            console.error(" Database update failed:", err);
+                if (userId) {
+                    await User.findByIdAndUpdate(userId, {
+                        role: 'Admin'
+                    });
+
+                    await createNotification({
+                        userId: userId,
+                        title: "Upgrade Successful",
+                        message: `Your organization has been upgraded to ${targetPlan}.`,
+                        type: "SUCCESS"
+                     });
+                }
+            } catch (err) {
+                console.error("Database update failed:", err);
+            }
         }
-    } else {
-        console.error(" Missing organizationId in session metadata!");
+        break;
+    }
+
+    case "invoice.payment_succeeded": {
+        const invoice = event.data.object;
+        const subscriptionId = invoice.subscription;
+        const periodEnd = invoice.lines?.data[0]?.period?.end; 
+
+        if (subscriptionId && periodEnd) {
+            try {
+                const expiredAt = new Date(periodEnd * 1000);
+
+                const org = await Organization.findOneAndUpdate(
+                    { subscriptionId: subscriptionId },
+                    { 
+                        subscriptionStatus: "ACTIVE",
+                        subscriptionExpiredAt: expiredAt
+                    },
+                    { new: true }
+                );
+
+                if (org) {
+                    await createNotification({
+                        userId: org.ownerId,
+                        title: "Renewal Successful",
+                        message: `Premium plan renewed. Valid until ${expiredAt.toLocaleDateString()}.`,
+                        type: "INFO"
+                    });
+                }
+            } catch (err) {
+                console.error("Auto-renewal update failed:", err);
+            }
+        }
+        break;
+    }
+
+    case "invoice.payment_failed": {
+        const invoice = event.data.object;
+        const subscriptionId = invoice.subscription;
+
+        if (subscriptionId) {
+            try {
+                const org = await Organization.findOneAndUpdate(
+                    { subscriptionId: subscriptionId },
+                    { subscriptionStatus: "PAST_DUE" },
+                    { new: true }
+                );
+
+                if (org) {
+                    await createNotification({
+                        userId: org.ownerId,
+                        title: "Payment Failed",
+                        message: "Renewal payment failed. Please check your payment method.",
+                        type: "WARNING"
+                    });
+                }
+            } catch (err) {
+                console.error("Payment failed update error:", err);
+            }
+        }
+        break;
+    }
+
+    case "customer.subscription.deleted": {
+        const subscription = event.data.object;
+        const subscriptionId = subscription.id;
+
+        if (subscriptionId) {
+            try {
+                const org = await Organization.findOneAndUpdate(
+                    { subscriptionId: subscriptionId },
+                    { 
+                        plan: "FREE",              
+                        subscriptionStatus: "INACTIVE", 
+                        subscriptionId: null,      
+                        subscriptionExpiredAt: null
+                    },
+                    { new: true }
+                );
+
+                if (org) {
+                    await createNotification({
+                        userId: org.ownerId,
+                        title: "Premium Expired",
+                        message: "Your Premium plan has expired. Account downgraded to Free.",
+                        type: "ERROR"
+                    });
+                }
+            } catch (err) {
+                console.error("Subscription deleted error:", err);
+            }
+        }
+        break;
     }
   }
 
   res.status(200).json({ received: true });
 };
 
-/**
- * @desc    Cancel Subscription (Downgrade to FREE)
- * @route   POST /payment/cancel
- * @access  Private
- */
 export const cancelSubscription = async (req, res) => {
   try {
     const { currentOrganizationId } = req.user;
@@ -172,7 +246,9 @@ export const cancelSubscription = async (req, res) => {
     }
 
     try {
-      await stripe.subscriptions.cancel(organization.subscriptionId);
+      await stripe.subscriptions.update(organization.subscriptionId, {
+        cancel_at_period_end: true
+      });
     } catch (stripeError) {
       console.error("Stripe Cancel Error:", stripeError);
       if (stripeError.code !== 'resource_missing') {
@@ -180,17 +256,30 @@ export const cancelSubscription = async (req, res) => {
       }
     }
 
-    organization.plan = "FREE";
     organization.subscriptionStatus = "CANCELLED";
-    organization.subscriptionId = null; 
     organization.updatedAt = new Date();
     
     await organization.save();
 
+    const expiredDate = organization.subscriptionExpiredAt 
+        ? new Date(organization.subscriptionExpiredAt).toLocaleDateString() 
+        : "end of period";
+
+    await createNotification({
+        userId: organization.ownerId,
+        title: "Cancellation Scheduled",
+        message: `Premium cancellation scheduled. You can use Premium features until ${expiredDate}.`,
+        type: "WARNING"
+    });
+
     return res.status(200).json({
       success: true,
-      message: "Subscription cancelled successfully. Plan downgraded to FREE.",
-      data: { plan: "FREE" }
+      message: "Subscription scheduled for cancellation at the end of the billing period.",
+      data: { 
+          plan: organization.plan,
+          status: "CANCELLED",
+          expiredAt: organization.subscriptionExpiredAt
+      }
     });
 
   } catch (error) {
