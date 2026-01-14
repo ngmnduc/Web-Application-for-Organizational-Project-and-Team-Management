@@ -14,7 +14,7 @@ import { EmptyState } from '../components/EmptyState';
 import { LoaderOverlay } from '../components/LoaderOverlay';
 import { ErrorState } from '../components/ErrorState';
 import { useAuth } from '../services/AuthContext'; 
-import { usePollingNotifications } from '../hooks/usePollingNotifications';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 // --- Helper: Chuẩn hóa dữ liệu Backend sang UI (Tiếng Anh) ---
 const normalizeNotification = (beData) => {
@@ -22,7 +22,7 @@ const normalizeNotification = (beData) => {
     let iconColor = 'text-gray-500';
     let iconBg = 'bg-gray-100';
     let title = "New Notification";
-    const content = beData.payload; 
+    const content = beData.content || beData.payload || "No content";
 
     switch (beData.type) {
         case 'MENTION':
@@ -105,7 +105,7 @@ const NotificationList = () => {
     const { user } = useAuth(); 
     
     // Sử dụng Hook lấy dữ liệu
-    const { notifications, unreadCount, isLoading, isError, refresh, markAsRead, markAllAsRead } = usePollingNotifications(30000);
+    const { notifications, unreadCount, isLoading, isError, refresh, markAsRead, markAllAsRead } = useRealtimeNotifications();
 
     const handleNotificationClick = async (item) => {
         if (!item.read) markAsRead(item._id);

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BellIcon } from '@heroicons/react/24/outline';
 import { Link, useNavigate } from 'react-router-dom'; 
 import { useAuth } from '../services/AuthContext'; 
-import { usePollingNotifications } from '../hooks/usePollingNotifications';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 export default function NotificationBell() {
     const { user } = useAuth();
@@ -11,7 +11,7 @@ export default function NotificationBell() {
     const dropdownRef = useRef(null);
 
     // Sử dụng Hook ở trên
-    const { notifications, unreadCount, markAsRead } = usePollingNotifications(30000);
+    const { notifications, unreadCount, markAsRead } = useRealtimeNotifications();
 
     const displayCount = unreadCount > 9 ? '9+' : unreadCount;
     const viewAllLink = user?.role === 'Admin' ? '/admin/notifications' : '/notifications';
