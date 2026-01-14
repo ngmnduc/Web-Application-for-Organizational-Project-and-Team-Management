@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { API_BASE_URL } from '../utils/constants';
 
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
     const [name, setName] = useState('');
@@ -31,7 +32,7 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
             const fetchUsers = async () => {
                 try {
                     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
-                    const res = await fetch(`${API_BASE_URL}/users`, {
+                    const res = await fetch(`${VITE_API_BASE_URL}/users`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     const data = await res.json();
