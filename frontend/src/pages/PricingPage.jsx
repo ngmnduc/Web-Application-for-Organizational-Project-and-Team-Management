@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom'; 
 import { ArrowLeft, Check, Crown, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+// import axiosInstance from '../utils/axios'; // Nhớ import axiosInstance hoặc dùng fetch
 
 import logoIcon from '../assets/images/logo.png'; 
 import logoText from '../assets/images/syncora-official.png'; 
@@ -9,86 +10,111 @@ const API_BASE_URL = 'http://localhost:4000/api';
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const [selectedPlan, setSelectedPlan] = useState('Free');
+  const [selectedPlan, setSelectedPlan] = useState('Free'); // Chỉ dùng để highlight UI
   
   // State Join Project
   const [showJoinInput, setShowJoinInput] = useState(false);
   const [joinLink, setJoinLink] = useState('');
   const [joinError, setJoinError] = useState(''); 
   const [isJoining, setIsJoining] = useState(false);
-
-  // State Payment
+  
+  // State Payment & Processing
   const [paymentError, setPaymentError] = useState(''); 
+  const [isProcessing, setIsProcessing] = useState(false); // Loading state chung
 
-  const handleSelectPlan = async (plan) => {
-    const token = localStorage.getItem('token');
-    if(!token){
-      navigate('/login');
-      return;
-    }
-    try {
-        // Gọi API tạo Org 
-        const res = await axiosInstance.post('/organizations', {
-            name: "My New Workspace", // Có thể thêm input cho user nhập tên
-            plan: plan
+  // --- 1. XỬ LÝ CHỌN GÓI FREE ---
+  const handleFreePlan = async (e) => {
+      e.stopPropagation(); // Chặn sự kiện nổi bọt từ div cha
+      setPaymentError('');
+      
+      const token = localStorage.getItem('token');
+      
+      // CASE 1: Chưa đăng nhập -> Sang Signup với gói FREE
+      if (!token) {
+        navigate('/signup', { state: { plan: 'FREE' } });
+        return;
+      }
+
+      // CASE 2: Đã đăng nhập -> Tạo Org Free ngay lập tức
+      setIsProcessing(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/organizations`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                name: "My Workspace", 
+                plan: "FREE"
+            })
         });
+        
+        const res = await response.json();
 
-        if (res.data.success) {
-            // CẬP NHẬT LẠI USER LOCALSTORAGE
-            // Vì BE sau khi tạo Org sẽ update user có currentOrganizationId mới
-            const updatedUser = res.data.data.user; 
-            const newToken = res.data.data.token; // Token mới chứa OrgId
-
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            localStorage.setItem('token', newToken); 
-            window.location.href = '/home';
+        if (response.ok && res.success) {
+            // Update lại token mới (chứa OrgId) vào LocalStorage
+            if (res.data && res.data.token) {
+                localStorage.setItem('token', res.data.token); // Quan trọng
+                // Nếu BE trả về user mới thì update luôn
+                // localStorage.setItem('user', JSON.stringify(res.data.user));
+            }
+            window.location.href = '/home'; // Redirect cứng để reload App state
+        } else {
+            setPaymentError(res.message || "Failed to create workspace");
         }
-    } catch (err) {
-        console.error("Failed to create org", err);
-    }
-
-    
-    setSelectedPlan(plan);
-    setPaymentError('');
+      } catch (err) {
+        console.error(err);
+        setPaymentError("Connection error");
+      } finally {
+        setIsProcessing(false);
+      }
   };
 
-  // --- LOGIC CHỌN GÓI ADMIN ---
-  const handleAdminUpgrade = async () => {
+  // --- 2. XỬ LÝ CHỌN GÓI PREMIUM (ADMIN) ---
+  const handleAdminUpgrade = async (e) => {
+    e.stopPropagation(); // Chặn sự kiện nổi bọt
     setPaymentError('');
+    
     const token = localStorage.getItem('token');
     
-    // Chưa đăng nhập -> Sang Signup
+    // CASE 1: Chưa đăng nhập -> Sang Signup với gói PREMIUM (Flow mày cần)
     if (!token) {
-        navigate('/signup', { state: { from: 'pricing', plan: 'Admin' } });
+        // Param này sẽ được trang Signup bắt lấy để redirect sang Stripe sau khi đký
+        navigate('/signup', { state: { plan: 'PREMIUM' } });
         return;
     }
 
+    // CASE 2: Đã đăng nhập -> Gọi API lấy link thanh toán
+    setIsProcessing(true);
     try {
       const response = await fetch(`${API_BASE_URL}/payment/session`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        // [FIX] Phải gửi body plan lên backend
+        body: JSON.stringify({ 
+            plan: 'PREMIUM' 
+        })
       });
+
       const data = await response.json();
+      
       if (response.ok && data.url) {
-        window.location.href = data.url; 
+        window.location.href = data.url; // Redirect sang Stripe
       } else {
         setPaymentError(data.message || 'Payment initiation failed.');
       }
     } catch (error) {
       setPaymentError('Connection error. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleFreePlan = () => {
-      const token = localStorage.getItem('token');
-      if (token) navigate('/home'); 
-      else navigate('/login');
-  };
-
-  // --- LOGIC JOIN PROJECT ---
+  // --- 3. JOIN PROJECT ---
   const handleJoinProject = async () => {
       setJoinError('');
       if (!joinLink.trim()) {
@@ -96,7 +122,6 @@ export default function PricingPage() {
           return;
       }
 
-      // Tách mã invite
       let inviteCode = joinLink.trim();
       if (inviteCode.includes('/')) {
           inviteCode = inviteCode.split('/').pop();
@@ -104,13 +129,12 @@ export default function PricingPage() {
 
       const token = localStorage.getItem('token');
       
-      // Chưa login -> Chuyển sang SIGN UP (Kèm mã invite để xử lý sau)
+      // Chưa login -> Sang Signup kèm mã Invite
       if (!token) {
-          navigate('/signup', { state: { from: 'pricing', action: 'join', code: inviteCode } });
+          navigate('/signup', { state: { action: 'join', code: inviteCode } });
           return;
       }
 
-      // Đã login -> Gọi API Join trực tiếp
       setIsJoining(true);
       try {
           const res = await fetch(`${API_BASE_URL}/projects/join`, {
@@ -125,18 +149,8 @@ export default function PricingPage() {
           const data = await res.json();
           
           if (res.ok) {
-              if (data.data && data.data.token) {
-                  localStorage.setItem('token', data.data.token);
-                  if (data.data.user) {
-                      localStorage.setItem('user', JSON.stringify(data.data.user));
-                  }
-                  
-                  // Force reload trang để App nhận diện Token mới và Org mới
-                  window.location.href = '/home'; 
-                  return;
-              }
-
-              navigate('/home'); 
+              // Join thành công -> Update token nếu cần thiết (thường join project ko đổi token org ngay, tùy logic)
+              window.location.href = '/home'; 
           } else {
               setJoinError(data.message || "Failed to join project.");
           }
@@ -149,15 +163,16 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
+       {/* Background Effects... */}
        <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 -right-40 w-80 h-80 bg-orange-500 rounded-full opacity-20 blur-3xl"></div>
         <div className="absolute bottom-40 -left-40 w-96 h-96 bg-orange-600 rounded-full opacity-10 blur-3xl"></div>
       </div>
 
       <nav className="relative z-10 container mx-auto px-6 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-2 group cursor-pointer">
-            <img src={logoIcon} alt="Logo Icon" className="w-14 h-14 object-contain transition-transform group-hover:scale-105" />
-            <img src={logoText} alt="Syncora Text" className="h-8 object-contain transition-transform group-hover:scale-105" />
+        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => navigate('/')}>
+            <img src={logoIcon} alt="Logo" className="w-14 h-14 object-contain" />
+            <img src={logoText} alt="Syncora" className="h-8 object-contain" />
         </div>
         <button 
           onClick={() => navigate('/')} 
@@ -179,8 +194,12 @@ export default function PricingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16">
-            {/* FREE PLAN */}
-            <div onClick={() => handleSelectPlan('Free')} className={`bg-zinc-900 rounded-2xl border-2 p-8 transition-all duration-300 cursor-pointer flex flex-col ${selectedPlan === 'Free' ? 'border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.3)] scale-[1.02]' : 'border-zinc-800 hover:border-orange-500/50'}`}>
+            
+            {/* FREE PLAN CARD */}
+            <div 
+                onClick={() => setSelectedPlan('Free')} // Chỉ highlight UI, không gọi API
+                className={`bg-zinc-900 rounded-2xl border-2 p-8 transition-all duration-300 cursor-pointer flex flex-col ${selectedPlan === 'Free' ? 'border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.3)] scale-[1.02]' : 'border-zinc-800 hover:border-orange-500/50'}`}
+            >
               <div className="mb-6">
                 <h3 className="text-2xl mb-2 font-bold">Free Plan</h3>
                 <div className="flex items-baseline gap-2 mb-4"><span className="text-5xl text-orange-500 font-bold">$0</span><span className="text-gray-400">/forever</span></div>
@@ -191,11 +210,20 @@ export default function PricingPage() {
                   <div key={idx} className="flex items-start gap-3"><div className="w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0 mt-0.5"><Check className="w-3 h-3 text-orange-500" /></div><span className="text-gray-300">{feature}</span></div>
                 ))}
               </div>
-              <button onClick={handleFreePlan} className="block w-full py-3 px-6 bg-zinc-800 text-white text-center rounded-lg hover:bg-zinc-700 transition-all duration-300 border border-zinc-700 font-bold">Continue with Free</button>
+              <button 
+                onClick={handleFreePlan} // Chỉ Button mới trigger API
+                disabled={isProcessing}
+                className="block w-full py-3 px-6 bg-zinc-800 text-white text-center rounded-lg hover:bg-zinc-700 transition-all duration-300 border border-zinc-700 font-bold disabled:opacity-50"
+              >
+                {isProcessing && selectedPlan === 'Free' ? <Loader2 className="w-5 h-5 animate-spin mx-auto"/> : "Continue with Free"}
+              </button>
             </div>
 
-            {/* ADMIN PLAN */}
-            <div onClick={() => handleSelectPlan('Admin')} className={`bg-gradient-to-b from-orange-500/10 to-zinc-900 rounded-2xl border-2 p-8 relative transition-all duration-300 cursor-pointer flex flex-col ${selectedPlan === 'Admin' ? 'border-orange-500 shadow-[0_0_40px_rgba(249,115,22,0.4)] scale-[1.02]' : 'border-orange-500/50 hover:shadow-2xl hover:shadow-orange-500/20'}`}>
+            {/* ADMIN (PREMIUM) PLAN CARD */}
+            <div 
+                onClick={() => setSelectedPlan('Admin')} // Chỉ highlight UI
+                className={`bg-gradient-to-b from-orange-500/10 to-zinc-900 rounded-2xl border-2 p-8 relative transition-all duration-300 cursor-pointer flex flex-col ${selectedPlan === 'Admin' ? 'border-orange-500 shadow-[0_0_40px_rgba(249,115,22,0.4)] scale-[1.02]' : 'border-orange-500/50 hover:shadow-2xl hover:shadow-orange-500/20'}`}
+            >
               <div className="absolute -top-4 left-1/2 -translate-x-1/2"><div className="bg-orange-500 text-black px-4 py-1 rounded-full text-sm flex items-center gap-1 font-bold shadow-lg"><Crown className="w-4 h-4" /> Most Popular</div></div>
               <div className="mb-6">
                 <h3 className="text-2xl mb-2 font-bold">Admin Plan</h3>
@@ -207,7 +235,13 @@ export default function PricingPage() {
                   <div key={idx} className="flex items-start gap-3"><div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0 mt-0.5"><Check className="w-3 h-3 text-black" /></div><span className="text-white">{feature}</span></div>
                 ))}
               </div>
-              <button onClick={handleAdminUpgrade} className="w-full py-3 px-6 bg-orange-500 text-black rounded-lg hover:bg-orange-600 transition-all duration-300 shadow-lg shadow-orange-500/50 font-bold">Get Admin Access</button>
+              <button 
+                onClick={handleAdminUpgrade} // Chỉ Button mới trigger API
+                disabled={isProcessing}
+                className="w-full py-3 px-6 bg-orange-500 text-black rounded-lg hover:bg-orange-600 transition-all duration-300 shadow-lg shadow-orange-500/50 font-bold disabled:opacity-50"
+              >
+                {isProcessing && selectedPlan === 'Admin' ? <Loader2 className="w-5 h-5 animate-spin mx-auto"/> : "Get Admin Access"}
+              </button>
               
               {paymentError && <div className="mt-3 flex items-center gap-2 text-red-500 text-sm justify-center animate-pulse"><AlertCircle className="w-4 h-4" /><span>{paymentError}</span></div>}
             </div>
@@ -223,7 +257,13 @@ export default function PricingPage() {
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showJoinInput ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}>
                     <div className="flex flex-col gap-2">
                         <div className={`flex gap-2 p-2 bg-zinc-900 border rounded-xl ${joinError ? 'border-red-500' : 'border-zinc-700'}`}>
-                            <input type="text" placeholder="Paste your invite link here..." className="flex-1 bg-transparent border-none text-white px-4 focus:ring-0 placeholder-gray-500 outline-none" value={joinLink} onChange={(e) => { setJoinLink(e.target.value); if (joinError) setJoinError(''); }} />
+                            <input 
+                                type="text" 
+                                placeholder="Paste your invite link here..." 
+                                className="flex-1 bg-transparent border-none text-white px-4 focus:ring-0 placeholder-gray-500 outline-none" 
+                                value={joinLink} 
+                                onChange={(e) => { setJoinLink(e.target.value); if (joinError) setJoinError(''); }} 
+                            />
                             <button disabled={isJoining} onClick={handleJoinProject} className="bg-orange-500 text-black font-bold px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 disabled:opacity-50">
                                 {isJoining ? <Loader2 className="w-4 h-4 animate-spin"/> : <>Join <ArrowRight className="w-4 h-4" /></>}
                             </button>
@@ -234,6 +274,7 @@ export default function PricingPage() {
              </div>
           </div>
 
+          {/* Footer... */}
           <div className="text-center pb-8">
             <p className="text-gray-400 mb-4">All plans include 14-day money-back guarantee</p>
             <div className="flex items-center justify-center gap-8 text-sm text-gray-500">

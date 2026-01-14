@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { signup } from '../services/authService'; // Bỏ import login vì không dùng nữa
+import { signup } from '../services/authService'; 
 import { useAuth } from '../services/AuthContext';
 import tag from '../assets/images/logo.png';
-import { Mail, Lock } from "lucide-react"; // Bỏ import User icon nếu không dùng
+import { Mail, Lock } from "lucide-react"; 
 import { GoogleLogin } from '@react-oauth/google';
 import { loginWithGoogle } from '../services/authService';
-
-const API_BASE_URL = 'http://localhost:4000/api';
 
 const SignUpPage = () => {
   const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '' });
@@ -23,26 +21,12 @@ const SignUpPage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePostSignupRedirect = async (token) => {
-    // 1. Xử lý Payment (Nếu user chọn gói Admin từ trang Pricing)
-    if (location.state?.from === 'pricing' && location.state?.plan === 'Admin') {
-        try {
-            const response = await fetch(`${API_BASE_URL}/payment/session`, { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            if (response.ok && data.url) {
-                window.location.href = data.url; 
-                return;
-            }
-        } catch (error) { console.error("Payment error:", error); }
-    }
-
-    // 2. Xử lý Join Project
-    // Nếu có invite code -> Backend đã tự add vào project -> Về Home
+  // Hàm này chỉ lo điều hướng nội bộ (Join Project hoặc về Home)
+  // Không lo payment nữa vì Backend đã trả link payment rồi
+  const handlePostSignupRedirect = (token) => {
+    // Xử lý Join Project (Nếu có invite code)
     if (location.state?.action === 'join' && location.state?.code) {
-        navigate('/pending'); 
+        navigate('/pending'); // Hoặc trang accept invite tùy logic của mày
     } else {
         navigate('/home');
     }
@@ -53,7 +37,8 @@ const SignUpPage = () => {
       const { credential } = credentialResponse;
       const data = await loginWithGoogle(credential); 
       saveLogin(data.user, data.token);
-      await handlePostSignupRedirect(data.token);
+      // Google Login thường mặc định là Free, trừ khi mày custom thêm logic
+      handlePostSignupRedirect(data.token);
     } catch (err) {
       setError("Google login failed.");
     }
@@ -70,26 +55,40 @@ const SignUpPage = () => {
       setIsLoading(true);
       const name = `${formData.firstName} ${formData.lastName}`.trim();
       const inviteCode = location.state?.code || null;
-      const plan = location.state?.plan || 'Free'; 
+      
+      // [QUAN TRỌNG] Lấy plan từ trang Pricing truyền sang (Admin/PREMIUM)
+      // Backend của mày đang check "PREMIUM" nên tốt nhất gửi đúng chuỗi đó
+      let plan = location.state?.plan || 'FREE';
+      if (plan === 'Admin') plan = 'PREMIUM'; // Map lại cho chắc cú
+
+      // Gọi API Signup
       const response = await signup(name, formData.email, formData.password, inviteCode, plan);
       
-      // Backend trả về: { success: true, data: { token, user... } }
-      // Service trả về: response.data
+      // Backend trả về: { success: true, paymentUrl: "...", data: { token, user } }
+      // Tùy vào axios response interceptor của mày, data có thể nằm ở response hoặc response.data
+      // Tao viết thế này để cover cả 2 trường hợp:
+      const paymentUrl = response.paymentUrl || response.data?.paymentUrl;
       const token = response.data?.token || response.token; 
       const user = response.data?.user || response.user;
 
       if (user && token) {
-          saveLogin(user, token); // Lưu token nóng hổi vào Context
-          await handlePostSignupRedirect(token); // Điều hướng ngay
+          saveLogin(user, token); // Lưu token trước
+
+          // [FIX LOGIC] Check xem Backend có trả về link thanh toán không
+          if (paymentUrl) {
+              // Nếu có -> Redirect sang Stripe NGAY LẬP TỨC
+              window.location.href = paymentUrl;
+          } else {
+              // Nếu không (Gói Free) -> Điều hướng nội bộ
+              handlePostSignupRedirect(token);
+          }
       } else {
-          // Trường hợp hy hữu không có token
           navigate('/login');
       }
-      // ------------------------------------------------
 
     } catch (err) {
       console.error(err);
-      setError(err.error?.message || err.message || 'Signup failed.');
+      setError(err.response?.data?.message || err.message || 'Signup failed.');
     } finally {
       setIsLoading(false);
     }

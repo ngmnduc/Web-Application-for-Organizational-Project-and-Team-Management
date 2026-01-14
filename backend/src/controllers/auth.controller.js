@@ -1,7 +1,7 @@
 import User from "../models/user.model.js";
-import Organization from "../models/organization.model.js"; 
-import Project from "../models/project.model.js"; 
-import ProjectMember from "../models/projectMember.model.js"; 
+import Organization from "../models/organization.model.js";
+import Project from "../models/project.model.js";
+import ProjectMember from "../models/projectMember.model.js";
 import OrganizationMember from "../models/organizationMember.model.js";
 import { signToken } from "../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
@@ -10,19 +10,19 @@ import { sendPasswordResetEmail, sendWelcomeEmail } from "../services/email.serv
 import * as authValidator from "../validators/auth.validator.js";
 import * as authService from "../services/auth.service.js";
 import mongoose from "mongoose";
+import Stripe from "stripe";
+import dotenv from "dotenv";
 
+dotenv.config();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// POST /auth/signup - WITH TRANSACTION
 export async function signup(req, res, next) {
-  //  START SESSION
   const session = await mongoose.startSession();
   
   try {
-    //  START TRANSACTION
     session.startTransaction();
 
-    // 1. Validate request data
     const validation = authValidator.validateSignup(req.body);
     if (!validation.isValid) {
       await session.abortTransaction();
@@ -33,9 +33,11 @@ export async function signup(req, res, next) {
       });
     }
 
-    const { name, email, password, inviteCode, plan } = req.body;
+    const { name, email, password, inviteCode } = req.body;
+    // Chuẩn hóa plan về chữ hoa, mặc định là FREE
+    const plan = req.body.plan ? req.body.plan.toUpperCase() : "FREE";
 
-    // 2.  CHECK INVITE CODE & VALIDATE PROJECT
+    // 1. Logic Join Project (Giữ nguyên)
     let projectToJoin = null;
     if (inviteCode) {
       projectToJoin = await Project.findOne({
@@ -43,42 +45,24 @@ export async function signup(req, res, next) {
         deletedAt: null
       }).session(session); 
       
-      //  Validate: Project không tồn tại
       if (!projectToJoin) {
         await session.abortTransaction();
-        return res.status(400).json({ 
-          success: false, 
-          error: "ValidationError", 
-          message: "Invalid or expired invite code" 
-        });
+        return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid or expired invite code" });
       }
-
-      //  Validate: Project đã bị archive
       if (projectToJoin.isArchived) {
         await session.abortTransaction();
-        return res.status(400).json({ 
-          success: false, 
-          error: "ValidationError", 
-          message: "This project has been archived and cannot accept new members" 
-        });
+        return res.status(400).json({ success: false, error: "ValidationError", message: "This project has been archived" });
       }
-
-      //  Validate: Project đã bị inactive
       if (projectToJoin.status === "INACTIVE") {
         await session.abortTransaction();
-        return res.status(400).json({ 
-          success: false, 
-          error: "ValidationError", 
-          message: "This project is currently inactive" 
-        });
+        return res.status(400).json({ success: false, error: "ValidationError", message: "This project is currently inactive" });
       }
     }
 
-    // 3. Create user (TRONG TRANSACTION)
+    // 2. Create User
     const result = await authService.createUserWithSession(name, email, password, session);
     const userId = result.user.id || result.user._id;
 
-    // Get created user
     const user = await User.findById(userId).session(session);
     if (!user) {
       await session.abortTransaction();
@@ -88,189 +72,145 @@ export async function signup(req, res, next) {
     let finalOrganizationId;
     let finalOrgObj;
 
-    // CASE 1: JOIN EXISTING PROJECT
+    // --- CASE A: JOIN EXISTING PROJECT ---
     if (projectToJoin) {
       finalOrganizationId = projectToJoin.organizationId;
       finalOrgObj = await Organization.findById(finalOrganizationId).session(session);
 
-      //  Validate Organization
-      if (!finalOrgObj) {
+      if (!finalOrgObj || finalOrgObj.status === "INACTIVE") {
         await session.abortTransaction();
-        return res.status(404).json({ 
-          success: false, 
-          error: "NotFoundError", 
-          message: "Organization not found" 
-        });
+        return res.status(403).json({ success: false, error: "ForbiddenError", message: "Organization invalid or inactive" });
       }
 
-      if (finalOrgObj.status === "INACTIVE") {
-        await session.abortTransaction();
-        return res.status(403).json({ 
-          success: false, 
-          error: "ForbiddenError", 
-          message: "This organization is currently inactive" 
-        });
-      }
-
-      // A. Update User (Member role)
       user.currentOrganizationId = finalOrganizationId;
       user.organizations = [finalOrganizationId];
       user.role = "Member"; 
       await user.save({ session }); 
 
-      // B. Add to OrganizationMember
-      await OrganizationMember.create([{
-        userId: user._id,
-        organizationId: finalOrganizationId,
-        roleInOrganization: "ORG_MEMBER"
-      }], { session }); 
-
-      // C. Add to ProjectMember
-      const existingPrjMem = await ProjectMember.findOne({ 
-        userId: user._id, 
-        projectId: projectToJoin._id 
-      }).session(session);
-
+      await OrganizationMember.create([{ userId: user._id, organizationId: finalOrganizationId, roleInOrganization: "ORG_MEMBER" }], { session }); 
+      
+      const existingPrjMem = await ProjectMember.findOne({ userId: user._id, projectId: projectToJoin._id }).session(session);
       if (!existingPrjMem) {
-        await ProjectMember.create([{
-          userId: user._id,
-          projectId: projectToJoin._id,
-          organizationId: finalOrganizationId,
-          roleInProject: "Member",
-          status: "PENDING"
-        }], { session }); 
+        await ProjectMember.create([{ userId: user._id, projectId: projectToJoin._id, organizationId: finalOrganizationId, roleInProject: "Member", status: "PENDING" }], { session }); 
       }
 
     } 
-    //  CASE 2: CREATE NEW ORGANIZATION
+    // --- CASE B: CREATE NEW ORGANIZATION ---
     else {
-      const selectedPlan = (plan === "Admin" || plan === "PREMIUM") ? "PREMIUM" : "FREE";
+      const initialPlan = "FREE"; // Luôn tạo FREE trước
 
-      // Create default organization
       const [newOrg] = await Organization.create([{
         name: `${name}'s Organization`,
         ownerId: user._id,
         status: 'ACTIVE',
-        plan: selectedPlan, 
+        plan: initialPlan, 
+        subscriptionStatus: 'INACTIVE',
         allowedIps: [],
-        attendanceSettings: {
-          enableIpCheck: true,
-          standardCheckInHour: 9,
-          standardCheckOutHour: 17,
-          allowLateCheckIn: true,
-          lateThresholdMinutes: 15
-        }
+        attendanceSettings: { enableIpCheck: true, standardCheckInHour: 9, standardCheckOutHour: 17, allowLateCheckIn: true, lateThresholdMinutes: 15 }
       }], { session }); 
 
       finalOrganizationId = newOrg._id;
       finalOrgObj = newOrg;
 
-      // Update user (Admin role)
       user.currentOrganizationId = newOrg._id;
       user.organizations = [newOrg._id];
       user.role = "Admin"; 
       await user.save({ session }); 
 
-      //  Add to OrganizationMember (Admin)
-      await OrganizationMember.create([{
-        userId: user._id,
-        organizationId: newOrg._id,
-        roleInOrganization: "ORG_ADMIN"
-      }], { session }); 
-
+      await OrganizationMember.create([{ userId: user._id, organizationId: newOrg._id, roleInOrganization: "ORG_ADMIN" }], { session }); 
     }
 
-    //  COMMIT TRANSACTION 
     await session.commitTransaction();
 
-    // 4. Generate Token (sau khi commit)
-    const tokenPayload = {
-      sub: user._id.toString(),    
-      email: user.email,
-      role: user.role,
-      organizationId: finalOrganizationId.toString() 
-    };
-    const newToken = signToken(tokenPayload);
-
-    // 5. Send welcome email (không blocking, không trong transaction)
-    try {
-      await sendWelcomeEmail(user.email, user.name);
-    } catch (emailErr) {
-      console.error("Failed to send welcome email:", emailErr);
+    // 3. Logic Payment (Chạy sau khi commit transaction)
+    let paymentUrl = null;
+    if (!projectToJoin && plan === "PREMIUM") {
+        try {
+            const sessionStripe = await stripe.checkout.sessions.create({
+                payment_method_types: ["card"],
+                // [FIX] Thêm dòng này để Stripe tự điền email user
+                customer_email: email, 
+                
+                line_items: [
+                    {
+                        price_data: {
+                            currency: "usd",
+                            product_data: {
+                                name: "Premium Plan Subscription",
+                                description: "Unlock unlimited projects (Signup Upgrade)",
+                            },
+                            // [FIX] Giá $29 (2900 cents) khớp với Pricing Page. Sửa thành 2000 nếu muốn $20.
+                            unit_amount: 2000, 
+                            recurring: { interval: "month" },
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: "subscription",
+                success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
+                metadata: {
+                    organizationId: finalOrganizationId.toString(),
+                    userId: user._id.toString(),
+                    targetPlan: "PREMIUM"
+                },
+            });
+            paymentUrl = sessionStripe.url;
+        } catch (stripeError) {
+            console.error("Stripe Session Creation Failed:", stripeError);
+            // Không throw error để user vẫn đăng ký được (chỉ mất link thanh toán)
+        }
     }
 
-    // 6. Return response
+    // 4. Response
+    const tokenPayload = { sub: user._id.toString(), email: user.email, role: user.role, organizationId: finalOrganizationId.toString() };
+    const newToken = signToken(tokenPayload);
+
+    try { await sendWelcomeEmail(user.email, user.name); } catch (emailErr) { console.error("Failed to send welcome email:", emailErr); }
+
     return res.status(201).json({
       success: true,
-      message: projectToJoin 
-        ? "Joined project successfully" 
-        : "User and Organization created successfully",
+      message: projectToJoin ? "Joined project successfully" : "User created successfully",
+      paymentUrl, // Trả về link thanh toán
       data: {
         token: newToken,
         tokenType: "Bearer",
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          currentOrganizationId: finalOrganizationId,
-          organizations: user.organizations,
-          createdAt: user.createdAt,
+        user: { 
+            id: user._id, 
+            name: user.name, 
+            email: user.email, 
+            role: user.role, 
+            currentOrganizationId: finalOrganizationId, 
+            organizations: user.organizations, 
+            createdAt: user.createdAt 
         },
-        organization: {
-          id: finalOrgObj._id,
-          name: finalOrgObj.name,
-          ownerId: finalOrgObj.ownerId,
-          status: finalOrgObj.status,
-          plan: finalOrgObj.plan,
-          createdAt: finalOrgObj.createdAt
+        organization: { 
+            id: finalOrgObj._id, 
+            name: finalOrgObj.name, 
+            ownerId: finalOrgObj.ownerId, 
+            status: finalOrgObj.status, 
+            plan: finalOrgObj.plan, 
+            createdAt: finalOrgObj.createdAt 
         },
-        ...(projectToJoin && {
-          project: {
-            id: projectToJoin._id,
-            name: projectToJoin.name,
-            code: projectToJoin.code
-          }
-        })
+        ...(projectToJoin && { project: { id: projectToJoin._id, name: projectToJoin.name, code: projectToJoin.code } })
       },
     });
 
   } catch (err) {
-    // ROLLBACK TRANSACTION nếu có lỗi
     await session.abortTransaction();
-    
     console.error("[SIGNUP] Transaction failed:", err.message);
-
-    if (err.message === "EMAIL_EXISTS") {
-      return res.status(409).json({ 
-        success: false, 
-        error: "ConflictError", 
-        message: "Email already registered" 
-      });
-    }
-    if (err.message === "USER_CREATION_FAILED") {
-      return res.status(500).json({ 
-        success: false, 
-        error: "ServerError", 
-        message: "Failed to create user" 
-      });
-    }
     
-    // Generic error
-    return res.status(500).json({
-      success: false,
-      error: "ServerError",
-      message: err.message || "Signup failed. Please try again."
-    });
+    if (err.message === "EMAIL_EXISTS") return res.status(409).json({ success: false, error: "ConflictError", message: "Email already registered" });
+    if (err.message === "USER_CREATION_FAILED") return res.status(500).json({ success: false, error: "ServerError", message: "Failed to create user" });
+    
+    return res.status(500).json({ success: false, error: "ServerError", message: err.message || "Signup failed." });
   } finally {
-    // END SESSION (cleanup)
     session.endSession();
   }
 }
 
 export async function login(req, res, next) {
   try {
-    // Validate request data
     const validation = authValidator.validateLogin(req.body);
     if (!validation.isValid) {
       return res.status(400).json({
@@ -280,19 +220,16 @@ export async function login(req, res, next) {
       });
     }
 
-    // Login using service
     const { email, password } = req.body;
     const authResult = await authService.loginUser(email, password); 
     const publicUserId = authResult.user.id || authResult.user._id; 
 
-    // Query lấy User gốc + các trường cần thiết
     const user = await User.findById(publicUserId).select('+currentOrganizationId +organizations');
 
     if (!user) {
          return res.status(401).json({ success: false, message: "User not found after login verification." });
     }
     if (!user.currentOrganizationId) {
-        // Fallback: Nếu user cũ chưa có Org, có thể lấy Org đầu tiên trong list làm default
         if (user.organizations && user.organizations.length > 0) {
             user.currentOrganizationId = user.organizations[0];
             await User.findByIdAndUpdate(user._id, { currentOrganizationId: user.organizations[0] });
@@ -305,18 +242,15 @@ export async function login(req, res, next) {
         }
     }
 
-    // Get organization info (optional)
    const tokenPayload = {
-      sub: user._id.toString(),    
+      sub: user._id.toString(),     
       email: user.email,
       role: user.role,
       organizationId: user.currentOrganizationId.toString()
     };
     
-    // Gọi hàm signToken từ utils
     const newToken = signToken(tokenPayload);
 
-    // 5. Lấy thông tin Org để trả về FE
     const organization = await Organization.findById(user.currentOrganizationId)
         .select('name ownerId status plan createdAt');
 
@@ -328,7 +262,7 @@ export async function login(req, res, next) {
         tokenType: "Bearer",
         user: {
             ...authResult.user, 
-            currentOrganizationId: user.currentOrganizationId, // Lấy từ biến user vừa query lại ở trên
+            currentOrganizationId: user.currentOrganizationId,
             organizations: user.organizations
         },
         organization: organization
@@ -378,7 +312,6 @@ export async function handleGoogleLogin(req, res, next) {
           });
         }
     
-        // Handle Google auth using service
         const result = await authService.handleGoogleAuth(credential);
     
         return res.status(200).json({
@@ -402,17 +335,15 @@ export async function handleGoogleLogin(req, res, next) {
 
 export async function me(req, res, next) {
     try {
-        // verifyToken middleware attaches req.user
         const user = req.user;
         if (!user) return res.status(401).json({ success: false, error: "AuthenticationError", message: "Unauthorized" });
         
         let organization = null;
         if (user.currentOrganizationId) {
             organization = await Organization.findById(user.currentOrganizationId)
-                .select('name ownerId status plan createdAt'); // Lấy trường Plan
+                .select('name ownerId status plan createdAt');
         }
 
-        // Format user response
         const publicUser = {
           id: user._id,
           name: user.name,
@@ -425,22 +356,18 @@ export async function me(req, res, next) {
           updatedAt: user.updatedAt,
         };
         
-        // Trả về cả User và Organization (chứa Plan mới nhất)
         return res.json({ success: true, data: { user: publicUser, organization } });
       } catch (err) {
         next(err);
       }
 }
 
-
-// PUT /auth/:id/role
 export async function promoteRole(req, res, next) {
   try {
     const { id } = req.params;
     const { role } = req.body || {};
     const newRole = role || "Manager";
 
-  
     const allowed = ["Admin", "Manager", "Member"];
     if (!allowed.includes(newRole)) {
         return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid role" });
@@ -449,17 +376,12 @@ export async function promoteRole(req, res, next) {
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ success: false, error: "NotFoundError", message: "User not found" });
 
-    // 2. Update Role Hệ Thống
     user.role = newRole;
     await user.save();
 
-    // 3. === LOGIC ĐỒNG BỘ SANG PROJECT (AUTO-SYNC) ===
     if (user.currentOrganizationId) {
-        // Map role hệ thống sang role dự án
-        // Hệ thống: Admin/Manager/Member -> Dự án: Admin/Manager/Member
         let projectRole = newRole;
 
-        // Cập nhật tất cả dự án trong Org mà user này đang tham gia
         await ProjectMember.updateMany(
             { 
                 userId: user._id, 
@@ -471,14 +393,12 @@ export async function promoteRole(req, res, next) {
         );
         console.log(`[SYNC] Role synced: User ${user.email} is now ${projectRole} in all projects.`);
     }
-    // ==================================================
     
-    // Trả về data mới nhất
     const publicUser = {
       id: user._id,
       name: user.name,
       email: user.email,
-      role: user.role, // Role mới
+      role: user.role,
       status: user.status,
     };
 
@@ -490,7 +410,6 @@ export async function promoteRole(req, res, next) {
 
 export async function changePassword(req, res, next) {
     try {
-        // Validate input
         const validation = authValidator.validateChangePassword(req.body);
         if (!validation.isValid) {
           return res.status(400).json({
@@ -502,7 +421,6 @@ export async function changePassword(req, res, next) {
     
         const { currentPassword, newPassword } = req.body;
     
-        // Change password using service
         await authService.changeUserPassword(
           req.user._id,
           currentPassword,
@@ -534,7 +452,6 @@ export async function changePassword(req, res, next) {
 
 export async function updateProfile(req, res, next) {
     try {
-        // Validate input
         const validation = authValidator.validateUpdateProfile(req.body);
         if (!validation.isValid) {
           return res.status(400).json({
@@ -544,7 +461,6 @@ export async function updateProfile(req, res, next) {
           });
         }
     
-        // Update profile using service
         const updatedUser = await authService.updateUserProfile(
           req.user._id,
           req.body
@@ -569,7 +485,6 @@ export async function updateProfile(req, res, next) {
 
 export async function forgotPassword(req, res, next) {
     try {
-        // Validate input
         const validation = authValidator.validateForgotPassword(req.body);
         if (!validation.isValid) {
           return res.status(400).json({
@@ -581,10 +496,8 @@ export async function forgotPassword(req, res, next) {
     
         const { email } = req.body;
     
-        // Request password reset using service
         await authService.requestPasswordReset(email);
     
-        // Always return success for security (don't reveal if user exists)
         return res.json({
           success: true,
           message:
@@ -597,7 +510,6 @@ export async function forgotPassword(req, res, next) {
 
 export async function resetPassword(req, res, next) {
     try {
-        // Validate input
         const validation = authValidator.validateResetPassword(req.body);
         if (!validation.isValid) {
           return res.status(400).json({
@@ -609,7 +521,6 @@ export async function resetPassword(req, res, next) {
     
         const { token, newPassword } = req.body;
     
-        // Reset password using service
         await authService.resetUserPassword(token, newPassword);
     
         return res.json({
@@ -641,7 +552,6 @@ export async function switchOrg(req, res, next) {
           });
         }
     
-        // Switch organization using service
         const result = await authService.switchOrganization(
           req.user._id,
           organizationId
