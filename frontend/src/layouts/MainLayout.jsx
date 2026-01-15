@@ -4,7 +4,7 @@ import SideBar from '../components/SideBar';
 import Navbar from '../components/NavBar'; 
 import { getProjects } from '../services/projectService';
 import { getTasksByProject } from '../services/taskService';
-import { usePollingNotifications } from '../hooks/usePollingNotifications';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { 
     ClipboardDocumentListIcon as TotalSolid, 
     ClockIcon as ClockSolid,
@@ -94,7 +94,9 @@ const MainLayout = () => {
     { number: dueSoonCount, label: 'Due soon', icon: <WarningSolid />, iconColor: "text-orange-500", bgColor: "bg-orange-100", textColor: "text-orange-600" },
   ];
 
-  const { unreadCount } = usePollingNotifications(30000); 
+  
+  // Gọi hook polling 
+  const { unreadCount } = useRealtimeNotifications(); 
 
   const handleLogout = () => {
     logout();
