@@ -27,17 +27,23 @@ export default function PricingPage() {
       return;
     }
     try {
-        // Gọi API tạo Org 
-        const res = await axiosInstance.post('/organizations', {
-            name: "My New Workspace", // Có thể thêm input cho user nhập tên
-            plan: plan
+        const res = await fetch(`${API_BASE_URL}/organizations`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                name: "My New Workspace", 
+                plan: plan
+            })
         });
+        
+        const data = await res.json();
 
-        if (res.data.success) {
-            // CẬP NHẬT LẠI USER LOCALSTORAGE
-            // Vì BE sau khi tạo Org sẽ update user có currentOrganizationId mới
-            const updatedUser = res.data.data.user; 
-            const newToken = res.data.data.token; // Token mới chứa OrgId
+        if (data.success) {
+            const updatedUser = data.data.user; 
+            const newToken = data.data.token; 
 
             localStorage.setItem('user', JSON.stringify(updatedUser));
             localStorage.setItem('token', newToken); 
@@ -47,17 +53,14 @@ export default function PricingPage() {
         console.error("Failed to create org", err);
     }
 
-    
     setSelectedPlan(plan);
     setPaymentError('');
   };
 
-  // --- LOGIC CHỌN GÓI ADMIN ---
   const handleAdminUpgrade = async () => {
     setPaymentError('');
     const token = localStorage.getItem('token');
     
-    // Chưa đăng nhập -> Sang Signup
     if (!token) {
         navigate('/signup', { state: { from: 'pricing', plan: 'Admin' } });
         return;
@@ -96,7 +99,6 @@ export default function PricingPage() {
           return;
       }
 
-      // Tách mã invite
       let inviteCode = joinLink.trim();
       if (inviteCode.includes('/')) {
           inviteCode = inviteCode.split('/').pop();
@@ -104,13 +106,13 @@ export default function PricingPage() {
 
       const token = localStorage.getItem('token');
       
-      // Chưa login -> Chuyển sang SIGN UP (Kèm mã invite để xử lý sau)
+      // 1. Chưa login -> Chuyển sang SIGN UP (Kèm mã invite để xử lý sau)
       if (!token) {
           navigate('/signup', { state: { from: 'pricing', action: 'join', code: inviteCode } });
           return;
       }
 
-      // Đã login -> Gọi API Join trực tiếp
+      // 2. Đã login -> Gọi API Join trực tiếp
       setIsJoining(true);
       try {
           const res = await fetch(`${API_BASE_URL}/projects/join`, {
@@ -131,12 +133,22 @@ export default function PricingPage() {
                       localStorage.setItem('user', JSON.stringify(data.data.user));
                   }
                   
-                  // Force reload trang để App nhận diện Token mới và Org mới
-                  window.location.href = '/home'; 
+                  // 🟢 [LOGIC MỚI] Check trạng thái Pending
+                  // Nếu API trả về status là PENDING hoặc user chưa có organization nào -> Pending Page
+                  // Giả sử API trả về data.data.membershipStatus hoặc ta check user.organizations
+                  const user = data.data.user || JSON.parse(localStorage.getItem('user'));
+                  
+                  // Nếu user join vào một project mới và đang chờ duyệt
+                  // (Thường API join sẽ trả về thông tin membership, ở đây ta giả định logic)
+                  
+                  // Logic an toàn: Nếu Join thành công, ta chuyển hướng đến trang Pending để user biết trạng thái
+                  // Nếu là Auto-Join (public project) thì về Home, nhưng thường invite code là private -> Pending
+                  navigate('/pending'); 
                   return;
               }
 
-              navigate('/home'); 
+              // Fallback nếu không có data rõ ràng (mặc định cho là Pending để an toàn)
+              navigate('/pending'); 
           } else {
               setJoinError(data.message || "Failed to join project.");
           }
