@@ -21,6 +21,7 @@ import {
     ChevronUpDownIcon, 
     CheckIcon
 } from '@heroicons/react/24/outline';
+import { useNotifications } from '../context/NotificationContext';
 
 // === MENU ITEMS ===
 const menuItems = [
@@ -52,6 +53,7 @@ const SidebarItem = ({ item, isActive, unreadCount, fullPath, isExpanded }) => {
             <div className="relative">
                 <item.icon className={`w-6 h-6 transition-colors duration-300 min-w-[24px] ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
                 
+                {/* Chỉ hiện Dấu chấm khi KHÔNG mở rộng (!isExpanded) */}
                 {!isExpanded && item.name === 'Notifications' && unreadCount > 0 && (
                     <span className="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white bg-red-500 transform translate-x-1/2 -translate-y-1/2"></span>
                 )}
@@ -68,9 +70,10 @@ const SidebarItem = ({ item, isActive, unreadCount, fullPath, isExpanded }) => {
                 </span>
             </div>
             
-            {isExpanded && item.name === 'Notifications' && !isActive && unreadCount > 0 && (
-                <span className="ml-auto min-w-5 h-5 px-1.5 text-[10px] bg-red-500 rounded-full flex items-center justify-center text-white font-bold transition-opacity duration-300 delay-100">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+            {/* Chỉ hiện Con số khi ĐANG mở rộng (isExpanded) */}
+            {isExpanded && item.name === 'Notifications' && unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse ml-auto">
+                    {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
             )}
         </Link>
@@ -78,21 +81,39 @@ const SidebarItem = ({ item, isActive, unreadCount, fullPath, isExpanded }) => {
 };
 
 
-const SideBar = ({ unreadCount, basePath="" }) => {
+const SideBar = ({ basePath=""}) => {
     const location = useLocation();
-    const { user } = useAuth(); 
+    const { user: contextUser } = useAuth(); 
+    
+    // 🔴 FIX: Lazy Initialization - Đọc trực tiếp từ localStorage khi khởi tạo state
+    // Giúp UI hiển thị đúng ngay lập tức mà không cần chờ useEffect chạy
+    const [user, setUser] = useState(() => {
+        const stored = localStorage.getItem('user');
+        return stored ? JSON.parse(stored) : contextUser;
+    });
+    
     const [isHovered, setIsHovered] = useState(false);
+    const { unreadCount } = useNotifications();
+
+    // 🔴 FIX: Vẫn giữ useEffect để cập nhật nếu localStorage thay đổi sau đó (VD: khi chuyển trang)
+    useEffect(() => {
+        const loadUser = () => {
+            const stored = localStorage.getItem('user');
+            if (stored) {
+                setUser(JSON.parse(stored));
+            } else if (contextUser) {
+                setUser(contextUser);
+            }
+        };
+        loadUser();
+    }, [location.pathname, contextUser]);
 
     const currentPath = location.pathname;
     const isAdmin = user?.role === 'Admin';
     const homeLink = isAdmin ? '/admin/home' : '/home';
 
     // --- LOGIC CHỌN LOGO  ---
-    
-    // Xác định xem nếu mở rộng thì dùng logo nào (Admin hay User)
     const currentFullLogo = isAdmin ? logoAdminFull : logoUserFull;
-
-    // Xác định hiển thị logo Full hay logo Icon dựa trên trạng thái Hover
     const displaySrc = isHovered ? currentFullLogo : (isAdmin ? logoAdmin : logoUser);
 
     const visibleMenuItems = menuItems.filter(item => {
@@ -153,9 +174,25 @@ const SideBar = ({ unreadCount, basePath="" }) => {
         </div>
     );
 }
+
 const ProjectSwitcher = ({ isExpanded }) => {
     const { selectedProjectId, selectedProjectName, switchProject } = useProject();
-    const { user } = useAuth();
+    const { user: contextUser } = useAuth();
+    
+    // 🔴 FIX: Áp dụng Lazy Initialization tương tự cho ProjectSwitcher
+    const [user, setUser] = useState(() => {
+        const stored = localStorage.getItem('user');
+        return stored ? JSON.parse(stored) : contextUser;
+    });
+    
+    const location = useLocation();
+
+    useEffect(() => {
+        const stored = localStorage.getItem('user');
+        if (stored) setUser(JSON.parse(stored));
+        else setUser(contextUser);
+    }, [location.pathname, contextUser]);
+
     const [projects, setProjects] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const isAdmin = user?.role === 'Admin';
@@ -164,7 +201,6 @@ const ProjectSwitcher = ({ isExpanded }) => {
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                // Dùng axiosInstance thay vì fetch thường
                 const res = await axiosInstance.get('/projects');
                 if(res.data.success) setProjects(res.data.data);
             } catch (err) { console.error(err); }
@@ -204,12 +240,11 @@ const ProjectSwitcher = ({ isExpanded }) => {
                 {isExpanded && <ChevronUpDownIcon className="w-5 h-5 text-gray-400" />}
             </button>
 
-            {/* DROPDOWN MENU - Hiện ra khi bấm */}
+            {/* DROPDOWN MENU */}
             {isOpen && (
                 <div className="absolute bottom-full left-3 w-60 bg-white rounded-xl shadow-2xl border border-gray-100 mb-2 p-2 z-[60] animate-in slide-in-from-bottom-2">
                     <p className="px-2 py-1 text-xs font-bold text-gray-400 uppercase">Select Project</p>
                     
-                    {/* Option All Projects */}
                     {isAdmin && (
                         <>
                             <button onClick={() => handleSelect('all', 'All Projects')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 text-sm flex items-center justify-between">
@@ -220,7 +255,6 @@ const ProjectSwitcher = ({ isExpanded }) => {
                         </>
                     )}
 
-                    {/* List Projects */}
                     <div className="max-h-48 overflow-y-auto custom-scrollbar">
                         {projects.map(p => (
                             <button key={p._id} onClick={() => handleSelect(p._id, p.name)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 text-sm flex items-center justify-between group">

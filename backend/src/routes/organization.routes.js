@@ -1,5 +1,8 @@
 import express from "express";
-import { createOrganization } from "../controllers/organization.controller.js";
+import { 
+  createOrganization, 
+  getCurrentOrganization
+} from "../controllers/organization.controller.js";
 import { verifyToken } from "../middlewares/auth.js"; 
 
 const router = express.Router();
@@ -10,5 +13,12 @@ const router = express.Router();
  * @access  Private
  */
 router.post("/organizations", verifyToken, createOrganization);
+
+/**
+ * @desc    Get current organization data 
+ * @route   GET /api/organizations/current
+ * @access  Private
+ */
+router.get("/organizations/current", verifyToken, getCurrentOrganization); 
 
 export default router;

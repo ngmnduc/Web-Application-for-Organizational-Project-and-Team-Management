@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -15,6 +16,11 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
     //(chống click đúp)
     const isSubmittingRef = useRef(false);
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    //(chống click đúp)
+    const isSubmittingRef = useRef(false);
+
     // State lưu lỗi
     const [errors, setErrors] = useState({});
 
@@ -26,6 +32,8 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
             setDeadline(''); 
             setManager(''); 
             setErrors({});
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
             setIsSubmitting(false);
             isSubmittingRef.current = false;
             
@@ -48,6 +56,11 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
         // Chặn nếu đang gửi
         if (isSubmittingRef.current) return;
 
+    const handleSubmit = async () => {
+        
+        // Chặn nếu đang gửi
+        if (isSubmittingRef.current) return;
+
         const newErrors = {};
         
         // Validate các trường bắt buộc
@@ -64,8 +77,10 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
                 isNaN(selectedDate.getTime()) || 
                 year < 2000 || 
                 year > 3000 || 
+                year > 3000 || 
                 selectedDate < today
             ) {
+                newErrors.deadline = "Invalid date (must be future).";
                 newErrors.deadline = "Invalid date (must be future).";
             }
         }
@@ -100,9 +115,37 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
         if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
             handleSubmit();
         }
+
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+
+        try {
+            
+            const payload = { name, description, deadline };
+            if (manager) payload.manager = manager;
+
+            await onAddProject(payload); 
+            
+
+            
+        } catch (error) {
+            console.error("Error creating project:", error);
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
+        }
+
+    };
+
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+            handleSubmit();
+        }
     };
 
     const getInputClass = (field) => `w-full px-3 py-2 border rounded-lg ${errors[field] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`;
+
+    if (!isOpen) return null;
 
     if (!isOpen) return null;
 
@@ -116,8 +159,11 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
 
                 {/*  Thay thẻ <form> bằng <div> để chặn trình duyệt tự submit */}
                 <div className="space-y-4" onKeyDown={handleKeyDown}>
+                {/*  Thay thẻ <form> bằng <div> để chặn trình duyệt tự submit */}
+                <div className="space-y-4" onKeyDown={handleKeyDown}>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Project Name <span className="text-red-500">*</span></label>
+                        <input type="text" className={getInputClass('name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter project name" autoFocus />
                         <input type="text" className={getInputClass('name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter project name" autoFocus />
                         {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                     </div>
@@ -131,7 +177,10 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
                         <div>
                             {/* Manager Optional */}
                             <label className="block text-sm font-medium text-gray-700 mb-1">Manager (Optional)</label>
+                            {/* Manager Optional */}
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Manager (Optional)</label>
                             <select className={getInputClass('manager')} value={manager} onChange={(e) => setManager(e.target.value)}>
+                                <option value="">-- Assign Later --</option>
                                 <option value="">-- Assign Later --</option>
                                 {managersList.map(m => (<option key={m._id || m.id} value={m._id || m.id}>{m.name}</option>))}
                             </select>
@@ -162,7 +211,26 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
                         >
                             {isSubmitting ? 'Creating...' : 'Create'}
                         </button>
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            className="px-5 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
+                        
+                        {/*  Đổi type="submit" thành "button" và gọi onClick thủ công */}
+                        <button 
+                            type="button" 
+                            onClick={handleSubmit}
+                            disabled={isSubmitting}
+                            className="px-5 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 shadow-md disabled:opacity-50 disabled:cursor-not-allowed" 
+                            style={{ backgroundColor: 'var(--color-brand)' }}
+                        >
+                            {isSubmitting ? 'Creating...' : 'Create'}
+                        </button>
                     </div>
+                </div>
                 </div>
             </div>
         </div>
