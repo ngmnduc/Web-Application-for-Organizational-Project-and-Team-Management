@@ -62,6 +62,8 @@ export const createCheckoutSession = async (req, res) => {
       metadata: {
         userId: userId.toString(), 
         organizationId: currentOrganizationId.toString(),
+        userId: userId.toString(), 
+        organizationId: currentOrganizationId.toString(),
         targetPlan: planName 
       },
 
