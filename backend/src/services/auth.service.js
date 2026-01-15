@@ -102,8 +102,8 @@ export const loginUser = async (email, password) => {
     const newOrgIdStr = newOrgId.toString();
     
     if (currentOrgIdStr !== newOrgIdStr) {
-      user.currentOrganizationId = newOrgId;
-      await user.save();
+      // OPTIMIZATION: Dùng findByIdAndUpdate thay vì user.save() để tránh trigger password hash hook
+      await User.findByIdAndUpdate(user._id, { currentOrganizationId: newOrgId });
     }
     
     organizationId = newOrgIdStr;

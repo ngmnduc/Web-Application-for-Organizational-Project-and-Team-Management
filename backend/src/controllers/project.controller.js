@@ -1,15 +1,31 @@
 import * as projectValidator from "../validators/project.validator.js";
 import * as projectService from "../services/project.service.js";
 import { createNotification } from "../services/notification.service.js";
+import { emitForceLogoutProject } from "../services/socket.service.js";
 import User from "../models/user.model.js"; 
 import { signToken } from "../utils/jwt.js"; 
 import ProjectMember from "../models/projectMember.model.js";
 import Project from "../models/project.model.js";
+
 // POST /projects
 export const createProject = async (req, res) => {
   try {
+    // Log request body và headers
+    console.log('[CONTROLLER] req.body:', JSON.stringify(req.body, null, 2));
+    console.log('[CONTROLLER] req.headers:', {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? 'EXISTS' : 'MISSING'
+    });
+
     const validation = projectValidator.validateCreateProject(req.body);
+
+    console.log('[CONTROLLER] Validation result:', {
+      isValid: validation.isValid,
+      errors: validation.errors
+    });
+
     if (!validation.isValid) {
+      console.log('[CONTROLLER] Validation FAILED, returning 400');
       return res.status(400).json({ 
         success: false, 
         error: "ValidationError",
@@ -20,7 +36,14 @@ export const createProject = async (req, res) => {
     const currentOrgId = req.user.currentOrganizationId;
     const userId = req.user._id;
 
+    console.log('[CONTROLLER] User context:', {
+      userId,
+      currentOrgId,
+      userRole: req.user.role
+    });
+
     if (!currentOrgId) {
+      console.log('[CONTROLLER] No organization context');
       return res.status(400).json({ 
         success: false, 
         message: "Organization context missing" 
@@ -33,6 +56,7 @@ export const createProject = async (req, res) => {
       currentOrgId
     );
 
+    console.log('[CONTROLLER] Project created successfully:', project._id);
     res.status(201).json({ 
       success: true, 
       message: "Project created successfully", 
@@ -40,6 +64,7 @@ export const createProject = async (req, res) => {
     });
 
   } catch (err) {
+    console.error('[CONTROLLER] Error:', err.message);
     if (err.message === 'ORGANIZATION_REQUIRED') {
       return res.status(400).json({ success: false, error: "ValidationError", message: "Organization is required" });
     }
@@ -500,7 +525,15 @@ export const removeProjectMember = async (req, res) => {
     const currentOrgId = req.user.currentOrganizationId;
     const requestorId = req.user._id;
     
+    // Get project info before removal for socket event
+    const project = await Project.findById(id).select('name');
+    
     await projectService.removeMember(id, memberId, requestorId, currentOrgId);
+
+    // Emit socket event to force logout the removed user from this project
+    if (project) {
+      emitForceLogoutProject(memberId, id, project.name);
+    }
 
     res.json({ success: true, message: "Member removed successfully" });
   } catch (err) {
