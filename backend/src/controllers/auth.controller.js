@@ -128,7 +128,6 @@ export async function signup(req, res, next) {
         try {
             const sessionStripe = await stripe.checkout.sessions.create({
                 payment_method_types: ["card"],
-                // [FIX] Thêm dòng này để Stripe tự điền email user
                 customer_email: email, 
                 
                 line_items: [
@@ -139,7 +138,6 @@ export async function signup(req, res, next) {
                                 name: "Premium Plan Subscription",
                                 description: "Unlock unlimited projects (Signup Upgrade)",
                             },
-                            // [FIX] Giá $29 (2900 cents) khớp với Pricing Page. Sửa thành 2000 nếu muốn $20.
                             unit_amount: 2000, 
                             recurring: { interval: "month" },
                         },
@@ -154,11 +152,18 @@ export async function signup(req, res, next) {
                     userId: user._id.toString(),
                     targetPlan: "PREMIUM"
                 },
+                // [FIX] Thêm metadata vào subscription để webhook invoice.payment_succeeded tìm được org
+                subscription_data: {
+                    metadata: {
+                        organizationId: finalOrganizationId.toString(),
+                        userId: user._id.toString(),
+                        targetPlan: "PREMIUM"
+                    }
+                },
             });
             paymentUrl = sessionStripe.url;
         } catch (stripeError) {
             console.error("Stripe Session Creation Failed:", stripeError);
-            // Không throw error để user vẫn đăng ký được (chỉ mất link thanh toán)
         }
     }
 
@@ -341,7 +346,7 @@ export async function me(req, res, next) {
         let organization = null;
         if (user.currentOrganizationId) {
             organization = await Organization.findById(user.currentOrganizationId)
-                .select('name ownerId status plan createdAt');
+              .select('name ownerId status plan createdAt subscriptionStatus subscriptionExpiredAt subscriptionId');
         }
 
         const publicUser = {
