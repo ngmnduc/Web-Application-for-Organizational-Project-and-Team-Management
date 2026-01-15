@@ -114,7 +114,7 @@ export default function PricingPage() {
     }
   };
 
-  // --- LOGIC JOIN PROJECT ---
+  // --- 3. JOIN PROJECT ---
   const handleJoinProject = async () => {
       setJoinError('');
       if (!joinLink.trim()) {
@@ -131,7 +131,7 @@ export default function PricingPage() {
       
       // 1. Chưa login -> Chuyển sang SIGN UP (Kèm mã invite để xử lý sau)
       if (!token) {
-          navigate('/signup', { state: { from: 'pricing', action: 'join', code: inviteCode } });
+          navigate('/signup', { state: { action: 'join', code: inviteCode } });
           return;
       }
 
