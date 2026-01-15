@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { API_BASE_URL } from '../utils/constants';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-
 const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
