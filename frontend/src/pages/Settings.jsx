@@ -374,7 +374,7 @@ const TabButton = ({ label, activeTab, onClick }) => (
         className={`px-4 py-2 font-medium text-sm transition-colors relative ${
             activeTab === label ? 'text-gray-900 border-b-2 font-semibold' : 'text-gray-500 hover:text-gray-700'
         }`}
-        style={activeTab === label ? { borderColor: PRIMARY_COLOR } : { borderColor: 'transparent' }}
+        style={activeTab === label ? { borderColor: 'var(--color-brand)' } : { borderColor: 'transparent' }}
         onClick={() => onClick(label)}
     >
         {label}

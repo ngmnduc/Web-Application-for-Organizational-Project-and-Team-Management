@@ -24,7 +24,7 @@ export const useRealtimeNotifications = () => {
             const token = getToken();
             if (!token || !user) return;
 
-            const response = await fetch(`${API_URL}/notifications?limit=20`, {
+            const response = await fetch(`${API_BASE_URL}/notifications?limit=20`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -113,7 +113,7 @@ export const useRealtimeNotifications = () => {
         // Gọi API ngầm
         try {
             const token = getToken();
-            await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+            await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ export const useRealtimeNotifications = () => {
 
         try {
             const token = getToken();
-            await fetch(`${API_URL}/notifications/read-all`, {
+            await fetch(`${API_BASE_URL}/notifications/read-all`, {
                 method: 'PATCH', // Chú ý: Backend cần có route này (đã thấy trong notification.controller.js)
                 headers: {
                     'Content-Type': 'application/json',
