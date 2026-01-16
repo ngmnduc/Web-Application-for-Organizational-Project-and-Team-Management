@@ -62,7 +62,18 @@ export const createCheckoutSession = async (req, res) => {
       metadata: {
         userId: userId.toString(), 
         organizationId: currentOrganizationId.toString(),
+        userId: userId.toString(), 
+        organizationId: currentOrganizationId.toString(),
         targetPlan: planName 
+      },
+
+      // [FIX] Truyền metadata vào subscription để invoice.payment_succeeded có thể tìm org
+      subscription_data: {
+        metadata: {
+          userId: userId.toString(),
+          organizationId: currentOrganizationId.toString(),
+          targetPlan: planName
+        }
       },
 
       success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -80,6 +91,9 @@ export const createCheckoutSession = async (req, res) => {
   }
 };
 
+/**
+ * [UPDATED] Webhook with Debug Logging
+ */
 export const handleWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
@@ -90,23 +104,66 @@ export const handleWebhook = async (req, res) => {
       sig, 
       process.env.STRIPE_WEBHOOK_SECRET
     );
+    // [DEBUG LOG] Bố xem terminal có hiện dòng này không khi thanh toán xong
+    console.log("🔔 [Webhook Received]", event.type);
   } catch (err) {
-    console.error(`Webhook Signature Error: ${err.message}`);
+    console.error(`❌ Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
   
   switch (event.type) {
     case "checkout.session.completed": {
         const session = event.data.object;
+        console.log("📦 [Session Data]:", {
+            metadata: session.metadata,
+            subscription: session.subscription,
+            mode: session.mode
+        });
+
         const { organizationId, targetPlan = "PREMIUM", userId } = session.metadata || {};
 
         if (organizationId) {
             try {
-                await Organization.findByIdAndUpdate(organizationId, { 
+                // [FIX TRIỆT ĐỂ] Lấy subscriptionExpiredAt từ Stripe subscription
+                let subscriptionExpiredAt = null;
+                let subscriptionId = session.subscription;
+                
+                if (subscriptionId) {
+                    try {
+                        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                        console.log("📅 [Stripe Subscription]:", {
+                            id: subscription.id,
+                            status: subscription.status,
+                            current_period_end: subscription.current_period_end
+                        });
+                        
+                        if (subscription.current_period_end) {
+                            subscriptionExpiredAt = new Date(subscription.current_period_end * 1000);
+                            console.log("✅ [ExpiredAt from Stripe]:", subscriptionExpiredAt);
+                        }
+                    } catch (stripeErr) {
+                        console.error("⚠️ [Stripe API Error]:", stripeErr.message);
+                    }
+                }
+                
+                // [FALLBACK] Nếu không lấy được từ Stripe, set 30 ngày từ bây giờ
+                if (!subscriptionExpiredAt) {
+                    subscriptionExpiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                    console.log("⚠️ [Fallback ExpiredAt]:", subscriptionExpiredAt);
+                }
+
+                const updatedOrg = await Organization.findByIdAndUpdate(organizationId, { 
                     plan: targetPlan,
                     subscriptionStatus: "ACTIVE",  
-                    subscriptionId: session.subscription,
+                    subscriptionId: subscriptionId,
+                    subscriptionExpiredAt: subscriptionExpiredAt,
                     updatedAt: new Date()
+                }, { new: true });
+
+                console.log(`✅ [DB Update Complete] Org ${organizationId}:`, {
+                    plan: updatedOrg?.plan,
+                    subscriptionStatus: updatedOrg?.subscriptionStatus,
+                    subscriptionExpiredAt: updatedOrg?.subscriptionExpiredAt
                 });
 
                 if (userId) {
@@ -122,8 +179,10 @@ export const handleWebhook = async (req, res) => {
                      });
                 }
             } catch (err) {
-                console.error("Database update failed:", err);
+                console.error("❌ Database update failed:", err);
             }
+        } else {
+             console.error("⚠️ [WARNING] Missing organizationId in metadata! Cannot update DB.");
         }
         break;
     }
@@ -131,31 +190,50 @@ export const handleWebhook = async (req, res) => {
     case "invoice.payment_succeeded": {
         const invoice = event.data.object;
         const subscriptionId = invoice.subscription;
-        const periodEnd = invoice.lines?.data[0]?.period?.end; 
+        
+        console.log("💰 [Invoice Payment Succeeded]:", {
+            subscriptionId,
+            invoiceId: invoice.id,
+            billing_reason: invoice.billing_reason
+        });
 
-        if (subscriptionId && periodEnd) {
+        if (subscriptionId) {
             try {
-                const expiredAt = new Date(periodEnd * 1000);
+                // Lấy subscription để có period_end chính xác
+                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                const expiredAt = new Date(subscription.current_period_end * 1000);
+                
+                console.log("📅 [Subscription Period End]:", expiredAt);
 
-                const org = await Organization.findOneAndUpdate(
-                    { subscriptionId: subscriptionId },
-                    { 
-                        subscriptionStatus: "ACTIVE",
-                        subscriptionExpiredAt: expiredAt
-                    },
-                    { new: true }
-                );
+                // Tìm org bằng subscriptionId
+                let org = await Organization.findOne({ subscriptionId: subscriptionId });
+                
+                // [FALLBACK] Nếu không tìm được bằng subscriptionId, thử tìm bằng metadata từ subscription
+                if (!org && subscription.metadata?.organizationId) {
+                    org = await Organization.findById(subscription.metadata.organizationId);
+                    console.log("🔍 [Found org via metadata]:", org?._id);
+                }
 
                 if (org) {
+                    await Organization.findByIdAndUpdate(org._id, { 
+                        subscriptionStatus: "ACTIVE",
+                        subscriptionExpiredAt: expiredAt,
+                        subscriptionId: subscriptionId // Đảm bảo subscriptionId được lưu
+                    });
+                    
+                    console.log(`✅ [Invoice Update] Org ${org._id} expiredAt set to ${expiredAt}`);
+                    
                     await createNotification({
                         userId: org.ownerId,
-                        title: "Renewal Successful",
-                        message: `Premium plan renewed. Valid until ${expiredAt.toLocaleDateString()}.`,
+                        title: "Payment Successful",
+                        message: `Premium plan active until ${expiredAt.toLocaleDateString()}.`,
                         type: "INFO"
                     });
+                } else {
+                    console.log("⚠️ [Invoice] No org found for subscriptionId:", subscriptionId);
                 }
             } catch (err) {
-                console.error("Auto-renewal update failed:", err);
+                console.error("❌ Invoice update failed:", err);
             }
         }
         break;
@@ -174,6 +252,7 @@ export const handleWebhook = async (req, res) => {
                 );
 
                 if (org) {
+                    console.log(`⚠️ [Payment Failed] Org ${org._id} marked as PAST_DUE`);
                     await createNotification({
                         userId: org.ownerId,
                         title: "Payment Failed",
@@ -206,6 +285,7 @@ export const handleWebhook = async (req, res) => {
                 );
 
                 if (org) {
+                    console.log(`🚫 [Expired] Org ${org._id} downgraded to FREE`);
                     await createNotification({
                         userId: org.ownerId,
                         title: "Premium Expired",
@@ -284,6 +364,70 @@ export const cancelSubscription = async (req, res) => {
 
   } catch (error) {
     console.error("Cancel Subscription Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const resumeSubscription = async (req, res) => {
+  try {
+    const { currentOrganizationId } = req.user;
+
+    const organization = await Organization.findById(currentOrganizationId);
+    if (!organization || !organization.subscriptionId) {
+        return res.status(404).json({ success: false, message: "No active subscription found" });
+    }
+
+    await stripe.subscriptions.update(organization.subscriptionId, {
+        cancel_at_period_end: false
+    });
+
+    organization.subscriptionStatus = "ACTIVE";
+    organization.updatedAt = new Date();
+    await organization.save();
+
+    await createNotification({
+        userId: organization.ownerId,
+        title: "Subscription Resumed",
+        message: "Your Premium plan has been reactivated successfully. Auto-renewal is now enabled.",
+        type: "SUCCESS"
+    });
+
+    return res.status(200).json({ 
+        success: true, 
+        message: "Subscription resumed successfully",
+        data: {
+            status: "ACTIVE",
+            plan: organization.plan
+        }
+    });
+
+  } catch (error) {
+    console.error("Resume Subscription Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const createPortalSession = async (req, res) => {
+  try {
+    const { currentOrganizationId } = req.user;
+    const organization = await Organization.findById(currentOrganizationId);
+
+    if (!organization || !organization.subscriptionId) {
+         return res.status(400).json({ success: false, message: "No active subscription found to manage." });
+    }
+
+    const subscription = await stripe.subscriptions.retrieve(organization.subscriptionId);
+    const customerId = subscription.customer;
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/admin/settings`, 
+    });
+
+    res.status(200).json({ success: true, url: session.url });
+
+  } catch (error) {
+    console.error("Portal Session Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

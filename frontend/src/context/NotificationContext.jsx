@@ -7,7 +7,6 @@ const NotificationContext = createContext();
 
 const SOCKET_URL = 'http://localhost:4000';
 
-
 export const NotificationProvider = ({ children }) => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);

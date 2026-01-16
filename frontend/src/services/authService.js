@@ -73,6 +73,7 @@ export const getMe = async () => {
   }
 };
 
+// [UPDATED] Hàm refresh profile có chống Cache
 export const refreshProfile = async () => {
   try {
     const token = localStorage.getItem("token");
@@ -80,11 +81,17 @@ export const refreshProfile = async () => {
 
     axiosInstance.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-    // Gọi API /auth/me (đã được update trả về cả organization)
-    const response = await axiosInstance.get("/auth/me");
+    // [FIX] Thêm timestamp để chặn Cache (Browser sẽ tưởng đây là URL mới và tải lại từ đầu)
+    const response = await axiosInstance.get(`/auth/me?t=${new Date().getTime()}`);
 
     if (response.data?.data) {
         const { user, organization } = response.data.data;
+
+        // Debug log để bố yên tâm là data mới đã về
+        console.log("🔥 [Fresh Data Loaded]", { 
+            plan: organization?.plan, 
+            status: organization?.subscriptionStatus 
+        });
 
         // Cập nhật User
         if (user) {
@@ -156,14 +163,12 @@ export const initAuth = () => {
 
 // Hàm gửi yêu cầu quên mật khẩu (Gửi email)
 export const requestPasswordReset = async (email) => {
-  // Thay đổi đường dẫn '/auth/forgot-password' tùy theo route BE của bạn
   const response = await axiosInstance.post('/auth/forgot-password', { email });
   return response.data;
 };
 
 // Hàm đặt lại mật khẩu mới (khi đã có token)
 export const resetPassword = async (token, newPassword) => {
-  // Thay đổi đường dẫn '/auth/reset-password' tùy theo route BE của bạn
   const response = await axiosInstance.post('/auth/reset-password', { 
     token, 
     newPassword 
@@ -171,4 +176,33 @@ export const resetPassword = async (token, newPassword) => {
   return response.data;
 };
 
+// 1. Hủy gói (Cancel at period end)
+export const cancelSubscription = async () => {
+  try {
+    const response = await axiosInstance.post('/payment/cancel');
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// 2. Khôi phục gói (Resume)
+export const resumeSubscription = async () => {
+  try {
+    const response = await axiosInstance.post('/payment/resume');
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// 3. Lấy link Customer Portal (Đổi thẻ)
+export const getPortalUrl = async () => {
+  try {
+    const response = await axiosInstance.post('/payment/portal');
+    return response.data; // { success: true, url: "..." }
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
 initAuth();
