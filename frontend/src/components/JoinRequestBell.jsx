@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { UserPlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { CheckIcon } from '@heroicons/react/24/solid';
 import { Loader2 } from 'lucide-react';
-
-const API_BASE_URL = 'http://localhost:4000/api';
+import { API_BASE_URL } from '../utils/constants';
 
 const formatDate = (dateString) => {
     const date = new Date(dateString);

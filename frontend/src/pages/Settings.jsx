@@ -7,8 +7,7 @@ import {
 } from '@heroicons/react/24/outline'; 
 import { useAuth } from '../services/AuthContext';
 
-const PRIMARY_COLOR = 'var(--color-brand)'; 
-const API_BASE_URL = 'http://localhost:4000/api';
+import { API_BASE_URL } from '../utils/constants';
 
 const getHeaders = () => {
     const token = localStorage.getItem('token');

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-
-const API_BASE_URL = 'http://localhost:4000/api';
+import { API_BASE_URL } from '../utils/constants';
 
 const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
     const [name, setName] = useState('');

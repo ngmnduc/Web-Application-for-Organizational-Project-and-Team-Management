@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from '../services/AuthContext'; // Giả sử bạn có AuthContext để lấy user
+import { API_BASE_URL } from '../utils/constants';
 
 // URL Backend (Đảm bảo đúng port server đang chạy, ví dụ 4000)
 const SOCKET_URL = 'http://localhost:4000';
-const API_URL = 'http://localhost:4000/api';
 
 export const useRealtimeNotifications = () => {
     const { user } = useAuth();

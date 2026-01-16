@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from '../services/AuthContext';
+import { API_BASE_URL } from '../utils/constants';
 
 const NotificationContext = createContext();
 
 const SOCKET_URL = 'http://localhost:4000';
-const API_URL = 'http://localhost:4000/api';
+
 
 export const NotificationProvider = ({ children }) => {
     const { user } = useAuth();
