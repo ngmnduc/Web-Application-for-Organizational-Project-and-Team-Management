@@ -25,41 +25,52 @@ const getHeaders = () => {
     };
 };
 
-// --- COMPONENT: ALERT WARNING (Dành cho Subscription) ---
+// --- COMPONENT: ALERT WARNING ---
 const AlertWarning = ({ organization }) => {
     if (!organization) return null;
     const { subscriptionStatus, plan, subscriptionExpiredAt } = organization;
     
+    // Case 1: Payment Failed
     if (subscriptionStatus === 'PAST_DUE') {
         return (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg shadow-sm animate-fade-in-down">
                 <div className="flex">
-                    <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
+                    <div className="flex-shrink-0">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-500" aria-hidden="true" />
+                    </div>
                     <div className="ml-3">
                         <h3 className="text-sm font-medium text-red-800">Payment Failed</h3>
-                        <p className="mt-2 text-sm text-red-700">We were unable to charge for your Premium renewal. Please update your payment card.</p>
+                        <div className="mt-2 text-sm text-red-700">
+                            <p>We were unable to charge for your Premium renewal. Please update your payment card immediately to avoid service interruption.</p>
+                        </div>
                     </div>
                 </div>
             </div>
         );
     }
 
+    // Case 2: Expiring Soon
     if (subscriptionStatus === 'CANCELLED' && plan === 'PREMIUM' && subscriptionExpiredAt) {
         const daysLeft = Math.ceil((new Date(subscriptionExpiredAt) - new Date()) / (1000 * 60 * 60 * 24));
         if (daysLeft <= 3 && daysLeft >= 0) {
             return (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg shadow-sm animate-fade-in-down">
                     <div className="flex">
-                        <ExclamationCircleIcon className="h-5 w-5 text-yellow-400" />
+                        <div className="flex-shrink-0">
+                            <ExclamationCircleIcon className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+                        </div>
                         <div className="ml-3">
                             <h3 className="text-sm font-medium text-yellow-800">Premium Plan Expiring Soon</h3>
-                            <p className="mt-2 text-sm text-yellow-700">Your plan will expire in {daysLeft} days. Resume renewal now to keep your benefits.</p>
+                            <div className="mt-2 text-sm text-yellow-700">
+                                <p>Your plan will expire in {daysLeft} days. Resume renewal now to keep your benefits.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             );
         }
     }
+
     return null;
 };
 
@@ -85,20 +96,24 @@ const NotificationBanner = ({ message, type, onClose }) => {
 };
 
 // --- COMPONENT: CONFIRM MODAL ---
-const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = "Delete", confirmColor = "bg-red-600" }) => {
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", confirmColor = "bg-red-600" }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
             <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
                 <div className="flex flex-col items-center text-center">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmColor.includes('red') ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-blue-500'}`}>
-                        <TrashIcon className="w-6 h-6" />
+                        <ExclamationTriangleIcon className="w-6 h-6" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
                     <p className="text-sm text-gray-500 mb-6">{message}</p>
                     <div className="flex gap-3 w-full">
-                        <button onClick={onClose} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition">Cancel</button>
-                        <button onClick={onConfirm} className={`flex-1 px-4 py-2.5 text-white rounded-xl font-medium hover:opacity-90 transition shadow-md ${confirmColor}`}>{confirmText}</button>
+                        <button onClick={onClose} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition">
+                            Cancel
+                        </button>
+                        <button onClick={onConfirm} className={`flex-1 px-4 py-2.5 text-white rounded-xl font-medium hover:opacity-90 transition shadow-md ${confirmColor}`}>
+                            {confirmText}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -153,7 +168,7 @@ const ImageCropperModal = ({ imageSrc, onCancel, onSave }) => {
     );
 };
 
-// --- COMPONENT: PROFILE INFO (Lấy từ Settings1) ---
+// --- COMPONENT: PROFILE INFO ---
 const ProfileInfo = () => {
     const { user, setUser } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
@@ -222,7 +237,7 @@ const ProfileInfo = () => {
     );
 };
 
-// --- COMPONENT: BILLING SECTION (Mày vừa làm) ---
+// --- COMPONENT: BILLING SECTION ---
 const BillingSection = ({ organization, onRefresh }) => {
     const [loading, setLoading] = useState(false);
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null });
@@ -234,6 +249,7 @@ const BillingSection = ({ organization, onRefresh }) => {
     const formatDate = (dateStr) => {
         if (!dateStr) return "N/A";
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return "N/A";
         return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
     };
     
@@ -242,30 +258,89 @@ const BillingSection = ({ organization, onRefresh }) => {
     const handleAction = async () => {
         setLoading(true);
         try {
-            if (modalConfig.type === 'cancel') await cancelSubscription();
-            else if (modalConfig.type === 'resume') await resumeSubscription();
+            if (modalConfig.type === 'cancel') {
+                await cancelSubscription();
+            } else if (modalConfig.type === 'resume') {
+                await resumeSubscription();
+            }
             await onRefresh();
-        } catch (error) { alert(error.message); } finally { setLoading(false); setModalConfig({ isOpen: false, type: null }); }
+        } catch (error) {
+            alert(error.message || "Action failed");
+        } finally {
+            setLoading(false);
+            setModalConfig({ isOpen: false, type: null });
+        }
+    };
+
+    const handleUpdateCard = async () => {
+        setLoading(true);
+        try {
+            const data = await getPortalUrl();
+            if (data.url) window.location.href = data.url;
+        } catch (error) {
+            alert("Failed to get portal link: " + error.message);
+            setLoading(false);
+        }
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-lg border overflow-hidden mt-8">
-            <ConfirmModal isOpen={modalConfig.isOpen} onClose={() => setModalConfig({ ...modalConfig, isOpen: false })} onConfirm={handleAction} title={modalConfig.type === 'cancel' ? "Cancel Renewal?" : "Resume Subscription?"} message="Are you sure?" confirmText="Confirm" confirmColor={modalConfig.type === 'cancel' ? "bg-red-600" : "bg-green-600"} />
-            <div className="p-6 border-b bg-gray-50/50 flex items-start gap-4">
-                <div className="p-3 bg-purple-50 rounded-xl text-purple-600"><BanknotesIcon className="w-8 h-8" /></div>
-                <div><h2 className="text-xl font-bold">Billing Information</h2><p className="text-sm text-gray-500">Manage your subscription.</p></div>
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden relative mt-8">
+            <ConfirmModal 
+                isOpen={modalConfig.isOpen} 
+                onClose={() => setModalConfig({ ...modalConfig, isOpen: false })} 
+                onConfirm={handleAction}
+                title={modalConfig.type === 'cancel' ? "Cancel Premium Plan?" : "Resume Subscription?"}
+                message={modalConfig.type === 'cancel' 
+                    ? `You can still use Premium features until ${expiredAt}. Are you sure you want to cancel the renewal?` 
+                    : "Your Premium plan will automatically renew in the next cycle. Do you want to continue?"}
+                confirmText={modalConfig.type === 'cancel' ? "Confirm Cancel" : "Resume Now"}
+                confirmColor={modalConfig.type === 'cancel' ? "bg-red-600" : "bg-green-600"}
+            />
+
+            <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-start gap-4">
+                <div className="p-3 bg-purple-50 rounded-xl text-purple-600">
+                    <BanknotesIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <h2 className="text-xl font-bold text-gray-900">Billing Information</h2>
+                    <p className="text-sm text-gray-500 mt-1">Manage your subscription plan and payment methods.</p>
+                </div>
             </div>
-            <div className="p-6">
-                <div className="border rounded-xl p-5 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="space-y-2 flex-1">
-                        <div className="text-sm font-medium">Plan: <span className="uppercase font-bold">{plan}</span> ({status})</div>
-                        <div className="text-3xl font-extrabold">{isPremium ? "$20 / Month" : "Free"}</div>
-                        {isPremium && <div className="text-sm text-gray-600">Renewal/Expiry: {expiredAt}</div>}
+
+            <div className="p-6 sm:p-8">
+                <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
+                    <div className="space-y-2 flex-1 w-full">
+                        <div className="text-sm font-medium">Plan: <span className="uppercase font-bold">{plan}</span></div>
+                        <div className="text-3xl font-extrabold text-gray-900">{isPremium ? "$20 / Month" : "Free"}</div>
+                        {isPremium && (
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <CalendarDaysIcon className="w-4 h-4 text-gray-400" />
+                                <span>Renewal/Expiry: <span className="font-semibold">{expiredAt}</span></span>
+                            </div>
+                        )}
                     </div>
-                    <div className="flex gap-3">
-                        {!isPremium && <button onClick={() => window.location.href = '/pricing'} className="px-5 py-2.5 bg-black text-white rounded-xl">Upgrade</button>}
-                        {isPremium && status === 'ACTIVE' && <button onClick={() => setModalConfig({ isOpen: true, type: 'cancel' })} className="text-red-600 border px-4 py-2 rounded-xl">Cancel Renewal</button>}
-                        {isPremium && status === 'CANCELLED' && <button onClick={() => setModalConfig({ isOpen: true, type: 'resume' })} className="bg-green-600 text-white px-5 py-2.5 rounded-xl">Resume</button>}
+
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                        {!isPremium && (
+                            <button onClick={() => window.location.href = '/pricing'} className="px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-black transition flex items-center justify-center gap-2">
+                                <CreditCardIcon className="w-4 h-4"/> Upgrade to Premium
+                            </button>
+                        )}
+                        {isPremium && status === 'ACTIVE' && (
+                            <button onClick={() => setModalConfig({ isOpen: true, type: 'cancel' })} className="px-4 py-2.5 bg-white border border-gray-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition">
+                                Cancel Renewal
+                            </button>
+                        )}
+                        {isPremium && status === 'CANCELLED' && (
+                            <button onClick={() => setModalConfig({ isOpen: true, type: 'resume' })} className="px-5 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition">
+                                Resume Subscription
+                            </button>
+                        )}
+                        {isPremium && status === 'PAST_DUE' && (
+                            <button onClick={handleUpdateCard} className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition">
+                                Update Card
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -273,22 +348,31 @@ const BillingSection = ({ organization, onRefresh }) => {
     );
 };
 
-// --- COMPONENT: ACCOUNT SETTINGS (Password + Billing) ---
+// --- COMPONENT: ACCOUNT SETTINGS ---
 const AccountSettings = ({ organization, onRefresh }) => {
     const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
     const [notification, setNotification] = useState({ message: '', type: '' });
     const [isLoading, setIsLoading] = useState(false);
 
+    const showNotification = (message, type = 'success') => setNotification({ message, type });
+
     const handleUpdatePassword = async () => {
-        if (!passwords.currentPassword) return setNotification({ message: 'Current password required', type: 'error' });
-        if (passwords.newPassword !== passwords.confirmPassword) return setNotification({ message: 'Passwords mismatch', type: 'error' });
+        if (!passwords.currentPassword) return showNotification('Current password is required.', 'error');
+        if (passwords.newPassword !== passwords.confirmPassword) return showNotification('Passwords mismatch', 'error');
+        
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/auth/change-password`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ currentPassword: passwords.currentPassword, newPassword: passwords.newPassword }) });
-            if (!res.ok) throw new Error('Failed');
-            setNotification({ message: 'Password updated!', type: 'success' });
+            const res = await fetch(`${API_BASE_URL}/auth/change-password`, {
+                method: 'POST', headers: getHeaders(), body: JSON.stringify({ currentPassword: passwords.currentPassword, newPassword: passwords.newPassword })
+            });
+            if (!res.ok) throw new Error('Failed to update password');
+            showNotification('Password updated successfully!', 'success');
             setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        } catch (error) { setNotification({ message: error.message, type: 'error' }); } finally { setIsLoading(false); }
+        } catch (error) { 
+            showNotification(error.message, 'error'); 
+        } finally { 
+            setIsLoading(false); 
+        }
     };
 
     return (
@@ -300,12 +384,14 @@ const AccountSettings = ({ organization, onRefresh }) => {
                     <div><h2 className="text-xl font-bold">Security</h2><p className="text-sm text-gray-500">Secure your account.</p></div>
                 </div>
                 <div className="p-6 space-y-6">
-                    <input type="password" name="currentPassword" value={passwords.currentPassword} onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})} placeholder="Current Password" className="w-full p-2 border rounded-lg"/>
-                    <div className="grid grid-cols-2 gap-4">
-                        <input type="password" name="newPassword" value={passwords.newPassword} onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})} placeholder="New Password" className="p-2 border rounded-lg"/>
-                        <input type="password" name="confirmPassword" value={passwords.confirmPassword} onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})} placeholder="Confirm Password" className="p-2 border rounded-lg"/>
+                    <input type="password" name="currentPassword" value={passwords.currentPassword} onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})} placeholder="Current Password" className="w-full p-2 border rounded-lg outline-none focus:ring-1 focus:ring-[var(--color-brand)]"/>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <input type="password" name="newPassword" value={passwords.newPassword} onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})} placeholder="New Password" className="p-2 border rounded-lg outline-none focus:ring-1 focus:ring-[var(--color-brand)]"/>
+                        <input type="password" name="confirmPassword" value={passwords.confirmPassword} onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})} placeholder="Confirm Password" className="p-2 border rounded-lg outline-none focus:ring-1 focus:ring-[var(--color-brand)]"/>
                     </div>
-                    <div className="flex justify-end"><button onClick={handleUpdatePassword} disabled={isLoading} className="px-6 py-2 bg-black text-white rounded-lg">Update Password</button></div>
+                    <div className="flex justify-end">
+                        <button onClick={handleUpdatePassword} disabled={isLoading} className="px-6 py-2 bg-black text-white rounded-lg hover:opacity-90 transition">Update Password</button>
+                    </div>
                 </div>
             </div>
             <BillingSection organization={organization} onRefresh={onRefresh} />
@@ -313,10 +399,9 @@ const AccountSettings = ({ organization, onRefresh }) => {
     );
 };
 
-// --- COMPONENT: PREFERENCES (Lấy từ Settings1) ---
+// --- COMPONENT: PREFERENCES ---
 const Preferences = () => {
     const [theme, setTheme] = useState('Light');
-    const [language, setLanguage] = useState('English');
     const [notificationPrefs, setNotificationPrefs] = useState([
         { id: 'taskAssigned', label: 'Task assigned', description: 'Notify when assigned', enabled: true },
         { id: 'mentioned', label: 'Mentioned', description: 'Notify when mentioned', enabled: true }
@@ -328,8 +413,8 @@ const Preferences = () => {
             <div className="mb-8 pb-6 border-b">
                 <h3 className="font-medium mb-3">Appearance</h3>
                 <div className="flex space-x-3">
-                    <button onClick={() => setTheme('Light')} className={`px-4 py-2 rounded-lg border ${theme === 'Light' ? 'border-black' : ''}`}>Light</button>
-                    <button onClick={() => setTheme('Dark')} className={`px-4 py-2 rounded-lg border ${theme === 'Dark' ? 'border-black' : ''}`}>Dark</button>
+                    <button onClick={() => setTheme('Light')} className={`px-4 py-2 rounded-lg border ${theme === 'Light' ? 'border-black font-bold' : ''}`}>Light</button>
+                    <button onClick={() => setTheme('Dark')} className={`px-4 py-2 rounded-lg border ${theme === 'Dark' ? 'border-black font-bold' : ''}`}>Dark</button>
                 </div>
             </div>
             <div className="space-y-4">
@@ -351,9 +436,12 @@ const TabButton = ({ label, activeTab, onClick }) => (
 );
 
 const Settings = () => {
-    const [activeTab, setActiveTab] = useState('Profile Info');
+    const [activeTab, setActiveTab] = useState('Profile Info'); 
     const { setUser } = useAuth();
-    const [organization, setOrganization] = useState(() => JSON.parse(localStorage.getItem('organization')));
+    const [organization, setOrganization] = useState(() => {
+        const savedOrg = localStorage.getItem('organization');
+        return savedOrg ? JSON.parse(savedOrg) : null;
+    });
 
     const syncData = async () => {
         try {
