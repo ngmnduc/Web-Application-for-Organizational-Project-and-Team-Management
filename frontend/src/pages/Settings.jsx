@@ -120,50 +120,140 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText 
     );
 };
 
+// --- COMPONENT: IMAGE CROPPER ---
+const ImageCropperModal = ({ imageSrc, onCancel, onSave }) => {
+    const [zoom, setZoom] = useState(1);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const imageRef = useRef(null);
+
+    const handleMouseDown = (e) => { setIsDragging(true); setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y }); };
+    const handleMouseMove = (e) => { if (!isDragging) return; setOffset({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); };
+    const handleMouseUp = () => setIsDragging(false);
+
+    const handleCrop = () => {
+        const canvas = document.createElement('canvas');
+        const size = 300; canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const img = imageRef.current;
+        const displaySize = 256; 
+        const scaleFactor = size / displaySize;
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, size, size);
+        ctx.translate(size / 2, size / 2); ctx.scale(zoom, zoom); ctx.translate(-size / 2, -size / 2);
+        ctx.drawImage(img, (offset.x * scaleFactor) + (size - size) / 2, (offset.y * scaleFactor) + (size - (img.height * (size/img.width))) / 2, size, img.height * (size / img.width));
+        onSave(canvas.toDataURL('image/jpeg', 0.9));
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="p-4 border-b flex justify-between items-center">
+                    <h3 className="font-semibold text-gray-800">Adjust Photo</h3>
+                    <button onClick={onCancel}><XMarkIcon className="w-6 h-6 text-gray-400" /></button>
+                </div>
+                <div className="p-6 flex flex-col items-center">
+                    <div className="relative w-64 h-64 rounded-full overflow-hidden border-4 border-gray-100 cursor-move bg-gray-50" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+                        <img ref={imageRef} src={imageSrc} alt="Crop" className="absolute max-w-none origin-center pointer-events-none" style={{ width: '100%', top: '50%', left: '50%', transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }} />
+                    </div>
+                    <input type="range" min="1" max="3" step="0.1" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-full mt-6 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[var(--color-brand)]"/>
+                </div>
+                <div className="p-4 bg-gray-50 border-t flex gap-3 justify-end">
+                    <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg">Cancel</button>
+                    <button onClick={handleCrop} className="px-6 py-2 text-sm font-bold text-white rounded-lg bg-[var(--color-brand)]">Save Photo</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- COMPONENT: PROFILE INFO ---
+const ProfileInfo = () => {
+    const { user, setUser } = useAuth();
+    const [isLoading, setIsLoading] = useState(false);
+    const [notification, setNotification] = useState({ message: '', type: '' });
+    const [showCropModal, setShowCropModal] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [tempImage, setTempImage] = useState(null);
+    const fileInputRef = useRef(null);
+    const [formData, setFormData] = useState({ name: '', phoneNumber: '', avatar: '' });
+
+    useEffect(() => { if (user) setFormData({ name: user.name || '', phoneNumber: user.phoneNumber || '', avatar: user.avatar || '' }); }, [user]);
+
+    const showNotification = (message, type = 'success') => setNotification({ message, type });
+    const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
+
+    const handleFileSelect = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => { setTempImage(reader.result); setShowCropModal(true); event.target.value = ''; };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleCropSave = (croppedBase64) => { setFormData(prev => ({ ...prev, avatar: croppedBase64 })); setShowCropModal(false); showNotification("Photo ready! Click 'Save Changes' to apply."); };
+
+    const handleSave = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/auth/profile`, {
+                method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ fullName: formData.name, phoneNumber: formData.phoneNumber, avatar: formData.avatar })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            const updatedUser = { ...user, ...data.data };
+            setUser(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            showNotification('Profile updated successfully!');
+        } catch (error) { showNotification(error.message, 'error'); } finally { setIsLoading(false); }
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-lg border relative">
+            <NotificationBanner message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
+            {showCropModal && <ImageCropperModal imageSrc={tempImage} onCancel={() => setShowCropModal(false)} onSave={handleCropSave} />}
+            <ConfirmModal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} onConfirm={() => { setFormData(prev => ({ ...prev, avatar: '' })); setShowDeleteConfirm(false); }} title="Remove Photo" message="Confirm removal of profile picture?" />
+            <h2 className="text-xl font-semibold mb-6">Personal Information</h2>
+            <div className="flex items-center space-x-6 mb-8">
+                <div className="relative group w-24 h-24 rounded-full overflow-hidden border-4 cursor-pointer bg-gray-200" onClick={() => fileInputRef.current.click()}>
+                    <img src={formData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name)}`} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><CameraIcon className="w-8 h-8 text-white" /></div>
+                </div>
+                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
+                <button onClick={() => fileInputRef.current.click()} className="text-sm font-bold" style={{ color: PRIMARY_COLOR }}>Change Photo</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <input type="text" id="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className="p-2 border rounded-lg focus:ring-1 focus:ring-[var(--color-brand)] outline-none"/>
+                <input type="email" value={user?.email || ''} className="p-2 border bg-gray-50 rounded-lg cursor-not-allowed" disabled />
+                <input type="text" id="phoneNumber" value={formData.phoneNumber} onChange={handleChange} placeholder="Phone Number" className="p-2 border rounded-lg focus:ring-1 focus:ring-[var(--color-brand)] outline-none"/>
+                <input type="text" value={user?.role || 'Member'} className="p-2 border bg-gray-50 rounded-lg cursor-not-allowed" disabled />
+            </div>
+            <div className="mt-8 flex justify-end">
+                <button onClick={handleSave} disabled={isLoading} className="px-6 py-2 text-white font-semibold rounded-lg bg-[var(--color-brand)]">{isLoading ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+        </div>
+    );
+};
+
 // --- COMPONENT: BILLING SECTION ---
 const BillingSection = ({ organization, onRefresh }) => {
     const [loading, setLoading] = useState(false);
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null });
 
-    // [FIX 1] Lấy plan từ organization, nếu null thì fallback
-    // Quan trọng: Check kỹ biến plan từ DB (Backend thường trả về UPPERCASE)
     const plan = organization?.plan ? organization.plan.toUpperCase() : "FREE";
     const status = organization?.subscriptionStatus ? organization.subscriptionStatus.toUpperCase() : "INACTIVE";
-    
-    // [FIX] Format date dd/mm/yyyy
+    const isPremium = plan === "PREMIUM" || plan === "ADMIN"; 
+
     const formatDate = (dateStr) => {
         if (!dateStr) return "N/A";
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return "N/A";
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
     };
     
     const expiredAt = formatDate(organization?.subscriptionExpiredAt);
 
-    // Logic xác định có phải Premium không
-    const isPremium = plan === "PREMIUM" || plan === "ADMIN"; 
-
-    // Helper: Badge Logic
-    const renderBadge = () => {
-        if (!isPremium) return <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-md uppercase">Free Plan</span>;
-        
-        switch (status) {
-            case 'ACTIVE':
-                return <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-md uppercase flex items-center gap-1"><CheckCircleIcon className="w-3 h-3"/> Active</span>;
-            case 'CANCELLED':
-                return <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-md uppercase flex items-center gap-1"><ExclamationCircleIcon className="w-3 h-3"/> Cancelled</span>;
-            case 'PAST_DUE':
-                return <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-md uppercase flex items-center gap-1"><ExclamationTriangleIcon className="w-3 h-3"/> Past Due</span>;
-            default:
-                // Nếu là Premium mà status Inactive (lỗi logic DB) thì vẫn hiện cảnh báo
-                return <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-md uppercase">Inactive</span>;
-        }
-    };
-
-    // Actions
     const handleAction = async () => {
         setLoading(true);
         try {
@@ -172,7 +262,7 @@ const BillingSection = ({ organization, onRefresh }) => {
             } else if (modalConfig.type === 'resume') {
                 await resumeSubscription();
             }
-            await onRefresh(); // Reload data
+            await onRefresh();
         } catch (error) {
             alert(error.message || "Action failed");
         } finally {
@@ -218,157 +308,128 @@ const BillingSection = ({ organization, onRefresh }) => {
 
             <div className="p-6 sm:p-8">
                 <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col md:flex-row justify-between items-center gap-6 shadow-sm">
-                    
-                    {/* Info Column */}
                     <div className="space-y-2 flex-1 w-full">
-                        <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-500 font-medium">Current Plan:</span>
-                            {renderBadge()}
-                        </div>
-                        
-                        {/* [FIX 2] Sửa hiển thị giá đúng $20 */}
-                        <div className="text-3xl font-extrabold text-gray-900 tracking-tight">
-                            {isPremium ? "$20 / Month" : "Free"}
-                        </div>
-
+                        <div className="text-sm font-medium">Plan: <span className="uppercase font-bold">{plan}</span></div>
+                        <div className="text-3xl font-extrabold text-gray-900">{isPremium ? "$20 / Month" : "Free"}</div>
                         {isPremium && (
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <CalendarDaysIcon className="w-4 h-4 text-gray-400" />
-                                {status === 'CANCELLED' ? (
-                                    <span className="text-red-600 font-medium">Expires on: {expiredAt}</span>
-                                ) : (
-                                    <span>Next renewal: <span className="font-semibold text-gray-900">{expiredAt}</span></span>
-                                )}
+                                <span>Renewal/Expiry: <span className="font-semibold">{expiredAt}</span></span>
                             </div>
                         )}
                     </div>
 
-                    {/* Actions Column */}
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                        
-                        {(!isPremium || status === 'INACTIVE') && (
-                            <button 
-                                onClick={() => window.location.href = '/pricing'}
-                                className="px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-black transition shadow-lg shadow-gray-200 flex items-center justify-center gap-2"
-                            >
+                        {!isPremium && (
+                            <button onClick={() => window.location.href = '/pricing'} className="px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-black transition flex items-center justify-center gap-2">
                                 <CreditCardIcon className="w-4 h-4"/> Upgrade to Premium
                             </button>
                         )}
-
                         {isPremium && status === 'ACTIVE' && (
-                            <>
-                                <button 
-                                    onClick={() => setModalConfig({ isOpen: true, type: 'cancel' })}
-                                    disabled={loading}
-                                    className="px-4 py-2.5 bg-white border border-gray-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 hover:border-red-200 transition disabled:opacity-50"
-                                >
-                                    Cancel Renewal
-                                </button>
-                                <button className="px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition">
-                                    View Invoice
-                                </button>
-                            </>
-                        )}
-
-                        {isPremium && status === 'CANCELLED' && (
-                            <button 
-                                onClick={() => setModalConfig({ isOpen: true, type: 'resume' })}
-                                disabled={loading}
-                                className="px-5 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition shadow-md flex items-center justify-center gap-2"
-                            >
-                                <ArrowPathIcon className="w-4 h-4"/> Resume Subscription
+                            <button onClick={() => setModalConfig({ isOpen: true, type: 'cancel' })} className="px-4 py-2.5 bg-white border border-gray-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition">
+                                Cancel Renewal
                             </button>
                         )}
-
+                        {isPremium && status === 'CANCELLED' && (
+                            <button onClick={() => setModalConfig({ isOpen: true, type: 'resume' })} className="px-5 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition">
+                                Resume Subscription
+                            </button>
+                        )}
                         {isPremium && status === 'PAST_DUE' && (
-                            <button 
-                                onClick={handleUpdateCard}
-                                disabled={loading}
-                                className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2"
-                            >
-                                <CreditCardIcon className="w-4 h-4"/> Update Card
+                            <button onClick={handleUpdateCard} className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition">
+                                Update Card
                             </button>
                         )}
                     </div>
                 </div>
-                
-                {isPremium && status === 'PAST_DUE' && (
-                    <p className="text-xs text-red-500 mt-3 text-center md:text-right">
-                        * There is an issue with your card. Please update it to continue using the service.
-                    </p>
-                )}
             </div>
         </div>
     );
 };
 
-// --- PRESERVED COMPONENTS ---
-const ImageCropperModal = ({ imageSrc, onCancel, onSave }) => { return null; }; // Placeholder
-const ProfileInfo = () => { return <div>Profile Content</div> }; // Placeholder
-
-// --- ACCOUNT SETTINGS ---
+// --- COMPONENT: ACCOUNT SETTINGS ---
 const AccountSettings = ({ organization, onRefresh }) => {
     const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
     const [notification, setNotification] = useState({ message: '', type: '' });
     const [isLoading, setIsLoading] = useState(false);
 
     const showNotification = (message, type = 'success') => setNotification({ message, type });
-    const handleChange = (e) => setPasswords({ ...passwords, [e.target.name]: e.target.value });
 
     const handleUpdatePassword = async () => {
         if (!passwords.currentPassword) return showNotification('Current password is required.', 'error');
+        if (passwords.newPassword !== passwords.confirmPassword) return showNotification('Passwords mismatch', 'error');
+        
         setIsLoading(true);
         try {
             const res = await fetch(`${API_BASE_URL}/auth/change-password`, {
                 method: 'POST', headers: getHeaders(), body: JSON.stringify({ currentPassword: passwords.currentPassword, newPassword: passwords.newPassword })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Failed');
-            showNotification('Password changed successfully!', 'success');
+            if (!res.ok) throw new Error('Failed to update password');
+            showNotification('Password updated successfully!', 'success');
             setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        } catch (error) { showNotification(error.message, 'error'); } 
-        finally { setIsLoading(false); }
+        } catch (error) { 
+            showNotification(error.message, 'error'); 
+        } finally { 
+            setIsLoading(false); 
+        }
     };
 
     return (
         <div className="space-y-8">
             <NotificationBanner message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
-
-            <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden relative">
-                <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-start gap-4">
-                    <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
-                        <ShieldCheckIcon className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900">Security & Login</h2>
-                        <p className="text-sm text-gray-500 mt-1">Manage your password to keep your account secure.</p>
-                    </div>
+            <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
+                <div className="p-6 border-b bg-gray-50/50 flex gap-4">
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><ShieldCheckIcon className="w-8 h-8" /></div>
+                    <div><h2 className="text-xl font-bold">Security</h2><p className="text-sm text-gray-500">Secure your account.</p></div>
                 </div>
-                
-                <div className="p-6 sm:p-8 space-y-8">
-                      <div className="max-w-md">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Current Password</label>
-                        <input type="password" name="currentPassword" value={passwords.currentPassword} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg"/>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <input type="password" name="newPassword" placeholder="New Password" value={passwords.newPassword} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg"/>
-                        <input type="password" name="confirmPassword" placeholder="Confirm Password" value={passwords.confirmPassword} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg"/>
-                      </div>
-                      <div className="flex justify-end pt-4">
-                        <button onClick={handleUpdatePassword} disabled={isLoading} className="px-6 py-2 bg-black text-white rounded-lg">Update Password</button>
-                      </div>
+                <div className="p-6 space-y-6">
+                    <input type="password" name="currentPassword" value={passwords.currentPassword} onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})} placeholder="Current Password" className="w-full p-2 border rounded-lg outline-none focus:ring-1 focus:ring-[var(--color-brand)]"/>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <input type="password" name="newPassword" value={passwords.newPassword} onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})} placeholder="New Password" className="p-2 border rounded-lg outline-none focus:ring-1 focus:ring-[var(--color-brand)]"/>
+                        <input type="password" name="confirmPassword" value={passwords.confirmPassword} onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})} placeholder="Confirm Password" className="p-2 border rounded-lg outline-none focus:ring-1 focus:ring-[var(--color-brand)]"/>
+                    </div>
+                    <div className="flex justify-end">
+                        <button onClick={handleUpdatePassword} disabled={isLoading} className="px-6 py-2 bg-black text-white rounded-lg hover:opacity-90 transition">Update Password</button>
+                    </div>
                 </div>
             </div>
-
             <BillingSection organization={organization} onRefresh={onRefresh} />
         </div>
     );
 };
 
-// --- PREFERENCES ---
-const Preferences = () => { return <div className="bg-white p-6 rounded-xl shadow-lg border">Preferences Content</div>; };
+// --- COMPONENT: PREFERENCES ---
+const Preferences = () => {
+    const [theme, setTheme] = useState('Light');
+    const [notificationPrefs, setNotificationPrefs] = useState([
+        { id: 'taskAssigned', label: 'Task assigned', description: 'Notify when assigned', enabled: true },
+        { id: 'mentioned', label: 'Mentioned', description: 'Notify when mentioned', enabled: true }
+    ]);
+    
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-lg border">
+            <h2 className="text-xl font-semibold mb-6">Preferences</h2>
+            <div className="mb-8 pb-6 border-b">
+                <h3 className="font-medium mb-3">Appearance</h3>
+                <div className="flex space-x-3">
+                    <button onClick={() => setTheme('Light')} className={`px-4 py-2 rounded-lg border ${theme === 'Light' ? 'border-black font-bold' : ''}`}>Light</button>
+                    <button onClick={() => setTheme('Dark')} className={`px-4 py-2 rounded-lg border ${theme === 'Dark' ? 'border-black font-bold' : ''}`}>Dark</button>
+                </div>
+            </div>
+            <div className="space-y-4">
+                <h3 className="font-medium">Notifications</h3>
+                {notificationPrefs.map(pref => (
+                    <div key={pref.id} className="flex justify-between items-center border-b pb-2">
+                        <div><p className="font-medium">{pref.label}</p><p className="text-sm text-gray-500">{pref.description}</p></div>
+                        <input type="checkbox" checked={pref.enabled} onChange={() => {}} className="h-5 w-5" style={{ accentColor: PRIMARY_COLOR }} />
+                    </div>
+                ))}
+            </div>
+            <button className="mt-8 px-6 py-2 text-white rounded-lg bg-[var(--color-brand)]">Save All</button>
+        </div>
+    );
+};
 
-// --- TAB BUTTON ---
 const TabButton = ({ label, activeTab, onClick }) => (
     <button
         className={`px-4 py-2 font-medium text-sm transition-colors relative ${
@@ -381,12 +442,9 @@ const TabButton = ({ label, activeTab, onClick }) => (
     </button>
 );
 
-// --- MAIN SETTINGS ---
 const Settings = () => {
-    const [activeTab, setActiveTab] = useState('Account Settings'); 
+    const [activeTab, setActiveTab] = useState('Profile Info'); 
     const { setUser } = useAuth();
-
-    // [FIX 3] Khởi tạo organization từ LocalStorage để tránh UI nhảy về FREE lúc đầu
     const [organization, setOrganization] = useState(() => {
         const savedOrg = localStorage.getItem('organization');
         return savedOrg ? JSON.parse(savedOrg) : null;
@@ -394,20 +452,12 @@ const Settings = () => {
 
     const syncData = async () => {
         try {
-            const data = await refreshProfile(); 
-            if (data) {
-                // Cập nhật state ngay khi có data mới từ API
-                setUser(data.user);
-                setOrganization(data.organization);
-            }
-        } catch (err) {
-            console.error("Sync failed:", err);
-        }
+            const data = await refreshProfile();
+            if (data) { setUser(data.user); setOrganization(data.organization); }
+        } catch (err) { console.error("Sync failed:", err); }
     };
 
-    useEffect(() => {
-        syncData();
-    }, []);
+    useEffect(() => { syncData(); }, []);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -422,13 +472,11 @@ const Settings = () => {
         <div className="flex-1 p-6 md:p-8 lg:p-10 bg-gray-50 min-h-screen">
             <div className="max-w-4xl mx-auto"> 
                 <AlertWarning organization={organization} />
-
                 <div className="flex space-x-6 border-b border-gray-200 mb-8">
                     <TabButton label="Profile Info" activeTab={activeTab} onClick={setActiveTab} />
                     <TabButton label="Account Settings" activeTab={activeTab} onClick={setActiveTab} />
                     <TabButton label="Preferences" activeTab={activeTab} onClick={setActiveTab} />
                 </div>
-
                 {renderContent()}
             </div>
         </div>
