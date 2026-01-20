@@ -26,7 +26,8 @@ class DashboardService {
     };
   }
 
-  async _getDailyTaskStats(baseMatch, dateQuery) {
+  async _getDailyTaskStats(baseMatch, dateQuery, isForAdmin = false) {
+    // Với Admin/Manager view, ta có thể muốn group data để đảm bảo đủ ngày
     const dailyData = await Task.aggregate([
       { 
         $match: { 
@@ -100,15 +101,16 @@ class DashboardService {
       projectBaseFilter._id = new mongoose.Types.ObjectId(projectId);
     }
 
-    const taskMatchStage = { 
+    // [FIX] Tách filter cho Task: Không áp dụng filter ngày tạo cho tổng quan (Snapshot)
+    // Chỉ áp dụng filter project/org
+    const taskSnapshotMatch = { 
       "project.organizationId": orgIdObj, 
       "project.deletedAt": null, 
-      deletedAt: null,
-      createdAt: dateMeta.query 
+      deletedAt: null
     };
 
     if (projectId && projectId !== 'all') {
-      taskMatchStage["project._id"] = new mongoose.Types.ObjectId(projectId);
+      taskSnapshotMatch["project._id"] = new mongoose.Types.ObjectId(projectId);
     }
 
     const [
@@ -130,25 +132,25 @@ class DashboardService {
       Project.countDocuments({ ...projectBaseFilter, status: "completed" }),
       ProjectMember.distinct("userId", { organizationId: currentOrganizationId, status: "ACTIVE" }).then(res => res.length),
 
-      // Task Counts (Filtered by Time)
+      // Task Counts (Snapshot - Không lọc theo ngày tạo để hiện đúng tổng số)
       Task.aggregate([
         { $lookup: { from: "projects", localField: "projectId", foreignField: "_id", as: "project" } },
         { $unwind: "$project" },
-        { $match: taskMatchStage },
+        { $match: taskSnapshotMatch },
         { $count: "count" }
       ]).then(res => res[0]?.count || 0),
 
       Task.aggregate([
         { $lookup: { from: "projects", localField: "projectId", foreignField: "_id", as: "project" } },
         { $unwind: "$project" },
-        { $match: { ...taskMatchStage, status: "DONE" } },
+        { $match: { ...taskSnapshotMatch, status: "DONE" } },
         { $count: "count" }
       ]).then(res => res[0]?.count || 0),
 
       Task.aggregate([
         { $lookup: { from: "projects", localField: "projectId", foreignField: "_id", as: "project" } },
         { $unwind: "$project" },
-        { $match: taskMatchStage },
+        { $match: taskSnapshotMatch },
         { $group: { _id: "$priority", count: { $sum: 1 } } }
       ]),
 
@@ -158,28 +160,14 @@ class DashboardService {
       
       this._getTodayAttendanceStats(currentOrganizationId, projectId && projectId !== 'all' ? [new mongoose.Types.ObjectId(projectId)] : null),
 
+      // Daily stats: Vẫn giữ filter ngày tạo (để vẽ biểu đồ activity theo ngày)
       this._getDailyTaskStats({
         "project.organizationId": orgIdObj,
         "project.deletedAt": null,
         deletedAt: null,
         ...(projectId && projectId !== 'all' ? { "project._id": new mongoose.Types.ObjectId(projectId) } : {})
-      }, dateMeta, true) 
+      }, dateMeta) 
     ]);
-
-    // Re-calculate daily stats specifically for Admin (Logic override from charts)
-    const dailyChart = await Task.aggregate([
-        { $lookup: { from: "projects", localField: "projectId", foreignField: "_id", as: "project" } },
-        { $unwind: "$project" },
-        { $match: taskMatchStage },
-        { $group: { _id: { $dayOfMonth: "$createdAt" }, count: { $sum: 1 } } }
-    ]);
-    
-    // Map chart data
-    const finalChart = [];
-    for (let d = 1; d <= dateMeta.daysInMonth; d++) {
-        const f = dailyChart.find(x => x._id === d);
-        finalChart.push({ name: `${d}/${dateMeta.month}`, value: f ? f.count : 0 });
-    }
 
     const avgProgress = allTasksCount > 0 ? Math.round((doneTasksCount / allTasksCount) * 100) : 0;
 
@@ -195,7 +183,7 @@ class DashboardService {
       kpi: { totalProjects, totalMembers, completedProjects, avgProgress },
       attendance: attendanceStats,
       charts: {
-        taskActivity: finalChart, 
+        taskActivity: dailyTaskChart, 
         projectStatus: [
           { name: "Active", value: activeProjects },
           { name: "Archived", value: archivedProjects },
@@ -229,10 +217,10 @@ class DashboardService {
 
     const dateMeta = this._getMetaDate(month, year);
     
-    const baseMatch = { 
+    // [FIX] Snapshot Match: Không lọc theo ngày tạo để đếm đúng tổng số Task hiện có
+    const snapshotMatch = { 
         projectId: { $in: projectIds }, 
-        deletedAt: null,
-        createdAt: dateMeta.query 
+        deletedAt: null
     };
 
     const now = new Date();
@@ -241,16 +229,31 @@ class DashboardService {
         priorityStatsRaw, teamSize, attendanceStats,
         dailyChartRaw 
     ] = await Promise.all([
-      Task.countDocuments(baseMatch),
-      Task.countDocuments({ ...baseMatch, status: "TODO" }),
-      Task.countDocuments({ ...baseMatch, status: "DOING" }),
-      Task.countDocuments({ ...baseMatch, status: "DONE" }),
-      Task.countDocuments({ ...baseMatch, dueDate: { $lt: now }, status: { $ne: "DONE" } }),
-      Task.aggregate([{ $match: baseMatch }, { $group: { _id: "$priority", count: { $sum: 1 } } }]),
+      Task.countDocuments(snapshotMatch),
+      Task.countDocuments({ ...snapshotMatch, status: "TODO" }),
+      Task.countDocuments({ ...snapshotMatch, status: "DOING" }),
+      Task.countDocuments({ ...snapshotMatch, status: "DONE" }),
+      Task.countDocuments({ ...snapshotMatch, dueDate: { $lt: now }, status: { $ne: "DONE" } }),
+      Task.aggregate([{ $match: snapshotMatch }, { $group: { _id: "$priority", count: { $sum: 1 } } }]),
       ProjectMember.distinct("userId", { projectId: { $in: projectIds }, status: "ACTIVE" }).then(res => res.length),
       this._getTodayAttendanceStats(currentOrganizationId, projectIds),
+      // Daily Stats: Sử dụng filter ngày để vẽ biểu đồ
       this._getDailyTaskStats({ projectId: { $in: projectIds }, deletedAt: null }, dateMeta) 
     ]);
+
+    // 🔴 BỔ SUNG: Logic xử lý Priority Map cho Manager
+    const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
+    if (priorityStatsRaw && Array.isArray(priorityStatsRaw)) {
+        priorityStatsRaw.forEach(item => {
+            const key = item._id ? item._id.toUpperCase() : "MEDIUM";
+            if (priorityMap.hasOwnProperty(key)) {
+                priorityMap[key] = item.count;
+            } else {
+                priorityMap['MEDIUM'] += item.count;
+            }
+        });
+    }
+    const priorityChartData = Object.keys(priorityMap).map(k => ({ name: k, value: priorityMap[k] }));
 
     return {
       success: true,
@@ -264,6 +267,8 @@ class DashboardService {
       attendance: attendanceStats,
       charts: {
         taskActivity: dailyChartRaw, 
+        // 🔴 ĐÃ THÊM: Trả về priorityDistribution để frontend vẽ biểu đồ
+        priorityDistribution: priorityChartData,
         progress: { total: totalTasks, done: doneTasks, percent: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0 }
       }
     };
@@ -272,26 +277,28 @@ class DashboardService {
   async getMemberStats(userId, projectId = null, month = null, year = null) {
     const dateMeta = this._getMetaDate(month, year);
     
-    const baseMatch = { 
+    // [FIX] Tách filter: Snapshot (Tổng quan) vs Activity (Theo thời gian)
+    const snapshotMatch = { 
         assigneeId: new mongoose.Types.ObjectId(userId),
-        deletedAt: null,
-        createdAt: dateMeta.query 
+        deletedAt: null
     };
     
     if (projectId && projectId !== 'all') {
-      baseMatch.projectId = new mongoose.Types.ObjectId(projectId);
+      snapshotMatch.projectId = new mongoose.Types.ObjectId(projectId);
     } 
 
     const now = new Date();
     const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, dailyChartRaw] = await Promise.all([
-      Task.countDocuments(baseMatch),
-      Task.countDocuments({ ...baseMatch, status: "TODO" }),
-      Task.countDocuments({ ...baseMatch, status: "DOING" }),
-      Task.countDocuments({ ...baseMatch, status: "DONE" }),
-      Task.countDocuments({ ...baseMatch, dueDate: { $lt: now }, status: { $ne: "DONE" } }),
-      this._getDailyTaskStats(baseMatch, dateMeta)
+      Task.countDocuments(snapshotMatch),
+      Task.countDocuments({ ...snapshotMatch, status: "TODO" }),
+      Task.countDocuments({ ...snapshotMatch, status: "DOING" }),
+      Task.countDocuments({ ...snapshotMatch, status: "DONE" }),
+      Task.countDocuments({ ...snapshotMatch, dueDate: { $lt: now }, status: { $ne: "DONE" } }),
+      // Chart Activity vẫn dùng filter ngày
+      this._getDailyTaskStats(snapshotMatch, dateMeta)
     ]);
 
+    // Priority cho Member không được yêu cầu trong biểu đồ nhưng logic thống kê task vẫn giữ nguyên
     return { 
         success: true, 
         period: { month: dateMeta.month, year: dateMeta.year },
@@ -301,7 +308,7 @@ class DashboardService {
   }
 
   _emptyStats() {
-    return { success: true, kpi: { totalTasks: 0, doneTasks: 0 }, attendance: { present: 0, late: 0, absent: 0, total: 0 }, charts: {} };
+    return { success: true, kpi: { totalTasks: 0, doneTasks: 0 }, attendance: { present: 0, late: 0, absent: 0, total: 0 }, charts: { priorityDistribution: [], taskActivity: [] } };
   }
 }
 

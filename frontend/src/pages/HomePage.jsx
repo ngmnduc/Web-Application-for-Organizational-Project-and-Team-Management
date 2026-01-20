@@ -155,6 +155,59 @@ const AIDailyWidget = ({ onClose }) => {
   );
 };
 
+const formatActivityContent = (act) => {
+  const userName = act.userId?.name || "Unknown User";
+  
+  // 1. Content rõ ràng
+  if (act.content && act.content.length > 5 && !act.content.match(/^(created|updated|deleted)/i)) {
+      return (
+          <span>
+              <span className="font-semibold text-gray-900">{userName}</span> {act.content}
+          </span>
+      );
+  }
+
+  // 2. Map Action
+  let actionText = "performed an action";
+  switch (act.action) {
+      case "CREATE_PROJECT": actionText = "created project"; break;
+      case "UPDATE_PROJECT": actionText = "updated project settings"; break;
+      case "DELETE_PROJECT": actionText = "deleted project"; break;
+      case "ARCHIVE_PROJECT": actionText = "archived project"; break;
+      case "JOIN_PROJECT": actionText = "joined the project"; break;
+      case "LEAVE_PROJECT": actionText = "left the project"; break;
+      
+      case "CREATE_TASK": actionText = "created task"; break;
+      case "UPDATE_TASK": actionText = "updated task"; break;
+      case "DELETE_TASK": actionText = "deleted task"; break;
+      case "COMPLETE_TASK": actionText = "completed task"; break;
+      default: actionText = act.action?.toLowerCase().replace(/_/g, ' ') || "updated";
+  }
+
+  // 3. Entity Name từ Metadata
+  let entityName = "";
+  if (act.metadata?.snapshot) {
+      entityName = act.metadata.snapshot.title || act.metadata.snapshot.name || "";
+  } else if (act.metadata?.changes) {
+      const nameChange = act.metadata.changes.find(c => c.field === 'name' || c.field === 'title');
+      if (nameChange) entityName = nameChange.new;
+      
+      const statusChange = act.metadata.changes.find(c => c.field === 'status');
+      if (statusChange) actionText = `moved task to ${statusChange.new}`;
+  }
+  
+  if (!entityName && act.content) {
+      const match = act.content.match(/"([^"]+)"/);
+      if (match) entityName = match[1];
+  }
+
+  return (
+      <span>
+          <span className="font-semibold text-gray-900">{userName}</span> {actionText} 
+          {entityName && <span className="font-semibold text-indigo-600"> "{entityName}"</span>}
+      </span>
+  );
+};
 
 const HomePage = () => {
   const { selectedProjectId, selectedProjectName, switchProject } = useProject();
@@ -167,6 +220,7 @@ const HomePage = () => {
   const [dashboardLoading, setDashboardLoading] = useState(false);
 // 🔵 NEW: State để xác định User đang xem Dashboard với tư cách gì (Admin/Manager/Member)
   const [dashboardViewRole, setDashboardViewRole] = useState(null);
+  const [loadingActivities, setLoadingActivities] = useState(false);
 
   const [stats, setStats] = useState(null);
   const [activities, setActivities] = useState([]);
@@ -244,32 +298,46 @@ const HomePage = () => {
   // ----------------------------------------------------------
   // 🔵 LOAD SUMMARY + ACTIVITY MỖI KHI currentProjectId THAY ĐỔI
   // ----------------------------------------------------------
+  const fetchActivities = async () => {
+      if (!selectedProjectId || selectedProjectId === 'all') {
+          setActivities([]);
+          return;
+      }
+      try {
+        setLoadingActivities(true);
+        // Thêm timestamp để bypass 304 Cache
+        const timestamp = new Date().getTime();
+        const activityRes = await axiosInstance.get(`/projects/${selectedProjectId}/activities?_t=${timestamp}`);
+        setActivities(activityRes.data.data || []);
+      } catch (error) {
+        console.error("Error fetching activities:", error);
+      } finally {
+        setLoadingActivities(false);
+      }
+  };
+
+  useEffect(() => {
+    fetchActivities();
+  }, [selectedProjectId, user]);
+
   useEffect(() => {
     if (selectedProjectId === 'all' || !selectedProjectId) {
         setStats(null);
-        setActivities([]);
         return;
     }
-    
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [summaryRes, activityRes] = await Promise.all([
-          axiosInstance.get(`/projects/${selectedProjectId}/summary`),
-          axiosInstance.get(`/projects/${selectedProjectId}/activities`)
-        ]);
-        
+        const summaryRes = await axiosInstance.get(`/projects/${selectedProjectId}/summary`);
         setStats(summaryRes.data.data);
-        setActivities(activityRes.data.data || []);
       } catch (error) {
-        console.error("Error:", error);
+        console.error("Error fetching legacy stats:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
-  }, [selectedProjectId, user]);
+  }, [selectedProjectId,user]);
   // ----------------------------------------------------------
 
 
@@ -413,35 +481,17 @@ const HomePage = () => {
   };
 
   // 🔵 CONFIG BIỂU ĐỒ CỘT (WEEKLY ACTIVITY)
-  const getWeeklyActivityOption = () => {
-    return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
-      xAxis: { 
-        type: 'category', 
-        data: memberStats?.charts?.last7DaysActivity?.map(d => d.day) || [], 
-        axisTick: { show: false }, 
-        axisLine: { lineStyle: { color: '#e5e7eb' } },
-        axisLabel: { color: '#6b7280' } 
-      },
-      yAxis: { 
-        type: 'value',
-        minInterval: 1, 
-        splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } },
-        axisLabel: { color: '#6b7280' } 
-      },
-      series: [{ 
-        name: 'Tasks Done', 
-        type: 'bar', 
-        barWidth: '40%', 
-        data: memberStats?.charts?.last7DaysActivity?.map(d => d.value) || [], 
-        itemStyle: { color: '#f35640', borderRadius: [4, 4, 0, 0] },
-        showBackground: true,
-        backgroundStyle: { color: '#f9fafb', borderRadius: [4, 4, 0, 0] }
-      }]
-    };
-  };
-
+   const getWeeklyActivityOption = () => ({
+    tooltip: { trigger: 'axis' },
+    grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+    xAxis: { type: 'category', data: memberStats?.charts?.taskActivity?.map(d => d.name) || [] },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{ 
+        name: 'Tasks', type: 'bar', barWidth: '40%', 
+        data: memberStats?.charts?.taskActivity?.map(d => d.value) || [],
+        itemStyle: { color: '#f35640', borderRadius: [4, 4, 0, 0] }
+    }]
+  });
   // --- RENDER HELPERS: Sử dụng dashboardViewRole thay vì user.role ---
   const isAdminView = dashboardViewRole === 'Admin';
   const isManagerView = dashboardViewRole === 'Manager';
@@ -513,8 +563,8 @@ const HomePage = () => {
     ? formatTaskSummaryData(memberStats.kpi) 
     : dynamicTasksSummary;
 
-  const managerSummaryData = managerStats?.kpi
-    ? formatTaskSummaryData(managerStats.kpi)
+  const managerSummaryData = managerStats?.kpi?.taskSummary
+    ? formatTaskSummaryData(managerStats.kpi.taskSummary)
     : dynamicTasksSummary;  
 
   if (dashboardLoading) {
@@ -812,39 +862,76 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Recent Activity (Code Gốc) */}
-          <div className="bg-white rounded-xl p-6 shadow border border-gray-100 ">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Recent Activity</h2>
-              <button className="text-brand text-sm hover:underline">View all activity</button>
-            </div>
-            <div className="space-y-4">
-              {loading ? (
-                 <p className="text-gray-400 text-sm">Loading activities...</p>
-              ) : activities.length > 0 ? (
-                activities.slice(0, 5).map((act) => (
-                  <div key={act._id} className="flex items-start gap-3">
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-bold uppercase text-sm">
-                      {act.userId?.name?.charAt(0) || "U"}
+            {/* Recent Activity List - Updated UI */}
+              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                </div>
+                
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ maxHeight: '320px' }}>
+                  {loadingActivities ? (
+                     // Loading Skeleton
+                     <div className="flex flex-col gap-4">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="animate-pulse flex gap-3">
+                                <div className="w-9 h-9 rounded-full bg-gray-100"></div>
+                                <div className="flex-1 space-y-2 py-1">
+                                    <div className="h-2.5 bg-gray-100 rounded w-3/4"></div>
+                                    <div className="h-2 bg-gray-100 rounded w-1/4"></div>
+                                </div>
+                            </div>
+                        ))}
+                     </div>
+                  ) : activities.length > 0 ? (
+                    activities.slice(0, 15).map((act) => (
+                      <div key={act._id} className="flex gap-3 group items-start transition-colors hover:bg-gray-50/50 p-1.5 rounded-lg -mx-1.5">
+                        {/* Avatar User */}
+                        <div className="flex-shrink-0 mt-0.5">
+                            {act.userId?.avatar ? (
+                                <img 
+                                    src={act.userId.avatar} 
+                                    alt={act.userId.name} 
+                                    className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" 
+                                />
+                            ) : (
+                                <div 
+                                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border shadow-sm"
+                                    style={{ 
+                                        backgroundColor: 'var(--color-bg-subtle, #eff6ff)', 
+                                        color: 'var(--color-brand, #3b82f6)',
+                                        borderColor: 'var(--color-border-subtle, #dbeafe)'
+                                    }}
+                                >
+                                    {act.userId?.name?.charAt(0).toUpperCase() || "U"}
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Nội dung Activity */}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-600 leading-snug break-words">
+                                {formatActivityContent(act)}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                                <ClockSolid className="w-3 h-3 text-gray-300" />
+                                {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                            </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    // Empty State
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                        <div className="p-3 bg-gray-50 rounded-full mb-3">
+                            <TotalSolid className="w-8 h-8 text-gray-300" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{act.userId?.name || "Unknown"}</span> 
-                        {' '}{act.content || act.action || "updated a task"} 
-                        {act.taskName && <strong> "{act.taskName}"</strong>}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {act.createdAt ? formatDistanceToNow(new Date(act.createdAt), { addSuffix: true }) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-sm">No recent activities found.</p>
-              )}
-            </div>
-          </div>
-          </div>
+                  )}
+                </div>
+              </div>
+           </div>
+          
 
         </section>
       )}
@@ -937,7 +1024,7 @@ const HomePage = () => {
                 </div>
                 
                     <div className="flex-1">
-                      <ReactECharts option={getWeeklyActivityOption()} style={{ height: '100%', width: '100%' }} />
+                      <ReactECharts option={getWeeklyActivityOption()} style={{ height: 250, width: '100%' }} />
                     </div>
                 
             </div>
