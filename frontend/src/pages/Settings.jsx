@@ -14,8 +14,7 @@ import {
     refreshProfile 
 } from '../services/authService';
 
-const PRIMARY_COLOR = 'var(--color-brand)'; 
-const API_BASE_URL = 'http://localhost:4000/api';
+import { API_BASE_URL } from '../utils/constants';
 
 const getHeaders = () => {
     const token = localStorage.getItem('token');
@@ -432,7 +431,15 @@ const Preferences = () => {
 };
 
 const TabButton = ({ label, activeTab, onClick }) => (
-    <button className={`px-4 py-2 font-medium text-sm transition-colors relative ${activeTab === label ? 'text-gray-900 border-b-2 font-semibold' : 'text-gray-500'}`} style={activeTab === label ? { borderColor: PRIMARY_COLOR } : { borderColor: 'transparent' }} onClick={() => onClick(label)}>{label}</button>
+    <button
+        className={`px-4 py-2 font-medium text-sm transition-colors relative ${
+            activeTab === label ? 'text-gray-900 border-b-2 font-semibold' : 'text-gray-500 hover:text-gray-700'
+        }`}
+        style={activeTab === label ? { borderColor: 'var(--color-brand)' } : { borderColor: 'transparent' }}
+        onClick={() => onClick(label)}
+    >
+        {label}
+    </button>
 );
 
 const Settings = () => {
