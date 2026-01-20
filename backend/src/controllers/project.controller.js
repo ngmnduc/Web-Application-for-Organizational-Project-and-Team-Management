@@ -6,11 +6,26 @@ import User from "../models/user.model.js";
 import { signToken } from "../utils/jwt.js"; 
 import ProjectMember from "../models/projectMember.model.js";
 import Project from "../models/project.model.js";
+
 // POST /projects
 export const createProject = async (req, res) => {
   try {
+    // Log request body và headers
+    console.log('[CONTROLLER] req.body:', JSON.stringify(req.body, null, 2));
+    console.log('[CONTROLLER] req.headers:', {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? 'EXISTS' : 'MISSING'
+    });
+
     const validation = projectValidator.validateCreateProject(req.body);
+
+    console.log('[CONTROLLER] Validation result:', {
+      isValid: validation.isValid,
+      errors: validation.errors
+    });
+
     if (!validation.isValid) {
+      console.log('[CONTROLLER] Validation FAILED, returning 400');
       return res.status(400).json({ 
         success: false, 
         error: "ValidationError",
@@ -21,7 +36,14 @@ export const createProject = async (req, res) => {
     const currentOrgId = req.user.currentOrganizationId;
     const userId = req.user._id;
 
+    console.log('[CONTROLLER] User context:', {
+      userId,
+      currentOrgId,
+      userRole: req.user.role
+    });
+
     if (!currentOrgId) {
+      console.log('[CONTROLLER] No organization context');
       return res.status(400).json({ 
         success: false, 
         message: "Organization context missing" 
@@ -34,6 +56,7 @@ export const createProject = async (req, res) => {
       currentOrgId
     );
 
+    console.log('[CONTROLLER] Project created successfully:', project._id);
     res.status(201).json({ 
       success: true, 
       message: "Project created successfully", 
@@ -41,6 +64,7 @@ export const createProject = async (req, res) => {
     });
 
   } catch (err) {
+    console.error('[CONTROLLER] Error:', err.message);
     if (err.message === 'ORGANIZATION_REQUIRED') {
       return res.status(400).json({ success: false, error: "ValidationError", message: "Organization is required" });
     }
@@ -306,7 +330,9 @@ export const getProjectActivities = async (req, res) => {
 export const getPendingRequests = async (req, res) => {
   try {
     const currentOrgId = req.user.currentOrganizationId;
-    
+    const userId = req.user._id;
+    const userRole = req.user.role; // System Role (Admin/Manager/Member)
+
     if (!currentOrgId) {
       return res.status(400).json({ 
         success: false, 
@@ -314,9 +340,48 @@ export const getPendingRequests = async (req, res) => {
       });
     }
 
-    const pendingList = await projectService.getPendingRequests(currentOrgId);
+    let query = {
+        organizationId: currentOrgId,
+        status: 'PENDING'
+    };
 
-    res.json({ success: true, data: pendingList });
+    // 👇 LOGIC PHÂN QUYỀN MỚI:
+    // Nếu KHÔNG PHẢI "Admin hệ thống", thì phải lọc theo Project mà người này làm Sếp
+    if (userRole !== 'Admin') {
+        // Tìm danh sách ID các Project mà user này đang là "Admin" hoặc "Manager"
+        const managedProjectIds = await ProjectMember.find({
+            userId: userId,
+            organizationId: currentOrgId,
+            roleInProject: { $in: ['Admin', 'Manager'] }, // Chỉ lấy quyền quản lý
+            status: 'ACTIVE'
+        }).distinct('projectId');
+
+        // Nếu không quản lý dự án nào -> Trả về rỗng luôn (Member thường sẽ rơi vào đây)
+        if (managedProjectIds.length === 0) {
+             return res.json({ success: true, data: [] });
+        }
+
+        // Nếu có quản lý, chỉ lấy request của các dự án đó
+        query.projectId = { $in: managedProjectIds };
+    }
+
+    const pendingMembers = await ProjectMember.find(query)
+    .populate('userId', 'name email avatar')
+    .populate('projectId', 'name')
+    .sort({ createdAt: -1 });
+
+    const formattedRequests = pendingMembers.map(m => ({
+        requestId: m._id,
+        projectId: m.projectId?._id,
+        projectName: m.projectId?.name || "Unknown",
+        userId: m.userId?._id,
+        userName: m.userId?.name || "Unknown",
+        userEmail: m.userId?.email,
+        userAvatar: m.userId?.avatar,
+        requestedAt: m.createdAt
+    })).filter(req => req.projectId && req.userId);
+
+    res.json({ success: true, data: formattedRequests });
   } catch (err) {
     res.status(500).json({ 
       success: false, 
@@ -404,6 +469,31 @@ export const joinProjectByCode = async (req, res) => {
       currentOrganizationId
     );
 
+    // 👇 THÊM: Gửi thông báo JOIN_REQUEST cho Admin/Manager của dự án
+    try {
+        const project = await Project.findById(projectId).select('name');
+        const joiner = await User.findById(userId).select('name');
+        
+        // Tìm các sếp trong dự án
+        const managers = await ProjectMember.find({
+            projectId: projectId,
+            roleInProject: { $in: ['Admin', 'Manager'] },
+            status: 'ACTIVE'
+        });
+
+        for (const mgr of managers) {
+            // Không báo cho chính mình (nếu mình là sếp)
+            if (String(mgr.userId) === String(userId)) continue;
+
+            await createNotification({
+                userId: mgr.userId,
+                type: 'JOIN_REQUEST', // Loại thông báo mới (cần update frontend để hứng icon)
+                content: `${joiner.name} requested to join "${project.name}"`,
+                metadata: { projectId, requestId: userId } // requestId tạm dùng userId
+            });
+        }
+    } catch (notiErr) { console.error("Noti Error:", notiErr); }
+
     const updatedUser = await User.findById(userId);
 
     const newToken = signToken({
@@ -417,8 +507,8 @@ export const joinProjectByCode = async (req, res) => {
       success: true, 
       message: "Successfully joined project", 
       projectId,
-      data: {
-        token: newToken,
+      data: { 
+        token: newToken, 
         user: {
           id: updatedUser._id,
           name: updatedUser.name,
@@ -477,10 +567,28 @@ export const addMember = async (req, res) => {
         });
     }
 
+    // 👇 THÊM: Gửi thông báo cho CẢ NHÓM (NEW_MEMBER)
+    try {
+        const newUser = await User.findById(targetUserId).select('name');
+        const activeMembers = await ProjectMember.find({ projectId: id, status: 'ACTIVE' });
+        
+        for (const m of activeMembers) {
+            // Trừ người vừa add và người thực hiện add
+            if (String(m.userId) === String(targetUserId) || String(m.userId) === String(req.user._id)) continue;
+            
+            await createNotification({
+                userId: m.userId,
+                type: 'NEW_MEMBER',
+                content: `${newUser.name} has been added to project "${project.name}"`,
+                metadata: { projectId: project._id, newMemberId: targetUserId }
+            });
+        }
+    } catch (e) { console.error(e); }
+
     res.status(200).json({ 
-      success: true, 
-      message: "Member added successfully", 
-      data: project 
+        success: true, 
+        message: "Member added successfully", 
+        data: project 
     });
 
   } catch (err) {
