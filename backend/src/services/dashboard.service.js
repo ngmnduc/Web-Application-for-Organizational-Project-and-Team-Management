@@ -288,22 +288,53 @@ class DashboardService {
     } 
 
     const now = new Date();
-    const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, dailyChartRaw] = await Promise.all([
+    const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, dailyChartRaw, priorityStatsRaw] = await Promise.all([
       Task.countDocuments(snapshotMatch),
       Task.countDocuments({ ...snapshotMatch, status: "TODO" }),
       Task.countDocuments({ ...snapshotMatch, status: "DOING" }),
       Task.countDocuments({ ...snapshotMatch, status: "DONE" }),
       Task.countDocuments({ ...snapshotMatch, dueDate: { $lt: now }, status: { $ne: "DONE" } }),
       // Chart Activity vẫn dùng filter ngày
-      this._getDailyTaskStats(snapshotMatch, dateMeta)
+      this._getDailyTaskStats(snapshotMatch, dateMeta),
+      Task.aggregate([
+        { $match: snapshotMatch },
+        { $group: { _id: "$priority", count: { $sum: 1 } } }
+      ])
     ]);
+
+    // 1. Khởi tạo map mặc định
+    const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
+
+    // 2. Cập nhật map từ kết quả query
+    if (priorityStatsRaw && Array.isArray(priorityStatsRaw)) {
+        priorityStatsRaw.forEach(item => {
+            if (item._id) {
+                const key = item._id.toUpperCase();
+                if (priorityMap.hasOwnProperty(key)) {
+                    priorityMap[key] = item.count;
+                } else {
+                    // Nếu có priority lạ, gộp vào MEDIUM (hoặc xử lý tùy ý)
+                    priorityMap['MEDIUM'] += item.count;
+                }
+            } else {
+                 // Nếu priority null/undefined
+                 priorityMap['MEDIUM'] += item.count;
+            }
+        });
+    }
+
+    // 3. Chuyển đổi sang format biểu đồ
+    const priorityChartData = Object.keys(priorityMap).map(k => ({ 
+        name: k.charAt(0) + k.slice(1).toLowerCase(), // "High", "Medium"...
+        value: priorityMap[k] 
+        }));
 
     // Priority cho Member không được yêu cầu trong biểu đồ nhưng logic thống kê task vẫn giữ nguyên
     return { 
         success: true, 
         period: { month: dateMeta.month, year: dateMeta.year },
         kpi: { totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks },
-        charts: { taskActivity: dailyChartRaw }
+        charts: { taskActivity: dailyChartRaw, priorityDistribution: priorityChartData }
     };
   }
 

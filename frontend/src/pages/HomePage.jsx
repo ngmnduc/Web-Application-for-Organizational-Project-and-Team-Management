@@ -456,6 +456,18 @@ const HomePage = () => {
     }]
   });
 
+  const getMemberBarOption = () => ({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'value', minInterval: 1, boundaryGap: [0, 0.01] },
+    yAxis: { type: 'category', data: memberStats?.charts?.priorityDistribution?.map(i => i.name) || [] },
+    series: [{
+        name: 'Tasks', type: 'bar',
+        data: memberStats?.charts?.priorityDistribution?.map(i => i.value) || [],
+        itemStyle: { color: '#f35640', borderRadius: [0, 4, 4, 0] }
+    }]
+  });
+
   // 🔵 MEMBER PIE CHART OPTION (Dùng dữ liệu memberStats)
   const getMemberPieOption = () => {
     if (!memberStats || !memberStats.kpi) return {
@@ -1000,19 +1012,9 @@ const HomePage = () => {
             </div>
 
             {/* 🔵 MODIFIED: TASK PRIORITY (USER DATA) */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100">
-              <h2 className="text-lg font-semibold mb-4">Task Priority</h2>
-              {!memberStats ? (
-                 <div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>
-              ) : (memberStats.priority) ? (
-                 <div className="space-y-6 pt-2">
-                    <Priority label="High" count={memberStats.priority.high || 0} total={memberStats.kpi?.totalTasks} color="bg-red-500" />
-                    <Priority label="Medium" count={memberStats.priority.medium || 0} total={memberStats.kpi?.totalTasks} color="bg-orange-500" />
-                    <Priority label="Low" count={memberStats.priority.low || 0} total={memberStats.kpi?.totalTasks} color="bg-green-500" />
-                 </div>
-              ) : (
-                <div className="text-center text-gray-500 py-10">No priority data</div>
-              )}
+            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col">
+              <h2 className="text-lg font-semibold mb-4">Task Priority Distribution</h2>             
+                <ReactECharts option={getMemberBarOption()} style={{ height: 250 }} />          
             </div>
           </div>
 
