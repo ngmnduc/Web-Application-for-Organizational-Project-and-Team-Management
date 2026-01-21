@@ -20,9 +20,6 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth(); // Lấy user từ Context
 
-  // 🔴 UPDATE: Cập nhật màu chủ đạo theo yêu cầu mới
-  // Admin: Màu riêng (#3b064d)
-  // Member & Manager: Màu giống nhau (#f35640)
   useEffect(() => {
     const root = document.documentElement;
     if (user?.role === 'Admin') {

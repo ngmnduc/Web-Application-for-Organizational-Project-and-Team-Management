@@ -1,6 +1,5 @@
 import axiosInstance from '../services/api';
 
-// 🔴 Helper: Xây dựng query string chuẩn, bao gồm cả timestamp để tránh 304
 const buildQuery = (projectId, month, year) => {
   const params = new URLSearchParams();
   
@@ -14,7 +13,7 @@ const buildQuery = (projectId, month, year) => {
     params.append('year', year);
   }
   
-  // 🔴 QUAN TRỌNG: Thêm timestamp để ép trình duyệt tải dữ liệu mới
+  // Thêm timestamp để ép trình duyệt tải dữ liệu mới
   params.append('_t', new Date().getTime());
   
   return `?${params.toString()}`;

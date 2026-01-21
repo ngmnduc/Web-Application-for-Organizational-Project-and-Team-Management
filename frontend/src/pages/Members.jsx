@@ -11,16 +11,16 @@ import { LoaderOverlay } from '../components/LoaderOverlay';
 import AddMemberModal from '../components/AddMemberModal';
 import AssignToProjectModal from '../components/AssignToProjectModal';
 import { useProject } from '../context/ProjectContext';
-import { getProjects } from '../services/projectService'; // ⚠️ THÊM IMPORT NÀY
+import { getProjects } from '../services/projectService';
 import { API_BASE_URL } from '../utils/constants';
 
-// --- Helper Functions ---
+// Helper Functions
 const getHeaders = () => ({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('accessToken')}`
 });
 
-// --- SUB-COMPONENTS ---
+// SUB-COMPONENTS 
 
 // Notification Banner
 const NotificationBanner = ({ message, type, onClose }) => {
@@ -91,7 +91,7 @@ const SelectProjectModal = ({ isOpen, onClose, user, onSelectProject }) => {
     );
 };
 
-// --- INVITE MODAL (ĐÃ FIX: BỎ ALERT CONFIRM) ---
+//INVITE MODAL 
 const InviteModal = ({ isOpen, onClose, projectId, showNotification }) => {
     const [inviteCode, setInviteCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -207,7 +207,7 @@ const RoleSelect = ({ currentRole, userId, onChange, canEdit, currentUserId }) =
     
     const displayRole = currentRole ? currentRole.charAt(0).toUpperCase() + currentRole.slice(1).toLowerCase() : 'Member';
     const currentStyle = getRoleStyle(displayRole);
-    // --- Kiểm tra xem có phải chính mình không ---
+    // Kiểm tra xem có phải chính mình không 
     const isSelf = currentUserId && String(userId) === String(currentUserId);
 
     if (!canEdit || isSelf) {
@@ -264,7 +264,7 @@ const UserInfoModal = ({ isOpen, onClose, user }) => {
     );
 };
 
-// --- MAIN COMPONENT ---
+// MAIN COMPONENT 
 const Members = () => { 
     const { user } = useAuth();
     const { selectedProjectId, switchProject, project} = useProject(); 
@@ -286,23 +286,23 @@ const Members = () => {
     const [removeProjectConfirm, setRemoveProjectConfirm] = useState(null); 
     const [selectProjectModal, setSelectProjectModal] = useState(null); 
 
-    // ✅ FIX: Ưu tiên System Admin trước khi check Project Role
+    // Ưu tiên System Admin trước khi check Project Role
     const isSystemAdmin = user?.role === 'Admin';
     const projectRole = project?.currentUserRole || 'Member';
     const isAdminView = selectedProjectId === 'all';
     
-    // ✅ FIX: Nếu là System Admin -> Luôn có quyền Admin trong Project
+    // Nếu là System Admin -> Luôn có quyền Admin trong Project
     const effectiveProjectRole = isSystemAdmin ? 'Admin' : projectRole;
     
     const isProjectAdmin = effectiveProjectRole === 'Admin';
     const isProjectManager = effectiveProjectRole === 'Manager';
     
-    // ✅ FIX: Logic check quyền đã chính xác
+    // Logic check quyền đã chính xác
     const canManageInAdminView = isSystemAdmin && isAdminView;
     const canManageInProjectView = !isAdminView && (isProjectAdmin || isProjectManager);
     const canManage = canManageInAdminView || canManageInProjectView;
     
-    // ✅ FIX: Quyền invite - System Admin luôn có quyền
+    // Quyền invite - System Admin luôn có quyền
     const canInvite = !isAdminView && (isSystemAdmin || isProjectAdmin || isProjectManager);
     
     const showNotification = (message, type = 'success') => {
@@ -311,9 +311,9 @@ const Members = () => {
     };
     const currentUserId = user?._id || user?.id;
 
-    // 1. Fetch Projects for Filte
+    // Fetch Projects for Filte
 
-    // 2. Fetch Members
+    // Fetch Members
 const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -342,18 +342,18 @@ const fetchData = useCallback(async () => {
                 membershipId: m._id 
             }));
 
-            // ✅ FIX: Ưu tiên System Role nếu là Admin
+            // Ưu tiên System Role nếu là Admin
             const meInProject = mapped.find(m => String(m.id) === String(myId));
             let myRoleInProject = meInProject ? meInProject.role : null;
             
-            // ✅ QUAN TRỌNG: Nếu System Admin -> Override thành Admin
+            // Nếu System Admin -> Override thành Admin
             if (mySystemRole === 'Admin') {
                 myRoleInProject = 'Admin';
             }
             
             setMyProjectRole(myRoleInProject);
 
-            // 2. Lọc bỏ Admin hệ thống ra khỏi danh sách hiển thị (để đỡ rối)
+            // Lọc bỏ Admin hệ thống ra khỏi danh sách hiển thị 
             const visibleMembers = mapped.filter(m => m.systemRole !== 'Admin');
             setMembers(visibleMembers);
         }
@@ -364,7 +364,7 @@ const fetchData = useCallback(async () => {
             const usersData = await usersRes.json();
 
             const mapped = (usersData.data || []).map(u => {
-                // [LOGIC MỚI] Ép hiển thị: Nếu không phải Admin thì coi là Member hết
+                // Ép hiển thị: Nếu không phải Admin thì coi là Member hết
                 let displaySystemRole = u.role;
                 if (u.role !== 'Admin') displaySystemRole = 'Member';
 
@@ -395,7 +395,7 @@ const handleChangeRole = async (userId, newRole) => {
         let url;
         let method = 'PUT';
         
-        // FIX: Phân biệt đang sửa role Hệ thống hay role Dự án
+        // Phân biệt đang sửa role Hệ thống hay role Dự án
         if (selectedProjectId !== 'all') {
             // Đang ở Project View -> Gọi API sửa role dự án
             const pId = selectedProjectId;
@@ -436,7 +436,7 @@ const handleChangeRole = async (userId, newRole) => {
     }
 };
 
-    // --- FIX: REMOVE MEMBER (Tìm đúng ID để xóa) ---
+    // REMOVE MEMBER (Tìm đúng ID để xóa)
     const handleRemoveClick = (member) => {
         if (selectedProjectId !== 'all') {
             // Đã có MembershipID -> Dùng luôn
@@ -463,7 +463,7 @@ const handleChangeRole = async (userId, newRole) => {
         }
     };
 
-      // --- Xoa Member khoi project (Tìm Membership ID) ---
+      //  Xoa Member khoi project (Tìm Membership ID) 
     const executeRemoveMember = async () => {
         if (!removeProjectConfirm) return;
         const { user, targetProjectId, membershipId } = removeProjectConfirm;
@@ -496,7 +496,7 @@ const handleChangeRole = async (userId, newRole) => {
         }
     };
 
-    // --- DELETE SYSTEM USER ---
+    // DELETE SYSTEM USER 
     const handleDeleteUser = async () => {
         if (!deleteUserModal) return;
         try {

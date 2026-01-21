@@ -19,12 +19,10 @@ import PricingPage from "./pages/PricingPage.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import PendingPage from "./pages/PendingPage.jsx";
 
-// sau này thêm Dashboard, NotFound,...
-
 function App() {
   return (
     <>
-      {/* ---  ĐẶT TOAST CONTAINER Ở ĐÂY (NÓ SẼ NẰM ĐÈ LÊN MỌI TRANG) --- */}
+      {/* TOAST CONTAINER (NÓ SẼ NẰM ĐÈ LÊN MỌI TRANG) */}
       <ToastContainer 
         position="top-right"
         autoClose={3000}

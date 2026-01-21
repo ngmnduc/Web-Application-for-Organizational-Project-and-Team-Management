@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; 
 import { ArrowLeft, Check, Crown, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
-// import axiosInstance from '../utils/axios'; // Nhớ import axiosInstance hoặc dùng fetch
 
 import logoIcon from '../assets/images/logo.png'; 
 import logoText from '../assets/images/syncora-official.png'; 
@@ -22,7 +21,7 @@ export default function PricingPage() {
   const [paymentError, setPaymentError] = useState(''); 
   const [isProcessing, setIsProcessing] = useState(false); // Loading state chung
 
-  // --- 1. XỬ LÝ CHỌN GÓI FREE ---
+  //  XỬ LÝ CHỌN GÓI FREE 
   const handleFreePlan = async (e) => {
       e.stopPropagation(); // Chặn sự kiện nổi bọt từ div cha
       setPaymentError('');
@@ -71,14 +70,14 @@ export default function PricingPage() {
       }
   };
 
-  // --- 2. XỬ LÝ CHỌN GÓI PREMIUM (ADMIN) ---
+  //   XỬ LÝ CHỌN GÓI PREMIUM (ADMIN) 
   const handleAdminUpgrade = async (e) => {
     e.stopPropagation(); // Chặn sự kiện nổi bọt
     setPaymentError('');
     
     const token = localStorage.getItem('token');
     
-    // CASE 1: Chưa đăng nhập -> Sang Signup với gói PREMIUM (Flow mày cần)
+    // CASE 1: Chưa đăng nhập -> Sang Signup với gói PREMIUM 
     if (!token) {
         // Param này sẽ được trang Signup bắt lấy để redirect sang Stripe sau khi đký
         navigate('/signup', { state: { plan: 'PREMIUM' } });
@@ -94,7 +93,7 @@ export default function PricingPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        // [FIX] Phải gửi body plan lên backend
+        //  Phải gửi body plan lên backend
         body: JSON.stringify({ 
             plan: 'PREMIUM' 
         })
@@ -114,7 +113,7 @@ export default function PricingPage() {
     }
   };
 
-  // --- 3. JOIN PROJECT ---
+  // JOIN PROJECT 
   const handleJoinProject = async () => {
       setJoinError('');
       if (!joinLink.trim()) {
@@ -129,13 +128,13 @@ export default function PricingPage() {
 
       const token = localStorage.getItem('token');
       
-      // 1. Chưa login -> Chuyển sang SIGN UP (Kèm mã invite để xử lý sau)
+      // Chưa login -> Chuyển sang SIGN UP (Kèm mã invite để xử lý sau)
       if (!token) {
           navigate('/signup', { state: { action: 'join', code: inviteCode } });
           return;
       }
 
-      // 2. Đã login -> Gọi API Join trực tiếp
+      // Đã login -> Gọi API Join trực tiếp
       setIsJoining(true);
       try {
           const res = await fetch(`${API_BASE_URL}/projects/join`, {
@@ -154,17 +153,13 @@ export default function PricingPage() {
                   localStorage.setItem('token', data.data.token);
                   if (data.data.user) {
                       localStorage.setItem('user', JSON.stringify(data.data.user));
-                  }
-                  
-                  // 🟢 [LOGIC MỚI] Check trạng thái Pending
+                  }               
+                  // Check trạng thái Pending
                   // Nếu API trả về status là PENDING hoặc user chưa có organization nào -> Pending Page
-                  // Giả sử API trả về data.data.membershipStatus hoặc ta check user.organizations
+                  // Giả sử API trả về data.data.membershipStatus hoặc check user.organizations
                   const user = data.data.user || JSON.parse(localStorage.getItem('user'));
-                  
                   // Nếu user join vào một project mới và đang chờ duyệt
-                  // (Thường API join sẽ trả về thông tin membership, ở đây ta giả định logic)
-                  
-                  // Logic an toàn: Nếu Join thành công, ta chuyển hướng đến trang Pending để user biết trạng thái
+                  // Nếu Join thành công, ta chuyển hướng đến trang Pending để user biết trạng thái
                   // Nếu là Auto-Join (public project) thì về Home, nhưng thường invite code là private -> Pending
                   navigate('/pending'); 
                   return;
@@ -184,7 +179,7 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
-       {/* Background Effects... */}
+       {/* Background Effects */}
        <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 -right-40 w-80 h-80 bg-orange-500 rounded-full opacity-20 blur-3xl"></div>
         <div className="absolute bottom-40 -left-40 w-96 h-96 bg-orange-600 rounded-full opacity-10 blur-3xl"></div>
@@ -295,7 +290,7 @@ export default function PricingPage() {
              </div>
           </div>
 
-          {/* Footer... */}
+          {/* Footer */}
           <div className="text-center pb-8">
             <p className="text-gray-400 mb-4">All plans include 14-day money-back guarantee</p>
             <div className="flex items-center justify-center gap-8 text-sm text-gray-500">

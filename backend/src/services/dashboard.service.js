@@ -116,7 +116,7 @@ class DashboardService {
 
     const activityMatch = { organizationId: currentOrganizationId };
 
-    // [FIX] Tách filter cho Task: Không áp dụng filter ngày tạo cho tổng quan (Snapshot)
+    // Tách filter cho Task: Không áp dụng filter ngày tạo cho tổng quan (Snapshot)
     // Chỉ áp dụng filter project/org
     const taskSnapshotMatch = { 
       "project.organizationId": orgIdObj, 
@@ -239,7 +239,7 @@ class DashboardService {
 
     const dateMeta = this._getMetaDate(month, year);
     
-    // [FIX] Snapshot Match: Không lọc theo ngày tạo để đếm đúng tổng số Task hiện có
+    // Không lọc theo ngày tạo để đếm đúng tổng số Task hiện có
     const snapshotMatch = { 
         projectId: { $in: projectIds }, 
         deletedAt: null
@@ -264,7 +264,7 @@ class DashboardService {
       this._getRecentActivities(activityMatch) 
     ]);
 
-    // 🔴 BỔ SUNG: Logic xử lý Priority Map cho Manager
+    // Logic xử lý Priority Map cho Manager
     const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
     if (priorityStatsRaw && Array.isArray(priorityStatsRaw)) {
         priorityStatsRaw.forEach(item => {
@@ -291,7 +291,7 @@ class DashboardService {
       activities: recentActivities,
       charts: {
         taskActivity: dailyChartRaw, 
-        // 🔴 ĐÃ THÊM: Trả về priorityDistribution để frontend vẽ biểu đồ
+        //Trả về priorityDistribution để frontend vẽ biểu đồ
         priorityDistribution: priorityChartData,
         progress: { total: totalTasks, done: doneTasks, percent: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0 }
       }
@@ -301,7 +301,7 @@ class DashboardService {
   async getMemberStats(userId, projectId = null, month = null, year = null) {
     const dateMeta = this._getMetaDate(month, year);
     
-    // [FIX] Tách filter: Snapshot (Tổng quan) vs Activity (Theo thời gian)
+    // Tách filter: Snapshot (Tổng quan) vs Activity (Theo thời gian)
     const snapshotMatch = { 
         assigneeId: new mongoose.Types.ObjectId(userId),
         deletedAt: null
@@ -335,10 +335,10 @@ class DashboardService {
       this._getRecentActivities(activityMatch)
     ]);
 
-    // 1. Khởi tạo map mặc định
+    // Khởi tạo map mặc định
     const priorityMap = { "HIGH": 0, "MEDIUM": 0, "LOW": 0, "CRITICAL": 0 };
 
-    // 2. Cập nhật map từ kết quả query
+    // Cập nhật map từ kết quả query
     if (priorityStatsRaw && Array.isArray(priorityStatsRaw)) {
         priorityStatsRaw.forEach(item => {
             if (item._id) {

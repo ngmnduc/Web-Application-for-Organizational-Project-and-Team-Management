@@ -17,8 +17,7 @@ import {
 } from "../controllers/task.controller.js";
 import { getLabels } from "../controllers/label.controller.js";
 import { verifyToken, requireOrgAccess } from "../middlewares/auth.js";
-import { verifyProjectAccess, requireProjectMember, requireProjectManager } from "../middlewares/project.auth.js";
-import { checkProjectActive } from "../middlewares/archive.middleware.js";
+import {requireProjectMember, requireProjectManager } from "../middlewares/project.auth.js";
 
 const router = express.Router();
 

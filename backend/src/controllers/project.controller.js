@@ -345,7 +345,6 @@ export const getPendingRequests = async (req, res) => {
         status: 'PENDING'
     };
 
-    // 👇 LOGIC PHÂN QUYỀN MỚI:
     // Nếu KHÔNG PHẢI "Admin hệ thống", thì phải lọc theo Project mà người này làm Sếp
     if (userRole !== 'Admin') {
         // Tìm danh sách ID các Project mà user này đang là "Admin" hoặc "Manager"
@@ -356,7 +355,7 @@ export const getPendingRequests = async (req, res) => {
             status: 'ACTIVE'
         }).distinct('projectId');
 
-        // Nếu không quản lý dự án nào -> Trả về rỗng luôn (Member thường sẽ rơi vào đây)
+        // Nếu không quản lý dự án nào -> Trả về rỗng 
         if (managedProjectIds.length === 0) {
              return res.json({ success: true, data: [] });
         }
@@ -469,7 +468,7 @@ export const joinProjectByCode = async (req, res) => {
       currentOrganizationId
     );
 
-    // 👇 THÊM: Gửi thông báo JOIN_REQUEST cho Admin/Manager của dự án
+    // Gửi thông báo JOIN_REQUEST cho Admin/Manager của dự án
     try {
         const project = await Project.findById(projectId).select('name');
         const joiner = await User.findById(userId).select('name');
@@ -487,7 +486,7 @@ export const joinProjectByCode = async (req, res) => {
 
             await createNotification({
                 userId: mgr.userId,
-                type: 'JOIN_REQUEST', // Loại thông báo mới (cần update frontend để hứng icon)
+                type: 'JOIN_REQUEST', // Loại thông báo mới 
                 content: `${joiner.name} requested to join "${project.name}"`,
                 metadata: { projectId, requestId: userId } // requestId tạm dùng userId
             });
@@ -567,7 +566,7 @@ export const addMember = async (req, res) => {
         });
     }
 
-    // 👇 THÊM: Gửi thông báo cho CẢ NHÓM (NEW_MEMBER)
+    // Gửi thông báo cho CẢ NHÓM (NEW_MEMBER)
     try {
         const newUser = await User.findById(targetUserId).select('name');
         const activeMembers = await ProjectMember.find({ projectId: id, status: 'ACTIVE' });

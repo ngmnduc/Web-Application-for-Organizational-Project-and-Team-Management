@@ -23,9 +23,9 @@ const io = new Server(httpServer,{
 
 setupSocket(io); 
 initSocket(io);
-// 5. QUAN TRỌNG: Logic kết nối & Join Room cho Notification
+// Logic kết nối & Join Room cho Notification
 io.on("connection", (socket) => {
-  // Lấy userId từ query parameters (Frontend gửi lên: query: { userId: ... })
+  // Lấy userId từ query parameters 
   const userId = socket.handshake.query.userId;
 
   if (userId) {

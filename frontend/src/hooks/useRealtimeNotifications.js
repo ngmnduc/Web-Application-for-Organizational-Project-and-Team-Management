@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
-import { useAuth } from '../services/AuthContext'; // Giả sử bạn có AuthContext để lấy user
+import { useAuth } from '../services/AuthContext'; 
 import { API_BASE_URL } from '../utils/constants';
 
 // URL Backend (Đảm bảo đúng port server đang chạy, ví dụ 4000)
@@ -18,7 +18,7 @@ export const useRealtimeNotifications = () => {
     // Helper: Lấy token
     const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken');
 
-    // --- 1. Initial Load: Lấy danh sách cũ từ API (Giữ nguyên logic cũ) ---
+    // Initial Load: Lấy danh sách cũ từ API 
     const fetchNotifications = useCallback(async () => {
         try {
             const token = getToken();
@@ -52,7 +52,7 @@ export const useRealtimeNotifications = () => {
         }
     }, [user]);
 
-    // --- 2. Socket: Lắng nghe sự kiện Realtime (Thay thế Polling) ---
+    // Socket: Lắng nghe sự kiện Realtime (Thay thế Polling) 
     useEffect(() => {
         if (!user) return;
 
@@ -72,15 +72,10 @@ export const useRealtimeNotifications = () => {
         socketRef.current.on("NEW_NOTIFICATION", (newNotification) => {
             console.log("🔔 New Realtime Notification:", newNotification);
 
-            // 1. Thêm thông báo mới vào đầu danh sách
+            // Thêm thông báo mới vào đầu danh sách
             setNotifications((prev) => [newNotification, ...prev]);
-
-            // 2. Tăng số lượng chưa đọc
+            // Tăng số lượng chưa đọc
             setUnreadCount((prev) => prev + 1);
-
-            // (Tuỳ chọn) Có thể thêm âm thanh hoặc Toast tại đây
-            // const audio = new Audio('/notification-sound.mp3');
-            // audio.play();
         });
 
         // Cleanup: Ngắt kết nối khi unmount để tránh memory leak và duplicate event
@@ -92,9 +87,9 @@ export const useRealtimeNotifications = () => {
         };
     }, [user, fetchNotifications]);
 
-    // --- 3. Hành động: Đánh dấu đã đọc ---
+    // Hành động: Đánh dấu đã đọc 
     const markAsRead = async (notificationId) => {
-        // Optimistic UI: Cập nhật giao diện ngay lập tức
+        // Cập nhật giao diện ngay lập tức
         let isWasUnread = false;
         
         setNotifications(prev => prev.map(n => {
@@ -122,11 +117,10 @@ export const useRealtimeNotifications = () => {
             });
         } catch (error) {
             console.error("Mark read failed", error);
-            // Có thể rollback state nếu cần thiết
         }
     };
 
-    // --- 4. Hành động: Đánh dấu tất cả đã đọc ---
+    // Hành động: Đánh dấu tất cả đã đọc 
     const markAllAsRead = async () => {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         setUnreadCount(0);
@@ -134,7 +128,7 @@ export const useRealtimeNotifications = () => {
         try {
             const token = getToken();
             await fetch(`${API_BASE_URL}/notifications/read-all`, {
-                method: 'PATCH', // Chú ý: Backend cần có route này (đã thấy trong notification.controller.js)
+                method: 'PATCH', 
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`

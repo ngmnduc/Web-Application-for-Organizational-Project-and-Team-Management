@@ -112,7 +112,6 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
                     <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-gray-500" /></button>
                 </div>
 
-                {/*  Thay thẻ <form> bằng <div> để chặn trình duyệt tự submit */}
                 <div className="space-y-4" onKeyDown={handleKeyDown}>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Project Name <span className="text-red-500">*</span></label>
@@ -150,7 +149,6 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
                             Cancel
                         </button>
                         
-                        {/*  Đổi type="submit" thành "button" và gọi onClick thủ công */}
                         <button 
                             type="button" 
                             onClick={handleSubmit}

@@ -505,7 +505,7 @@ export const addMember = async (projectId, userId, role = "Member", currentOrgan
 
   // Add member to ProjectMember table
   await ProjectMember.create({
-    organizationId: currentOrganizationId, // FIX: Thiếu organizationId
+    organizationId: currentOrganizationId, 
     projectId,
     userId,
     roleInProject: role,
@@ -539,7 +539,7 @@ export const removeMember = async (projectId, targetUserId, requestorId, current
     throw new Error('ORGANIZATION_REQUIRED');
   }
 
-  // 1. Kiểm tra project tồn tại
+  //Kiểm tra project tồn tại
   const project = await Project.findOne({
     _id: projectId,
     organizationId: currentOrganizationId,
@@ -550,12 +550,12 @@ export const removeMember = async (projectId, targetUserId, requestorId, current
     throw new Error('PROJECT_NOT_FOUND');
   }
 
-  // 2. CHẶN TUYỆT ĐỐI: Không cho xóa Project Owner/Creator
+  //Không cho xóa Project Owner/Creator
   if (project.createdBy.toString() === targetUserId.toString()) {
     throw new Error('CANNOT_REMOVE_CREATOR');
   }
 
-  // 3. Lấy thông tin role của người thực hiện (requestor)
+  //Lấy thông tin role của người thực hiện (requestor)
   const requestorMember = await ProjectMember.findOne({
     projectId,
     userId: requestorId,
@@ -577,7 +577,7 @@ export const removeMember = async (projectId, targetUserId, requestorId, current
     throw new Error('FORBIDDEN_PROJECT_ACTION'); // Người request không thuộc dự án
   }
 
-  // 4. Lấy thông tin role của người bị xóa (target)
+  //Lấy thông tin role của người bị xóa (target)
   const targetMember = await ProjectMember.findOne({
     projectId,
     userId: targetUserId,
@@ -588,12 +588,12 @@ export const removeMember = async (projectId, targetUserId, requestorId, current
     throw new Error('MEMBER_NOT_FOUND');
   }
 
-  // 5. Không cho phép tự xóa chính mình
+  //Không cho phép tự xóa chính mình
   if (requestorId.toString() === targetUserId.toString()) {
     throw new Error('CANNOT_REMOVE_SELF');
   }
 
-  // 6. SO SÁNH QUYỀN: Admin > Manager > Member
+  // SO SÁNH QUYỀN: Admin > Manager > Member
   const roleHierarchy = {
     'Admin': 3,
     'Manager': 2,
@@ -603,13 +603,13 @@ export const removeMember = async (projectId, targetUserId, requestorId, current
   const requestorRoleLevel = roleHierarchy[requestorMember.roleInProject] || 0;
   const targetRoleLevel = roleHierarchy[targetMember.roleInProject] || 0;
 
-  // Người thực hiện phải có quyền CAO HƠN HOẶC BẰNG người bị xóa
-  // Nhưng trong thực tế, nên yêu cầu CAO HƠN để tránh Member xóa Member
+  // Người thực hiện phải có quyền cao hơn hoặc bằng người bị xóa
+  // Nhưng trong thực tế, nên yêu cầu cao hơn để tránh Member xóa Member
   if (requestorRoleLevel <= targetRoleLevel) {
     throw new Error('INSUFFICIENT_PERMISSIONS'); // Không đủ quyền
   }
 
-  // 7. Xóa member khỏi ProjectMember table
+  //Xóa member khỏi ProjectMember table
   const result = await ProjectMember.findOneAndDelete({
     projectId,
     userId: targetUserId
@@ -700,7 +700,7 @@ export const getProjectActivities = async (projectId, currentOrganizationId, pag
     throw new Error('ORGANIZATION_REQUIRED');
   }
 
-  // 1. Verify project exists
+  // Verify project exists
   const project = await Project.findOne({
     _id: projectId,
     organizationId: currentOrganizationId,
@@ -713,7 +713,7 @@ export const getProjectActivities = async (projectId, currentOrganizationId, pag
 
   const skip = (page - 1) * limit;
 
-  // 2. Query & Count (Parallel)
+  //Query & Count (Parallel)
   const [activities, total] = await Promise.all([
     ActivityLog.find({ projectId })
       .populate('userId', 'name avatar')
@@ -798,7 +798,7 @@ export const getProjectMembers = async (projectId, currentOrganizationId) => {
   if (!mongoose.isValidObjectId(projectId)) throw new Error('INVALID_PROJECT_ID');
   if (!currentOrganizationId) throw new Error('ORGANIZATION_REQUIRED');
 
-  // 1. Check Project
+  // Check Project
   const project = await Project.findOne({
     _id: projectId,
     organizationId: currentOrganizationId,
@@ -807,15 +807,15 @@ export const getProjectMembers = async (projectId, currentOrganizationId) => {
 
   if (!project) throw new Error('PROJECT_NOT_FOUND');
   
-  // 2. Query ProjectMember
-  // 👇 SỬA Ở ĐÂY: Thêm status: 'ACTIVE' để loại bỏ PENDING
+  //  Query ProjectMember
+  // Thêm status: 'ACTIVE' để loại bỏ PENDING
   const members = await ProjectMember.find({ 
     projectId,
     status: 'ACTIVE'
   })
     .populate('userId', 'name email avatar role'); // Populate thêm role hệ thống của user
 
-  // 3. Format Data khớp với Members.jsx
+  //Format Data khớp với Members.jsx
   return members.map((m) => {
     if (!m.userId) return null;
 
@@ -1004,7 +1004,7 @@ export const joinProjectByCode = async (inviteCode, userId, currentOrganizationI
     //  START TRANSACTION
     session.startTransaction();
 
-    // 1. Tìm Project bằng Code (WITH SESSION)
+    //Tìm Project bằng Code (WITH SESSION)
     const project = await Project.findOne({ 
       inviteCode: normalizedCode,
       deletedAt: null 
@@ -1029,13 +1029,13 @@ export const joinProjectByCode = async (inviteCode, userId, currentOrganizationI
 
     const targetOrgId = project.organizationId;
 
-    // 2.  CHECK EXISTING ORGANIZATION MEMBER 
+    //CHECK EXISTING ORGANIZATION MEMBER 
     const existingOrgMember = await OrganizationMember.findOne({
       organizationId: targetOrgId,
       userId: userId
     }).session(session);
 
-    // FIX ROLE LOGIC: Nếu đã là member của Org, KHÔNG CẬP NHẬT ROLE
+    // Nếu đã là member của Org, KHÔNG CẬP NHẬT ROLE
     if (!existingOrgMember) {
       //  Case 1: User CHƯA thuộc Org này → Add vào Org với role ORG_MEMBER
       await OrganizationMember.create([{
@@ -1051,23 +1051,23 @@ export const joinProjectByCode = async (inviteCode, userId, currentOrganizationI
         {
           $addToSet: { organizations: targetOrgId },
           currentOrganizationId: targetOrgId,
-          role: "Member" //  CHỈ set role khi là member MỚI
+          role: "Member" //  CHỈ set role khi là member mới
         },
         { session }
       );
     } else {
-      //  Case 2: User ĐÃ thuộc Org này → CHỈ switch currentOrg, KHÔNG ĐỔI ROLE
+      //  Case 2: User ĐÃ thuộc Org này → CHỈ switch currentOrg, không đổi role
       await User.findByIdAndUpdate(
         userId, 
         {
           currentOrganizationId: targetOrgId
-          //  KHÔNG CẬP NHẬT role - GIỮ NGUYÊN role hiện tại (Admin/Manager/Member)
+          //  giữ nguyên role hiện tại (Admin/Manager/Member)
         },
         { session }
       );
     }
 
-    // 3. Check & Add Project Member
+    // Check & Add Project Member
     const existingProjectMember = await ProjectMember.findOne({
       projectId: project._id,
       userId
@@ -1094,10 +1094,10 @@ export const joinProjectByCode = async (inviteCode, userId, currentOrganizationI
       userId,
       organizationId: targetOrgId,
       roleInProject: projectRole, // Role trong project
-      status: "PENDING" // FIX: Đổi status từ ACTIVE thành PENDING
+      status: "PENDING" // Đổi status từ ACTIVE thành PENDING
     }], { session });
     
-    // 4.  Log activity (WITH SESSION)
+    //  Log activity (WITH SESSION)
     try {
       await ActivityLog.create([{
         projectId: project._id,

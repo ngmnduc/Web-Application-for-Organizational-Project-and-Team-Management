@@ -22,7 +22,7 @@ const SignUpPage = () => {
   };
 
   const handlePostSignupRedirect = async (token, user) => {
-    // 1. Ưu tiên xử lý Payment (Nếu user đến từ trang Pricing và chọn Admin)
+    //  Ưu tiên xử lý Payment (Nếu user đến từ trang Pricing và chọn Admin)
     if (location.state?.from === 'pricing' && location.state?.plan === 'Admin') {
         try {
             const response = await fetch(`${API_BASE_URL}/payment/session`, { 
@@ -37,18 +37,17 @@ const SignUpPage = () => {
         } catch (error) { console.error("Payment error:", error); }
     }
 
-    // 2. Xử lý Join Project (Invite Code)
+    //  Xử lý Join Project (Invite Code)
     // Nếu có invite code -> Backend đã tự add vào project -> Về Home (Bỏ qua bước chọn Plan vì là member)
     if (location.state?.action === 'join' && location.state?.code) {
         navigate('/pending'); 
         return;
     }
 
-    // 3. 🟢 [NEW] Kiểm tra Plan (Dành cho Owner mới tạo Organization)
+    // Kiểm tra Plan (Dành cho Owner mới tạo Organization)
     // Logic: Nếu user tạo Org mới (không phải join) và chưa có plan -> Redirect về Pricing
-    // Giả sử backend trả về thông tin organization trong user hoặc ta cần check riêng
-    // Ở đây ta dùng logic đơn giản: Nếu đăng ký mới mà không phải join team -> Buộc chọn Plan
-    
+    // Giả sử backend trả về thông tin organization trong user hoặc cần check riêng
+    // Ở đây dùng logic đơn giản: Nếu đăng ký mới mà không phải join team -> Buộc chọn Plan
     // Kiểm tra xem user có phải là người tạo Org không (thường signup mới mặc định tạo Org Free)
     // Nếu muốn bắt buộc chọn plan trả phí hoặc xác nhận plan Free:
     if (!location.state?.plan && !location.state?.code) {
@@ -57,7 +56,6 @@ const SignUpPage = () => {
         navigate('/pricing');
         return;
     }
-
     // Mặc định về Home nếu đã có plan hoặc là member join
     navigate('/home');
   };
@@ -67,7 +65,6 @@ const SignUpPage = () => {
       const { credential } = credentialResponse;
       const data = await loginWithGoogle(credential); 
       saveLogin(data.user, data.token);
-      // Google Login thường mặc định là Free, trừ khi mày custom thêm logic
       handlePostSignupRedirect(data.token);
     } catch (err) {
       setError("Google login failed.");
@@ -86,17 +83,16 @@ const SignUpPage = () => {
       const name = `${formData.firstName} ${formData.lastName}`.trim();
       const inviteCode = location.state?.code || null;
       
-      // [QUAN TRỌNG] Lấy plan từ trang Pricing truyền sang (Admin/PREMIUM)
-      // Backend của mày đang check "PREMIUM" nên tốt nhất gửi đúng chuỗi đó
+      // Lấy plan từ trang Pricing truyền sang (Admin/PREMIUM)
+      // Backend đang check "PREMIUM" 
       let plan = location.state?.plan || 'FREE';
       if (plan === 'Admin') plan = 'PREMIUM'; // Map lại cho chắc cú
 
       // Gọi API Signup
       const response = await signup(name, formData.email, formData.password, inviteCode, plan);
       
-      // Backend trả về: { success: true, paymentUrl: "...", data: { token, user } }
-      // Tùy vào axios response interceptor của mày, data có thể nằm ở response hoặc response.data
-      // Tao viết thế này để cover cả 2 trường hợp:
+      // Tùy vào axios response interceptor, data có thể nằm ở response hoặc response.data
+      // Kiểm tra cả 2 trường hợp:
       const paymentUrl = response.paymentUrl || response.data?.paymentUrl;
       const token = response.data?.token || response.token; 
       const user = response.data?.user || response.user;
@@ -104,9 +100,9 @@ const SignUpPage = () => {
       if (user && token) {
           saveLogin(user, token); // Lưu token trước
 
-          // [FIX LOGIC] Check xem Backend có trả về link thanh toán không
+          // Check xem Backend có trả về link thanh toán không
           if (paymentUrl) {
-              // Nếu có -> Redirect sang Stripe NGAY LẬP TỨC
+              // Nếu có -> Redirect sang Stripe 
               window.location.href = paymentUrl;
           } else {
               // Nếu không (Gói Free) -> Điều hướng nội bộ

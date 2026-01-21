@@ -2,7 +2,6 @@ import * as taskService from "../services/task.service.js";
 import mongoose from "mongoose";
 import Task from "../models/task.model.js"; 
 import { createNotification } from "../services/notification.service.js";
-// 🔴 THÊM: Import service ghi log
 import { logActivity } from "../services/activityLog.service.js";
 
 /**
@@ -122,7 +121,7 @@ export const createTask = async (req, res) => {
       currentOrgId
     );
     
-    // 🔴 THÊM: Ghi log hoạt động ngay sau khi tạo task thành công
+    // Ghi log hoạt động ngay sau khi tạo task thành công
     try {
         console.log('[createTask] Logging activity...');
         await logActivity({
@@ -191,7 +190,7 @@ export const updateTask = async (req, res) => {
       req.user
     );
 
-    // 🔴 THÊM: Ghi log hoạt động khi update task
+    // Ghi log hoạt động khi update task
     try {
         console.log('[updateTask] Logging activity...');
         await logActivity({
@@ -269,7 +268,7 @@ export const updateTaskStatus = async (req, res) => {
       req.user
     );
 
-    // 🔴 THÊM: Ghi log thay đổi trạng thái
+    // Ghi log thay đổi trạng thái
     try {
         console.log('[updateTaskStatus] Logging activity...');
         await logActivity({
@@ -377,7 +376,7 @@ export const deleteTask = async (req, res) => {
     console.log('[deleteTask] Request:', { taskId: req.params.id, user: req.user._id });
     const deletedTask = await taskService.deleteTask(req.params.id, req.user);
     
-    // 🔴 THÊM: Ghi log xóa task
+    // Ghi log xóa task
     try {
         console.log('[deleteTask] Logging activity...');
         await logActivity({

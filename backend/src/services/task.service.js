@@ -368,12 +368,12 @@ export const deleteTask = async (taskId, currentUser) => {
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');
 
-  // --- LOGIC PHÂN QUYỀN MỚI ---
+  // --- LOGIC PHÂN QUYỀN  ---
   
-  // 1. Nếu là System Admin (Role hệ thống) -> Có toàn quyền xóa
+  //Nếu là System Admin (Role hệ thống) -> Có toàn quyền xóa
   if (currentUser.role !== 'Admin') {
       
-      // 2. Nếu không phải System Admin, kiểm tra vai trò trong dự án
+      // Nếu không phải System Admin, kiểm tra vai trò trong dự án
       const member = await ProjectMember.findOne({
         projectId: task.projectId,
         userId: currentUser._id || currentUser.id,
@@ -388,7 +388,7 @@ export const deleteTask = async (taskId, currentUser) => {
       // Lấy role trong dự án (Project Role)
       const roleInProject = member.roleInProject || 'Member';
 
-      // 3. Chỉ cho phép "Manager" hoặc "Admin" (của dự án) xóa task
+      //  Chỉ cho phép "Manager" hoặc "Admin" (của dự án) xóa task
       // "Member" bình thường sẽ bị chặn
       if (!['Manager', 'Admin'].includes(roleInProject)) {
         throw new Error('PERMISSION_DENIED');
@@ -406,9 +406,9 @@ export const deleteTask = async (taskId, currentUser) => {
       taskId: task._id,
       action: "DELETE_TASK",
       content: `deleted task "${task.title}"`,
-      entityType: 'Task',     // Đảm bảo có field này để khớp với Model ActivityLog
-      entityId: task._id,     // Đảm bảo có field này
-      organizationId: task.organizationId // Đảm bảo có field này
+      entityType: 'Task',     
+      entityId: task._id,     
+      organizationId: task.organizationId 
     });
   } catch (e) { console.error("[TaskService] Log delete failed:", e); }
 

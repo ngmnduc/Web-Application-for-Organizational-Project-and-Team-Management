@@ -14,12 +14,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
-        {/*  */}
         <ProjectProvider>
             <App />
         </ProjectProvider>
         </NotificationProvider>
-        {/* ==================================== */}
       </AuthProvider>  
       </BrowserRouter>
     </React.StrictMode>

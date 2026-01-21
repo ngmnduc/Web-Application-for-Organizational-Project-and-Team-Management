@@ -113,7 +113,7 @@ const handleGoogleError = () => {
 }
   };
 
-  // 3. Xử lý Submit Forgot Password (Gửi Email)
+  // Xử lý Submit Forgot Password (Gửi Email)
   const handleForgotSubmit = async (e) => {
       e.preventDefault();
       setError('');
@@ -135,7 +135,7 @@ const handleGoogleError = () => {
       }
   };
 
-  // 4. Xử lý Submit Reset Password (Đổi pass mới)
+  //  Xử lý Submit Reset Password (Đổi pass mới)
   const handleResetSubmit = async (e) => {
       e.preventDefault();
       setError('');
@@ -221,7 +221,7 @@ const handleGoogleError = () => {
             </div>
           )}
 
-          {/* --- VIEW: LOGIN --- */}
+          {/* VIEW: LOGIN */}
           {view === 'login' && (
             <>
                 <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
@@ -293,7 +293,7 @@ const handleGoogleError = () => {
             </>
           )}
 
-          {/* --- VIEW: FORGOT PASSWORD --- */}
+          {/*VIEW: FORGOT PASSWORD */}
           {view === 'forgot' && (
               <form onSubmit={handleForgotSubmit} className="flex flex-col gap-4">
                   <div>
@@ -326,7 +326,7 @@ const handleGoogleError = () => {
               </form>
           )}
 
-          {/* --- VIEW: RESET PASSWORD (TOKEN) --- */}
+          {/*VIEW: RESET PASSWORD (TOKEN)*/}
           {view === 'reset' && (
               <form onSubmit={handleResetSubmit} className="flex flex-col gap-4">
                   <div>

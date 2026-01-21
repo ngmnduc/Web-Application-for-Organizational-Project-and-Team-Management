@@ -17,7 +17,7 @@ import ProjectDetailDrawer from '../components/ProjectDetailDrawer';
 
 import { API_BASE_URL } from '../utils/constants';
 
-// --- Sub-components (Định nghĩa ngay trong file để tránh lỗi import) ---
+//  Sub-components (Định nghĩa ngay trong file để tránh lỗi import) 
 
 const NotificationBanner = ({ message, type, onClose }) => {
     if (!message) return null;
@@ -45,7 +45,7 @@ const ProgressBar = ({ progress = 0 }) => (
     </div>
 );
 
-// --- Component Card ---
+//  Component Card 
 const ProjectCard = ({ project, onClick }) => {
     return (
         <div 
@@ -82,7 +82,7 @@ const ProjectCard = ({ project, onClick }) => {
     );
 };
 
-// --- Main Component ---
+//  Main Component 
 const Projects = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);

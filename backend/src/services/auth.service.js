@@ -10,7 +10,6 @@
  */
 
 import User from "../models/user.model.js";
-import Organization from "../models/organization.model.js";
 import OrganizationMember from "../models/organizationMember.model.js";
 import { signToken } from "../utils/jwt.js";
 import crypto from "crypto";
@@ -88,7 +87,7 @@ export const loginUser = async (email, password) => {
   if (orgMembers.length > 0 && orgMembers[0].organizationId) {
     currentOrganization = orgMembers[0].organizationId;
 
-    // Validate organization status (BE1 Requirement)
+    // Validate organization status 
     if (currentOrganization.status === 'INACTIVE') {
       throw new Error("ORGANIZATION_INACTIVE");
     }
@@ -159,11 +158,11 @@ export const handleGoogleAuth = async (credential) => {
       avatar: picture,
       role: "Member", 
       status: "ACTIVE",
-      currentOrganizationId: null, // Chưa thuộc về nơi nào
+      currentOrganizationId: null, 
       organizations: []
     });
 
-    // Gửi email chào mừng (Optional)
+    // Gửi email chào mừng 
     try {
       await sendWelcomeEmail(user.email, user.name);
     } catch (err) {
@@ -188,7 +187,7 @@ export const handleGoogleAuth = async (credential) => {
       email: user.email,
       avatar: user.avatar,
       role: user.role,
-      currentOrganizationId: user.currentOrganizationId, // Trả về để FE check
+      currentOrganizationId: user.currentOrganizationId, 
     },
     isNewUser,
   };
@@ -308,7 +307,7 @@ export const switchOrganization = async (userId, organizationId) => {
 
   const organization = membership.organizationId;
 
-  // Validate organization status (BE1 Requirement)
+  // Validate organization status 
   if (organization.status === 'INACTIVE') {
     throw new Error("ORGANIZATION_INACTIVE");
   }
@@ -327,7 +326,7 @@ export const switchOrganization = async (userId, organizationId) => {
     throw new Error("USER_NOT_FOUND");
   }
 
-  // Generate NEW token with new organizationId (BE1 Requirement)
+  // Generate NEW token with new organizationId 
   const newToken = signToken({ 
     sub: user._id.toString(), 
     role: user.role,
@@ -364,7 +363,7 @@ export async function createUserWithSession(name, email, password, session) {
     status: "ACTIVE",
   }], { session });
 
-  // Generate token (temporary, will be regenerated with orgId later)
+  // Generate token 
   const token = signToken({ 
     sub: user._id.toString(),
     email: user.email,
