@@ -629,8 +629,8 @@ const TaskDetail = () => {
 
             {/* Add comment */}
             <div className="mb-6 flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
-                    {user?.name?.[0] || "U"}
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-brand text-xs font-bold "style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                    {user?.name?.[0].toUpperCase() || "U"}
                 </div>
                 <div className="flex-1">
                    <MentionsInput
@@ -638,7 +638,7 @@ const TaskDetail = () => {
             onChange={(e) => setNewComment(e.target.value)}
             style={mentionInputStyle}
             placeholder="Write a comment... (Type '@' to mention)"
-            className="w-full focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+            className="w-full focus:ring-2  transition"
             a11ySuggestionsListLabel={"Suggested mentions"}
             disabled={isPostingComment}
         >
@@ -653,8 +653,8 @@ const TaskDetail = () => {
               }}
                 renderSuggestion={(suggestion, search, highlightedDisplay) => (
                     <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
-                            {suggestion.display.charAt(0)}
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold "style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                            {suggestion.display.charAt(0).toUpperCase()}
                         </div>
                         <span>{suggestion.display}</span>
                     </div>
@@ -721,8 +721,8 @@ const TaskDetail = () => {
                     <UserIcon className="w-3 h-3"/> Assignee
                 </span>
                 <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
-                        {task.assigneeName ? task.assigneeName[0] : "?"}
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                        {task.assigneeName ? task.assigneeName[0].toUpperCase() : "?"}
                     </div>
                     <span className="font-medium text-gray-900">{task.assigneeName || "Unassigned"}</span>
                 </div>
@@ -759,7 +759,7 @@ const TaskDetail = () => {
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Attachments</h2>
                  <button 
                     onClick={handleOpenAttachmentInput} 
-                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90  px-3 py-1.5 rounded-lg transition-all shadow-sm"
                  >
                     + Add File
                  </button>            
@@ -955,7 +955,7 @@ const TaskDetail = () => {
 
               <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 mt-2">
                 <button type="button" onClick={() => setIsEditOpen(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium shadow-sm">Save Changes</button>
+                <button type="submit" className="px-6 py-2 text-sm rounded-lg bg-brand text-white hover:opacity-90  font-medium shadow-sm">Save Changes</button>
               </div>
             </form>
           </div>

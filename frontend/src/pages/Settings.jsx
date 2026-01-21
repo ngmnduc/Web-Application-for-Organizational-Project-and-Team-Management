@@ -377,7 +377,7 @@ const AccountSettings = ({ organization, onRefresh }) => {
     return (
         <div className="space-y-8">
             <NotificationBanner message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
-            <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
+            <div className="bg-white rounded-xl shadow-md border overflow-hidden">
                 <div className="p-6 border-b bg-gray-50/50 flex gap-4">
                     <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><ShieldCheckIcon className="w-8 h-8" /></div>
                     <div><h2 className="text-xl font-bold">Security</h2><p className="text-sm text-gray-500">Secure your account.</p></div>

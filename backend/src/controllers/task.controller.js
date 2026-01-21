@@ -327,12 +327,28 @@ export const reorderTask = async (req, res) => {
       currentUserId: currentUser._id
     });
 
-    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition, currentUser);
+    const reorderTask = await taskService.reorderTask(taskId, newStatus, newPosition, currentUser);
+
+    try {
+        console.log('[reorderTask] Logging activity...');
+        await logActivity({
+            userId: req.user._id,
+            projectId: reorderTask.projectId,
+            organizationId: req.user.currentOrganizationId,
+            action: "REORDER_TASK",
+            entityType: "Task",
+            entityId: reorderTask._id,
+            description: `reordered task "${reorderTask.title}"`,
+            newData: reorderTask.toObject()
+        });
+    } catch (logError) {
+        console.error("[reorderTask] Failed to log activity:", logError);
+    }
     
     res.json({ 
       success: true, 
       message: "Task reordered successfully", 
-      data: updatedTask 
+      data: reorderTask 
     });
   } catch (err) {
     console.error('[reorderTask] Error:', err.message);
@@ -401,6 +417,18 @@ export const createSubtask = async (req, res) => {
   try {
     console.log('[createSubtask] Request:', { taskId: req.params.taskId, body: req.body });
     const subtask = await taskService.createSubtask(req.params.taskId, req.body.title);
+    try {
+        console.log('[subTask] Logging activity...');
+        await logActivity({
+            userId: req.user._id,
+            projectId: subtask.projectId,
+            organizationId: req.user.currentOrganizationId,
+            action: "CREATE_SUBTASK",
+            entityType: "Task",
+            entityId: subtask._id,
+            description: `create subtask "${subtask.title}"`,
+        });
+    } catch (logError) { console.error("[deleteTask] Log Error:", logError); }
     res.status(201).json({
       success: true,
       message: "Subtask created successfully",

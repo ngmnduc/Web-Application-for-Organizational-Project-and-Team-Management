@@ -3,7 +3,7 @@ import Project from "../models/project.model.js";
 import ProjectMember from "../models/projectMember.model.js";
 import Task from "../models/task.model.js";
 import Attendance from "../models/attendance.model.js"; 
-
+import ActivityLog from "../models/activityLog.model.js";
 class DashboardService {
   _getDateRange(month, year) {
     if (!month || !year) return null;
@@ -24,6 +24,19 @@ class DashboardService {
       month: m,
       year: y
     };
+  }
+
+  async _getRecentActivities(matchStage, limit = 10) {
+    try {
+      return await ActivityLog.find(matchStage)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate("userId", "name email avatar") // Populate user info để hiện avatar
+        .lean();
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+      return [];
+    }
   }
 
   async _getDailyTaskStats(baseMatch, dateQuery, isForAdmin = false) {
@@ -101,6 +114,8 @@ class DashboardService {
       projectBaseFilter._id = new mongoose.Types.ObjectId(projectId);
     }
 
+    const activityMatch = { organizationId: currentOrganizationId };
+
     // [FIX] Tách filter cho Task: Không áp dụng filter ngày tạo cho tổng quan (Snapshot)
     // Chỉ áp dụng filter project/org
     const taskSnapshotMatch = { 
@@ -124,7 +139,8 @@ class DashboardService {
       tasksByPriority,
       upcomingDeadlines,
       attendanceStats,
-      dailyTaskChart 
+      dailyTaskChart,
+      recentActivities 
     ] = await Promise.all([
       Project.countDocuments(projectBaseFilter),
       Project.countDocuments({ ...projectBaseFilter, status: "active" }),
@@ -166,7 +182,9 @@ class DashboardService {
         "project.deletedAt": null,
         deletedAt: null,
         ...(projectId && projectId !== 'all' ? { "project._id": new mongoose.Types.ObjectId(projectId) } : {})
-      }, dateMeta) 
+      }, dateMeta),
+      
+      this._getRecentActivities(activityMatch)
     ]);
 
     const avgProgress = allTasksCount > 0 ? Math.round((doneTasksCount / allTasksCount) * 100) : 0;
@@ -182,6 +200,7 @@ class DashboardService {
       period: { month: dateMeta.month, year: dateMeta.year },
       kpi: { totalProjects, totalMembers, completedProjects, avgProgress },
       attendance: attendanceStats,
+      activities: recentActivities,
       charts: {
         taskActivity: dailyTaskChart, 
         projectStatus: [
@@ -208,11 +227,14 @@ class DashboardService {
     if (!managedProjects.length) return this._emptyStats();
 
     let projectIds = managedProjects.map(m => m.projectId);
-    const totalManagedProjects = projectIds.length; 
+    const totalManagedProjects = projectIds.length;
+    
+    let activityMatch = { projectId: { $in: projectIds } };
 
     if (projectId && projectId !== 'all') {
       projectIds = projectIds.filter(id => id.toString() === projectId.toString());
       if (!projectIds.length) return this._emptyStats();
+      activityMatch = { projectId: projectId };
     }
 
     const dateMeta = this._getMetaDate(month, year);
@@ -227,7 +249,7 @@ class DashboardService {
     const [
         totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, 
         priorityStatsRaw, teamSize, attendanceStats,
-        dailyChartRaw 
+        dailyChartRaw,recentActivities 
     ] = await Promise.all([
       Task.countDocuments(snapshotMatch),
       Task.countDocuments({ ...snapshotMatch, status: "TODO" }),
@@ -238,7 +260,8 @@ class DashboardService {
       ProjectMember.distinct("userId", { projectId: { $in: projectIds }, status: "ACTIVE" }).then(res => res.length),
       this._getTodayAttendanceStats(currentOrganizationId, projectIds),
       // Daily Stats: Sử dụng filter ngày để vẽ biểu đồ
-      this._getDailyTaskStats({ projectId: { $in: projectIds }, deletedAt: null }, dateMeta) 
+      this._getDailyTaskStats({ projectId: { $in: projectIds }, deletedAt: null }, dateMeta),
+      this._getRecentActivities(activityMatch) 
     ]);
 
     // 🔴 BỔ SUNG: Logic xử lý Priority Map cho Manager
@@ -265,6 +288,7 @@ class DashboardService {
         taskSummary: { totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks }
       },
       attendance: attendanceStats,
+      activities: recentActivities,
       charts: {
         taskActivity: dailyChartRaw, 
         // 🔴 ĐÃ THÊM: Trả về priorityDistribution để frontend vẽ biểu đồ
@@ -282,13 +306,21 @@ class DashboardService {
         assigneeId: new mongoose.Types.ObjectId(userId),
         deletedAt: null
     };
+
+    let activityMatch = {};
     
     if (projectId && projectId !== 'all') {
       snapshotMatch.projectId = new mongoose.Types.ObjectId(projectId);
-    } 
+      activityMatch = { projectId: projectId };
+    } else {
+      // Nếu view All, Member chỉ nên thấy activity trong các project mình tham gia
+      const myProjects = await ProjectMember.find({ userId, status: "ACTIVE" }).select("projectId");
+      const myProjectIds = myProjects.map(p => p.projectId);
+      activityMatch = { projectId: { $in: myProjectIds } };
+    }
 
     const now = new Date();
-    const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, dailyChartRaw, priorityStatsRaw] = await Promise.all([
+    const [totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks, dailyChartRaw, priorityStatsRaw, recentActivities] = await Promise.all([
       Task.countDocuments(snapshotMatch),
       Task.countDocuments({ ...snapshotMatch, status: "TODO" }),
       Task.countDocuments({ ...snapshotMatch, status: "DOING" }),
@@ -299,7 +331,8 @@ class DashboardService {
       Task.aggregate([
         { $match: snapshotMatch },
         { $group: { _id: "$priority", count: { $sum: 1 } } }
-      ])
+      ]),
+      this._getRecentActivities(activityMatch)
     ]);
 
     // 1. Khởi tạo map mặc định
@@ -334,6 +367,7 @@ class DashboardService {
         success: true, 
         period: { month: dateMeta.month, year: dateMeta.year },
         kpi: { totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks },
+        activities: recentActivities,
         charts: { taskActivity: dailyChartRaw, priorityDistribution: priorityChartData }
     };
   }

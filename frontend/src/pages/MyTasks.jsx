@@ -158,7 +158,7 @@ const MyTasks = () => {
     
     // Debug log
     useEffect(() => {
-        console.log('🔐 [MyTasks] Permission check:', {
+        console.log(' [MyTasks] Permission check:', {
             systemRole,
             isSystemAdmin,
             projectRole,
@@ -405,7 +405,7 @@ const MyTasks = () => {
     // Create Task
     const openCreateModal = (statusColumn = 'Todo') => {
         if (!canManageTasks) {
-            console.warn('⚠️ No permission to create task. Role:', effectiveRole);
+            console.warn(' No permission to create task. Role:', effectiveRole);
             return;
         }
         setNewTaskForm({

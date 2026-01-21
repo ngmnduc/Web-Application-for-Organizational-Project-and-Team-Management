@@ -159,7 +159,7 @@ const formatActivityContent = (act) => {
   const userName = act.userId?.name || "Unknown User";
   
   // 1. Content rõ ràng
-  if (act.content && act.content.length > 5 && !act.content.match(/^(created|updated|deleted)/i)) {
+  if (act.content && act.content.length > 5 && !act.content.match(/^(created|updated|deleted|reordered)/i)) {
       return (
           <span>
               <span className="font-semibold text-gray-900">{userName}</span> {act.content}
@@ -181,7 +181,7 @@ const formatActivityContent = (act) => {
       case "UPDATE_TASK": actionText = "updated task"; break;
       case "DELETE_TASK": actionText = "deleted task"; break;
       case "COMPLETE_TASK": actionText = "completed task"; break;
-      default: actionText = act.action?.toLowerCase().replace(/_/g, ' ') || "updated";
+      case "REORDER_TASK": actionText = "reordered task"; break;
   }
 
   // 3. Entity Name từ Metadata
@@ -204,7 +204,7 @@ const formatActivityContent = (act) => {
   return (
       <span>
           <span className="font-semibold text-gray-900">{userName}</span> {actionText} 
-          {entityName && <span className="font-semibold text-indigo-600"> "{entityName}"</span>}
+          {entityName && <span className="font-semibold text-brand"> "{entityName}"</span>}
       </span>
   );
 };
@@ -242,8 +242,7 @@ const HomePage = () => {
   }, []);
 
   // ✅ ĐOẠN CODE KÍCH HOẠT RELOAD DỮ LIỆU
-   useEffect(() => {
-    if (!user) return;
+  
 
     const fetchDashboardData = async () => {
       setDashboardLoading(true);
@@ -252,6 +251,7 @@ const HomePage = () => {
       setAdminStats(null);
       setManagerStats(null);
       setMemberStats(null);
+      setActivities([]);
 
       try {
         const projectIdParam = selectedProjectId || 'all';
@@ -261,6 +261,7 @@ const HomePage = () => {
           setDashboardViewRole('Admin');
           const data = await dashboardService.getAdminStats(projectIdParam, selectedMonth, selectedYear);
           setAdminStats(data);
+          setActivities(data.activities || []);
         }
         
         // CASE 2: MANAGER HOẶC MEMBER (Cần kiểm tra quyền trong Project)
@@ -275,11 +276,13 @@ const HomePage = () => {
           if (isManagerInContext) {
             setDashboardViewRole('Manager');
             setManagerStats(managerData);
+            setActivities(managerData.activities || []);
           } else {
             // Nếu không phải Manager -> Chuyển sang Member View và lấy Member Stats
             setDashboardViewRole('Member');
             const memberData = await dashboardService.getMemberStats(projectIdParam, selectedMonth, selectedYear);
             setMemberStats(memberData);
+            setActivities(memberData.activities || []);
           }
         }
 
@@ -290,35 +293,11 @@ const HomePage = () => {
       }
     };
 
+    useEffect(() => {
+    if (!user) return;
     fetchDashboardData();
-  }, [user, selectedProjectId, selectedMonth, selectedYear]); // Re-run khi đổi dự án
+  }, [user, selectedProjectId, selectedMonth, selectedYear]); 
 
-  // ----------------------------------------------------------
-
-  // ----------------------------------------------------------
-  // 🔵 LOAD SUMMARY + ACTIVITY MỖI KHI currentProjectId THAY ĐỔI
-  // ----------------------------------------------------------
-  const fetchActivities = async () => {
-      if (!selectedProjectId || selectedProjectId === 'all') {
-          setActivities([]);
-          return;
-      }
-      try {
-        setLoadingActivities(true);
-        // Thêm timestamp để bypass 304 Cache
-        const timestamp = new Date().getTime();
-        const activityRes = await axiosInstance.get(`/projects/${selectedProjectId}/activities?_t=${timestamp}`);
-        setActivities(activityRes.data.data || []);
-      } catch (error) {
-        console.error("Error fetching activities:", error);
-      } finally {
-        setLoadingActivities(false);
-      }
-  };
-
-  useEffect(() => {
-    fetchActivities();
-  }, [selectedProjectId, user]);
 
   useEffect(() => {
     if (selectedProjectId === 'all' || !selectedProjectId) {
@@ -528,19 +507,25 @@ const HomePage = () => {
     const options = [];
     const now = new Date();
     const currentYear = now.getFullYear();
-    const yearsToGenerate = [currentYear, currentYear - 1]; // 2 năm
+    const currentMonth = now.getMonth() + 1; // 1-12
+    
+    // 1. Năm hiện tại: Từ tháng hiện tại trở về tháng 1
+    for (let month = currentMonth; month >= 1; month--) {
+        options.push({
+            value: `${month}-${currentYear}`,
+            label: `Month ${month}/${currentYear}`
+        });
+    }
 
-    yearsToGenerate.forEach(year => {
-        for (let month = 12; month >= 1; month--) {
-            // Chỉ hiện các tháng trong tương lai nếu muốn, ở đây ta hiện hết
-            // Hoặc giới hạn không hiện tháng tương lai của năm nay? (Tùy logic)
-            // Logic đơn giản: Hiện tất cả 12 tháng
-            options.push({
-                value: `${month}-${year}`,
-                label: `Month ${month}/${year}`
-            });
-        }
-    });
+    // 2. Năm ngoái: Lấy cả 12 tháng
+    const lastYear = currentYear - 1;
+    for (let month = 12; month >= 1; month--) {
+        options.push({
+            value: `${month}-${lastYear}`,
+            label: `Month ${month}/${lastYear}`
+        });
+    }
+
     return options;
   };
 
@@ -732,41 +717,44 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Recent Activity (Code Gốc) */}
-          <div className="bg-white rounded-xl p-6 shadow border border-gray-100 ">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Recent Activity</h2>
-              <button className="text-blue-500 text-sm hover:underline">View all activity</button>
-            </div>
-            <div className="space-y-4">
-              {loading ? (
-                 <p className="text-gray-400 text-sm">Loading activities...</p>
-              ) : activities.length > 0 ? (
-                activities.slice(0, 5).map((act) => (
-                  <div key={act._id} className="flex items-start gap-3">
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-bold uppercase text-sm">
-                      {act.userId?.name?.charAt(0) || "U"}
+            {/* Recent Activity List */}
+              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                </div>
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ maxHeight: '320px' }}>
+                  {activities.length > 0 ? (
+                    activities.slice(0, 15).map((act) => (
+                      <div key={act._id} className="flex gap-3 group items-start transition-colors hover:bg-gray-50/50 p-1.5 rounded-lg -mx-1.5">
+                        <div className="flex-shrink-0 mt-0.5">
+                            {act.userId?.avatar ? (
+                                <img src={act.userId.avatar} alt={act.userId.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" />
+                            ) : (
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold " style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                                    {act.userId?.name?.charAt(0).toUpperCase() || "U"}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-600 leading-snug break-words">
+                                {formatActivityContent(act)}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                                <ClockSolid className="w-3 h-3 text-gray-300" />
+                                {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                            </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                        <TotalSolid className="w-8 h-8 text-gray-300" />
+                        <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{act.userId?.name || "Unknown"}</span> 
-                        {' '}{act.content || act.action || "updated a task"} 
-                        {act.taskName && <strong> "{act.taskName}"</strong>}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {act.createdAt ? formatDistanceToNow(new Date(act.createdAt), { addSuffix: true }) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-sm">No recent activities found.</p>
-              )}
-            </div>
+                  )}
+                </div>
+              </div>
           </div>
-          </div>
-          
-
         </section>
       )}
 
@@ -874,52 +862,24 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Recent Activity List - Updated UI */}
+            {/* Recent Activity List */}
               <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
                 </div>
-                
                 <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ maxHeight: '320px' }}>
-                  {loadingActivities ? (
-                     // Loading Skeleton
-                     <div className="flex flex-col gap-4">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="animate-pulse flex gap-3">
-                                <div className="w-9 h-9 rounded-full bg-gray-100"></div>
-                                <div className="flex-1 space-y-2 py-1">
-                                    <div className="h-2.5 bg-gray-100 rounded w-3/4"></div>
-                                    <div className="h-2 bg-gray-100 rounded w-1/4"></div>
-                                </div>
-                            </div>
-                        ))}
-                     </div>
-                  ) : activities.length > 0 ? (
+                  {activities.length > 0 ? (
                     activities.slice(0, 15).map((act) => (
                       <div key={act._id} className="flex gap-3 group items-start transition-colors hover:bg-gray-50/50 p-1.5 rounded-lg -mx-1.5">
-                        {/* Avatar User */}
                         <div className="flex-shrink-0 mt-0.5">
                             {act.userId?.avatar ? (
-                                <img 
-                                    src={act.userId.avatar} 
-                                    alt={act.userId.name} 
-                                    className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" 
-                                />
+                                <img src={act.userId.avatar} alt={act.userId.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" />
                             ) : (
-                                <div 
-                                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border shadow-sm"
-                                    style={{ 
-                                        backgroundColor: 'var(--color-bg-subtle, #eff6ff)', 
-                                        color: 'var(--color-brand, #3b82f6)',
-                                        borderColor: 'var(--color-border-subtle, #dbeafe)'
-                                    }}
-                                >
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold " style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
                                     {act.userId?.name?.charAt(0).toUpperCase() || "U"}
                                 </div>
                             )}
                         </div>
-                        
-                        {/* Nội dung Activity */}
                         <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-600 leading-snug break-words">
                                 {formatActivityContent(act)}
@@ -932,19 +892,14 @@ const HomePage = () => {
                       </div>
                     ))
                   ) : (
-                    // Empty State
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
-                        <div className="p-3 bg-gray-50 rounded-full mb-3">
-                            <TotalSolid className="w-8 h-8 text-gray-300" />
-                        </div>
+                        <TotalSolid className="w-8 h-8 text-gray-300" />
                         <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
                     </div>
                   )}
                 </div>
               </div>
            </div>
-          
-
         </section>
       )}
 
@@ -1031,38 +986,43 @@ const HomePage = () => {
                 
             </div>
 
-          {/* Recent Activity (Code Gốc) */}
-          <div className="bg-white rounded-xl p-6 shadow border border-gray-100 ">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Recent Activity</h2>
-              <button className="text-brand text-sm hover:underline">View all activity</button>
-            </div>
-            <div className="space-y-4">
-              {loading ? (
-                 <p className="text-gray-400 text-sm">Loading activities...</p>
-              ) : activities.length > 0 ? (
-                activities.slice(0, 5).map((act) => (
-                  <div key={act._id} className="flex items-start gap-3">
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-bold uppercase text-sm">
-                      {act.userId?.name?.charAt(0) || "U"}
+          {/* Recent Activity List */}
+              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                </div>
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ maxHeight: '320px' }}>
+                  {activities.length > 0 ? (
+                    activities.slice(0, 15).map((act) => (
+                      <div key={act._id} className="flex gap-3 group items-start transition-colors hover:bg-gray-50/50 p-1.5 rounded-lg -mx-1.5">
+                        <div className="flex-shrink-0 mt-0.5">
+                            {act.userId?.avatar ? (
+                                <img src={act.userId.avatar} alt={act.userId.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" />
+                            ) : (
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold " style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                                    {act.userId?.name?.charAt(0).toUpperCase() || "U"}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-600 leading-snug break-words">
+                                {formatActivityContent(act)}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                                <ClockSolid className="w-3 h-3 text-gray-300" />
+                                {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                            </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                        <TotalSolid className="w-8 h-8 text-gray-300" />
+                        <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{act.userId?.name || "Unknown"}</span> 
-                        {' '}{act.content || act.action || "updated a task"} 
-                        {act.taskName && <strong> "{act.taskName}"</strong>}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {act.createdAt ? formatDistanceToNow(new Date(act.createdAt), { addSuffix: true }) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-sm">No recent activities found.</p>
-              )}
-            </div>
-            </div>
+                  )}
+                </div>
+              </div>
           </div>
         </section>
       </section>
@@ -1086,37 +1046,6 @@ const HomePage = () => {
         )}
       </button>
 
-    </div>
-  );
-};
-
-// --- Component con để render (Clean code) ---
-
-const StatusItem = ({ label, count, total, color }) => {
-    const val = count || 0;
-    const percent = total > 0 ? Math.round((val / total) * 100) : 0;
-    return (
-        <li className="flex justify-between text-sm">
-            <span className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${color}`}></span> {label}
-            </span>
-            <span>{val} ({percent}%)</span>
-        </li>
-    );
-}
-
-const Priority = ({ label, count, total, color }) => {
-  const val = count || 0;
-  const percent = total > 0 ? Math.round((val / total) * 100) : 0;
-  return (
-    <div className="mb-6 last:mb-0">
-        <div className="flex justify-between mb-1 text-sm text-gray-600">
-        <span>{label}</span>
-        <span>{val} ({percent}%)</span>
-        </div>
-        <div className="w-full h-3 bg-gray-100 rounded-full">
-        <div className={`h-3 ${color} rounded-full transition-all duration-500`} style={{ width: `${percent}%` }}></div>
-        </div>
     </div>
   );
 };
