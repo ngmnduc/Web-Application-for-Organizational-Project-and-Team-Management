@@ -69,14 +69,14 @@ const AddMemberModal = ({ isOpen, onClose, onAddMember }) => {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Name <span className="text-red-500">*</span></label>
-                        {/* Đã sửa placeholder */}
+                        {/* placeholder */}
                         <input type="text" className={getInputClass('name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter member name" />
                         {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                     </div>
                     
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
-                        {/* Đã sửa placeholder */}
+                        {/* placeholder */}
                         <input type="email" className={getInputClass('email')} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter email address" />
                         {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                     </div>

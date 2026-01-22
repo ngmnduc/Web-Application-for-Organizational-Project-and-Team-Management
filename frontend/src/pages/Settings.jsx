@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-    UserIcon, KeyIcon, SunIcon, GlobeAltIcon, 
-    PhotoIcon, CameraIcon, TrashIcon, ArrowPathIcon, 
+    CameraIcon, 
     XMarkIcon, CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-    ShieldCheckIcon, LockClosedIcon, FingerPrintIcon, MoonIcon,
+    ShieldCheckIcon,
     CreditCardIcon, CalendarDaysIcon, BanknotesIcon 
 } from '@heroicons/react/24/outline'; 
 import { useAuth } from '../services/AuthContext';
@@ -24,7 +23,7 @@ const getHeaders = () => {
     };
 };
 
-// --- COMPONENT: ALERT WARNING ---
+//  COMPONENT: ALERT WARNING 
 const AlertWarning = ({ organization }) => {
     if (!organization) return null;
     const { subscriptionStatus, plan, subscriptionExpiredAt } = organization;
@@ -73,7 +72,7 @@ const AlertWarning = ({ organization }) => {
     return null;
 };
 
-// --- COMPONENT: NOTIFICATION BANNER ---
+//  COMPONENT: NOTIFICATION BANNER 
 const NotificationBanner = ({ message, type, onClose }) => {
     if (!message) return null;
     const isSuccess = type === 'success';
@@ -94,7 +93,7 @@ const NotificationBanner = ({ message, type, onClose }) => {
     );
 };
 
-// --- COMPONENT: CONFIRM MODAL ---
+//  COMPONENT: CONFIRM MODAL 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", confirmColor = "bg-red-600" }) => {
     if (!isOpen) return null;
     return (
@@ -120,7 +119,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText 
     );
 };
 
-// --- COMPONENT: IMAGE CROPPER ---
+//  COMPONENT: IMAGE CROPPER 
 const ImageCropperModal = ({ imageSrc, onCancel, onSave }) => {
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -167,7 +166,7 @@ const ImageCropperModal = ({ imageSrc, onCancel, onSave }) => {
     );
 };
 
-// --- COMPONENT: PROFILE INFO ---
+//  COMPONENT: PROFILE INFO 
 const ProfileInfo = () => {
     const { user, setUser } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
@@ -236,7 +235,7 @@ const ProfileInfo = () => {
     );
 };
 
-// --- COMPONENT: BILLING SECTION ---
+//  COMPONENT: BILLING SECTION 
 const BillingSection = ({ organization, onRefresh }) => {
     const [loading, setLoading] = useState(false);
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null });
@@ -347,7 +346,7 @@ const BillingSection = ({ organization, onRefresh }) => {
     );
 };
 
-// --- COMPONENT: ACCOUNT SETTINGS ---
+//  COMPONENT: ACCOUNT SETTINGS 
 const AccountSettings = ({ organization, onRefresh }) => {
     const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
     const [notification, setNotification] = useState({ message: '', type: '' });
@@ -377,7 +376,7 @@ const AccountSettings = ({ organization, onRefresh }) => {
     return (
         <div className="space-y-8">
             <NotificationBanner message={notification.message} type={notification.type} onClose={() => setNotification({ message: '', type: '' })} />
-            <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
+            <div className="bg-white rounded-xl shadow-md border overflow-hidden">
                 <div className="p-6 border-b bg-gray-50/50 flex gap-4">
                     <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><ShieldCheckIcon className="w-8 h-8" /></div>
                     <div><h2 className="text-xl font-bold">Security</h2><p className="text-sm text-gray-500">Secure your account.</p></div>
@@ -398,7 +397,7 @@ const AccountSettings = ({ organization, onRefresh }) => {
     );
 };
 
-// --- COMPONENT: PREFERENCES ---
+//  COMPONENT: PREFERENCES 
 const Preferences = () => {
     const [theme, setTheme] = useState('Light');
     const [notificationPrefs, setNotificationPrefs] = useState([

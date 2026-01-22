@@ -44,7 +44,7 @@ export const ProjectProvider = ({ children }) => {
 
             const data = await res.json();
             
-            console.log('🔍 [ProjectContext] API Response:', {
+            console.log(' [ProjectContext] API Response:', {
                 projectId,
                 success: data.success,
                 currentUserRole: data.data?.currentUserRole,

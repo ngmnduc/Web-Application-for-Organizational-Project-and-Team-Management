@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 // Middleware to check if project is active (not archived)
 export async function checkProjectActive(req, res, next) {
   try {
-    // Extract project ID from params (could be :id or :projectId)
+    // Extract project ID from params 
     const projectId = req.params.id || req.params.projectId;
     
     if (!projectId) {

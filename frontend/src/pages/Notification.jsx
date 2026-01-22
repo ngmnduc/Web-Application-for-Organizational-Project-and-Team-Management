@@ -79,32 +79,32 @@ const Notification = () => {
     
     const { notifications, unreadCount, isLoading, isError, markAsRead, markAllAsRead } = useNotifications();
 
-    // --- LOGIC ĐIỀU HƯỚNG CHÍNH XÁC ---
+    //  LOGIC ĐIỀU HƯỚNG CHÍNH XÁC 
     const handleNotificationClick = async (item) => {
         if (!item.read) markAsRead(item._id);
 
         const basePath = user?.role === 'Admin' ? '/admin' : '';
         const meta = item.metadata || {};
 
-        // THÊM: NEW_MEMBER -> /members
+        // NEW_MEMBER -> /members
         if (item.type === 'NEW_MEMBER') {
              navigate(`${basePath}/members`);
              return;
         }
 
-        // 1. MENTION -> Vào thẳng chi tiết Task
+        //  MENTION -> Vào thẳng chi tiết Task
         if (item.type === 'MENTION' && meta.taskId) {
              navigate(`${basePath}/tasks/${meta.taskId}`);
              return;
         } 
         
-        // 2. ASSIGN -> Về trang Kanban (My Tasks)
+        //  ASSIGN -> Về trang Kanban (My Tasks)
         if (item.type === 'ASSIGNED' || item.type === 'TASK_ASSIGN') {
              navigate(`${basePath}/tasks`);
              return;
         }
 
-        // 3. Fallback cho các task noti khác (Overdue, Due Soon)
+        // Fallback cho các task noti khác (Overdue, Due Soon)
         if (meta.taskId) {
              navigate(`${basePath}/tasks/${meta.taskId}`);
              return;

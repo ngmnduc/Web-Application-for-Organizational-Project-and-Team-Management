@@ -94,7 +94,7 @@ const JoinRequestBell = () => {
 
   return (
     <div className="relative" ref={sidebarRef}>
-      {/* --- Trigger Button --- */}
+      {/*  Trigger Button */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`relative p-2 rounded-full transition-colors focus:outline-none ${isOpen ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100 hover:text-blue-600'}`}
@@ -107,7 +107,7 @@ const JoinRequestBell = () => {
         )}
       </button>
 
-      {/* --- Sidebar / Drawer --- */}
+      {/*Sidebar / Drawer */}
       {isOpen && (
         <div className="fixed inset-y-0 right-0 z-[100] w-[400px] bg-white shadow-2xl border-l border-gray-100 flex flex-col transform transition-transform duration-300 ease-in-out">
             

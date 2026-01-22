@@ -9,7 +9,7 @@
 export const validateCreateProject = (data) => {
   const errors = [];
 
-  // Name validation (REQUIRED)
+  // Name validation 
   if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
     errors.push('Project name is required');
   } else if (data.name.trim().length < 3) {
@@ -18,21 +18,21 @@ export const validateCreateProject = (data) => {
     errors.push('Project name cannot exceed 100 characters');
   }
 
-  // Description validation (OPTIONAL)
+  // Description validation 
   if (data.description !== undefined && typeof data.description !== 'string') {
     errors.push('Description must be a string');
   } else if (data.description && data.description.length > 500) {
     errors.push('Description cannot exceed 500 characters');
   }
 
-  // Deadline validation (REQUIRED)
+  // Deadline validation 
   if (!data.deadline) {
     errors.push('Deadline is required');
   } else if (isNaN(Date.parse(data.deadline))) {
     errors.push('Invalid deadline format');
   }
 
-  // Manager validation (OPTIONAL)
+  // Manager validation 
   if (data.manager !== undefined && data.manager !== null && data.manager !== '') {
     if (typeof data.manager !== 'string') {
       errors.push('Manager must be a valid user ID');

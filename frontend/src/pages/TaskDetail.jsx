@@ -13,7 +13,7 @@ import {
    addAttachment,
    removeAttachment
 } from "../services/taskService";
-import { useAuth } from "../services/AuthContext"; // Import useAuth
+import { useAuth } from "../services/AuthContext"; 
 import { ArrowLeftIcon, CalendarIcon, UserIcon, TagIcon, XMarkIcon, CheckCircleIcon, XCircleIcon, SparklesIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-toastify";
 import Swal from 'sweetalert2';
@@ -72,23 +72,23 @@ const TaskDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { selectedProjectId, currentProjectRole } = useProject(); // ✅ THÊM
+  const { selectedProjectId, currentProjectRole } = useProject(); 
 
   const subtaskInputRef = useRef(null);
   const isGeneratingRef = useRef(false);
   const lastGenerateTime = useRef(0);
   const COOLDOWN_MS = 5000;
 
-  // ✅ FIX: Tính toán quyền giống MyTasks
+  //  Tính toán quyền giống MyTasks
   const systemRole = user?.role || 'Member';
   const isSystemAdmin = systemRole === 'Admin';
   const projectRole = currentProjectRole || 'Member';
   const effectiveRole = isSystemAdmin ? 'Admin' : projectRole;
   
-  // ✅ FIX: Check quyền quản lý
+  //  Check quyền quản lý
   const canManage = ['Admin', 'Manager'].includes(effectiveRole);
 
-  // ✅ DEBUG: Log khi component mount
+  // Log khi component mount
   useEffect(() => {
     console.log('🔍 [TaskDetail] Permission:', {
       systemRole,
@@ -182,7 +182,7 @@ const TaskDetail = () => {
     fetchTask();
   }, [fetchTask]);
 
-  // ====== HANDLERS: COMMENTS ======
+  // HANDLERS: COMMENTS
   const handlePostComment = async () => {
     if (!newComment.trim()) return;
     try {
@@ -201,7 +201,7 @@ const TaskDetail = () => {
     }
   };  
 
-  // ====== HANDLERS: SUBTASKS ======
+  // HANDLERS: SUBTASKS
 
   const handleFocusSubtaskInput = () => {
     // Cuộn xuống và focus vào ô input
@@ -268,7 +268,7 @@ const TaskDetail = () => {
     }
   };
 
-  // --- AI HANDLER ---
+  //  AI HANDLER 
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   useEffect(() => {
@@ -331,7 +331,7 @@ const TaskDetail = () => {
     }
   };
 
-  // --- HANDLERS: EDIT TASK ---
+  //  HANDLERS: EDIT TASK 
   const openEditModal = () => {
     if (!task) return;
     setEditForm({
@@ -339,7 +339,7 @@ const TaskDetail = () => {
         description: task.description || "",
         assigneeId: task.assigneeId?._id || task.assigneeId || "",
         priority: task.priority || "MEDIUM",
-        status: task.status || "TODO", // Lưu ý: map đúng value với backend (TODO/DOING/DONE)
+        status: task.status || "TODO", 
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : "", // Format YYYY-MM-DD cho input date
         labels: task.labels ? task.labels.map(l => l.name || l).join(', ') : ""
     });
@@ -349,7 +349,7 @@ const TaskDetail = () => {
   const handleUpdateTask = async (e) => {
     e.preventDefault();
     try {
-        // --- FIX: Xử lý dữ liệu trước khi gửi ---
+        //  Xử lý dữ liệu trước khi gửi 
         const payload = {
           ...editForm,
           // Nếu là chuỗi rỗng thì gửi null, ngược lại gửi ID
@@ -375,7 +375,7 @@ const TaskDetail = () => {
         }));
         
         setIsEditOpen(false);
-        toast.success("Task updated successfully!"); // Báo thành công
+        toast.success("Task updated successfully!"); 
     } catch (err) {
         console.error("Update task failed", err);
         // Hiển thị chi tiết lỗi từ backend nếu có
@@ -383,7 +383,7 @@ const TaskDetail = () => {
     }
   };
 
-  // ====== HANDLERS: ATTACHMENTS ======
+  // HANDLERS: ATTACHMENTS
   const handleOpenAttachmentInput = () => {
     setIsAttachmentInputOpen(true);
     // Focus vào input sau khi mở
@@ -394,31 +394,30 @@ const TaskDetail = () => {
     }, 100);
   };
 
-  // --- THAY THẾ TOÀN BỘ HÀM handleAddAttachment CŨ BẰNG ĐOẠN NÀY ---
   const handleAddAttachment = async () => {
-    // 1. Validate
+    //  Validate
     if (!newAttachmentUrl.trim()) {
         toast.error("URL cannot be empty.");
         return;
     }
 
     try {
-        // 2. Chuẩn bị payload (map title -> name theo yêu cầu Backend)
+        //  Chuẩn bị payload 
         const payload = {
             url: newAttachmentUrl.trim(),
             name: newAttachmentTitle.trim() || newAttachmentUrl.trim(), 
         };
 
-        // 3. Gọi API thật
+        // Gọi API thật
         const addedAttachment = await addAttachment(taskId, payload);
 
-        // 4. Cập nhật State
+        //  Cập nhật State
         setTask(prev => ({
             ...prev,
             attachments: [...(prev.attachments || []), addedAttachment]
         }));
         
-        // 5. Reset form
+        //  Reset form
         setNewAttachmentUrl("");
         setNewAttachmentTitle("");
         setIsAttachmentInputOpen(false);
@@ -432,7 +431,7 @@ const TaskDetail = () => {
     }
   };
 
- // ========== RENDER GUARDS ==========
+ // RENDER GUARDS
   if (isLoading && !task) return <div className="p-8 text-center">Loading...</div>;
   if (error && !task) return <div className="p-8 text-center text-red-600">{error}</div>;
   if (!task) return <div className="p-8 text-center">Not found</div>;
@@ -441,7 +440,7 @@ const TaskDetail = () => {
   const subtasks = task.subtasks || [];
   const attachments = task.attachments || []; 
   const comments = commentsList || [];
-  // Xử lý hiển thị Priority (Backend trả về chữ hoa: HIGH, MEDIUM...)
+  // Xử lý hiển thị Priority 
   const displayPriority = task.priority 
     ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1).toLowerCase() 
     : "Medium";
@@ -458,7 +457,6 @@ const TaskDetail = () => {
           Back to tasks
         </button>
 
-        {/*  Dùng canManage thay vì currentUserRole */}
         {canManage && (
           <div className="flex gap-2">
             <button 
@@ -517,7 +515,7 @@ const TaskDetail = () => {
         </div>
       </div>
 
-      {/* --- THÊM ĐOẠN NÀY ĐỂ HIỆN LỖI --- */}
+      {/*  CHECK LỖI  */}
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg relative">
             <strong className="font-bold">Error: </strong>
@@ -544,7 +542,7 @@ const TaskDetail = () => {
 
           {/* Subtasks */}
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-            {/* --- HEADER CÓ NÚT AI --- */}
+            {/*  HEADER CÓ NÚT AI  */}
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Sub-tasks</h2>              
                  <button 
@@ -629,8 +627,8 @@ const TaskDetail = () => {
 
             {/* Add comment */}
             <div className="mb-6 flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
-                    {user?.name?.[0] || "U"}
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-brand text-xs font-bold "style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                    {user?.name?.[0].toUpperCase() || "U"}
                 </div>
                 <div className="flex-1">
                    <MentionsInput
@@ -638,7 +636,7 @@ const TaskDetail = () => {
             onChange={(e) => setNewComment(e.target.value)}
             style={mentionInputStyle}
             placeholder="Write a comment... (Type '@' to mention)"
-            className="w-full focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+            className="w-full focus:ring-2  transition"
             a11ySuggestionsListLabel={"Suggested mentions"}
             disabled={isPostingComment}
         >
@@ -653,8 +651,8 @@ const TaskDetail = () => {
               }}
                 renderSuggestion={(suggestion, search, highlightedDisplay) => (
                     <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
-                            {suggestion.display.charAt(0)}
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold "style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                            {suggestion.display.charAt(0).toUpperCase()}
                         </div>
                         <span>{suggestion.display}</span>
                     </div>
@@ -721,8 +719,8 @@ const TaskDetail = () => {
                     <UserIcon className="w-3 h-3"/> Assignee
                 </span>
                 <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
-                        {task.assigneeName ? task.assigneeName[0] : "?"}
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                        {task.assigneeName ? task.assigneeName[0].toUpperCase() : "?"}
                     </div>
                     <span className="font-medium text-gray-900">{task.assigneeName || "Unassigned"}</span>
                 </div>
@@ -739,7 +737,7 @@ const TaskDetail = () => {
                 </span>
               </div>
 
-              {/* Labels (Tạm ẩn nếu chưa có) */}
+              {/* Labels  */}
               <div className="flex flex-col gap-1">
                 <span className="text-gray-400 text-xs flex items-center gap-1">
                     <TagIcon className="w-3 h-3"/> Labels
@@ -759,7 +757,7 @@ const TaskDetail = () => {
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Attachments</h2>
                  <button 
                     onClick={handleOpenAttachmentInput} 
-                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90  px-3 py-1.5 rounded-lg transition-all shadow-sm"
                  >
                     + Add File
                  </button>            
@@ -859,7 +857,7 @@ const TaskDetail = () => {
         </div>
 
       </div>
-      {/* === EDIT TASK MODAL === */}
+      {/*  EDIT TASK MODAL  */}
       {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -955,7 +953,7 @@ const TaskDetail = () => {
 
               <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 mt-2">
                 <button type="button" onClick={() => setIsEditOpen(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-6 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium shadow-sm">Save Changes</button>
+                <button type="submit" className="px-6 py-2 text-sm rounded-lg bg-brand text-white hover:opacity-90  font-medium shadow-sm">Save Changes</button>
               </div>
             </form>
           </div>

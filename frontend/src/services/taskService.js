@@ -18,14 +18,12 @@ export const getTasksByProject = async (projectId, filters = {}) => {
         params.append('assignee', filters.assignee);
     }
 
-    // Backend hiện chưa support filter theo 'label' trong model, 
-    // nhưng nếu sau này có thì ta append vào đây.
     if (filters.label) {
         params.append('label', filters.label);
     }
 
     const queryString = params.toString();
-    // Gọi vào GET /tasks thay vì /projects/:id/tasks
+    // Gọi vào GET /tasks 
     const url = `/tasks${queryString ? `?${queryString}` : ''}`;
 
     const response = await axiosInstance.get(url);
@@ -123,14 +121,12 @@ export const reorderTask = async (taskId, newStatus, newPosition) => {
 };
 
 
-//=====Comments======
-
 /** * Lấy danh sách comment của 1 task
  * @param {string} taskId
  */
 export const getTaskComments = async (taskId) => {
   try {
-    // Gọi API lấy comment. Backend cần có route GET /tasks/:taskId/comments
+    // Gọi API lấy comment. 
     const response = await axiosInstance.get(`/tasks/${taskId}/comments`);
     return response.data.data || [];
   } catch (error) {
@@ -149,7 +145,6 @@ export const getTaskComments = async (taskId) => {
     const response = await axiosInstance.post(`/tasks/${taskId}/comments`, {
       content,
     });
-    // thường backend trả về comment mới
     return response.data.data;
   } catch (error) {
     console.error("Lỗi khi tạo comment:", error);
@@ -157,7 +152,6 @@ export const getTaskComments = async (taskId) => {
   }
 };
 
-// ======= Sub-tasks ========
 
 /**
  * tạo subtask mới
@@ -212,7 +206,6 @@ export const deleteSubtask = async (taskId, subtaskId) => {
  */
 export const generateAiSubtasks = async (taskId) => {
   try {
-    // Gọi đúng route đã định nghĩa trong task.routes.js
     const response = await axiosInstance.post(`/tasks/${taskId}/magic-subtasks`);
     return response.data.data; // Trả về mảng subtask mới
   } catch (error) {
@@ -221,7 +214,6 @@ export const generateAiSubtasks = async (taskId) => {
   }
 };
 
-// ======= Attachments ========
 
 /**
  * thêm attachment vào task
@@ -263,15 +255,12 @@ export default {
   getTaskById, 
   reorderTask,
   getProjectMembers,
-  //comment
   getTaskComments,
   createComment,
-  //subtask
   createSubtask,
   toggleSubtask,
   deleteSubtask,
   generateAiSubtasks,
-  //attachments
   addAttachment,
   removeAttachment
 };

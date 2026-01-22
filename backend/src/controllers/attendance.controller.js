@@ -562,8 +562,8 @@ export const getProjectAttendance = async (req, res) => {
         );
 
         let present = 0;
-        let lateDates = [];   // 🟢 Lưu chi tiết ngày + giờ muộn
-        let absentDates = []; // 🟢 Lưu chi tiết ngày nghỉ
+        let lateDates = [];   //  Lưu chi tiết ngày + giờ muộn
+        let absentDates = []; //  Lưu chi tiết ngày nghỉ
 
         userRecords.forEach(rec => {
             // Format ngày: DD/MM/YYYY

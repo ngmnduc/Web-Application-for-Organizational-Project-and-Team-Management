@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { ChevronDownIcon, PlusIcon, FunnelIcon, UserIcon, TagIcon, XMarkIcon, FolderIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, PlusIcon, UserIcon, TagIcon, XMarkIcon,} from '@heroicons/react/24/outline';
 import { 
   ClipboardDocumentListIcon as TotalSolid, 
   ClockIcon as ClockSolid, 
@@ -13,18 +13,18 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 import TaskSummary from '../components/TaskSummary';
 import { getProjects, getProjectLabels } from '../services/projectService';
-import { getTasksByProject, updateTaskStatus, createTask, reorderTask, getProjectMembers, deleteTask } from '../services/taskService';
+import { getTasksByProject, createTask, reorderTask, getProjectMembers, deleteTask } from '../services/taskService';
 import { useAuth } from '../services/AuthContext';
 import { useProject } from '../context/ProjectContext';
 
-// ===== Helper: Format Date =====
+//  Helper: Format Date 
 const formatDate = (dateString) => {
   if (!dateString) return '—';
   const date = new Date(dateString);
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); 
 };
 
-// ===== Helper: Get Initials =====
+//  Helper: Get Initials 
 const getInitials = (name) => {
   if (!name) return '??';
   const parts = name.trim().split(' ');
@@ -32,7 +32,7 @@ const getInitials = (name) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-// ===== Badge priority  =====
+//  Badge priority  
 const PriorityBadge = ({ level }) => {
   const normalizedLevel = level ? level.charAt(0).toUpperCase() + level.slice(1).toLowerCase() : 'Medium';
   const map = {
@@ -49,13 +49,13 @@ const PriorityBadge = ({ level }) => {
   );
 };
 
-// ===== Kanban Card =====
+//Kanban Card 
 const KanbanCard = ({ task, onOpenDetail, onDelete }) => { 
   return (
     <div
       type="button"
       onClick={() => onOpenDetail(task)}
-      className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition relative group" // <--- 2. Thêm relative group
+      className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition relative group" 
     >
       
       {onDelete && (
@@ -70,7 +70,7 @@ const KanbanCard = ({ task, onOpenDetail, onDelete }) => {
             <XMarkIcon className="w-4 h-4" />
         </button>
       )}
-      {/* --- PHẦN HEADER: Đưa Priority và Project Name lên đây --- */}
+      {/* HEADER */}
       <div className="flex items-center gap-2 mb-2 flex-wrap pr-6n">
         {/* Badge Priority */}
         <PriorityBadge level={task.priority} />
@@ -82,14 +82,14 @@ const KanbanCard = ({ task, onOpenDetail, onDelete }) => {
             </span>
         )}
 
-        {/* 3. Badge Labels (Nếu có thật sự) */}
+        {/*  Badge Labels  */}
         {task.labels && task.labels.map((lbl, idx) => (
           <span key={idx} className="text-xs px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
             {lbl}
           </span>
         ))}
 
-        {/* 4. Badge Due Soon */}
+        {/*  Badge Due Soon */}
         {task.dueSoon && (
           <span className="text-xs px-2 py-0.5 rounded-md bg-orange-100 text-orange-700">
             Due soon
@@ -102,7 +102,7 @@ const KanbanCard = ({ task, onOpenDetail, onDelete }) => {
         {task.title}
       </h4>
 
-      {/* --- FOOTER: Date & Avatar --- */}
+      {/*  FOOTER: Date & Avatar  */}
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-3 text-gray-500">
           <div className="flex items-center gap-1" title="Due Date">
@@ -127,7 +127,6 @@ const KanbanCard = ({ task, onOpenDetail, onDelete }) => {
   );
 };
 
-// ===== MyTasks =====
 const MyTasks = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -139,26 +138,26 @@ const MyTasks = () => {
         currentProjectRole  // Sử dụng helper từ context
     } = useProject();
     
-    // ========== PERMISSION LOGIC =========
-    // 1. Lấy System Role
+    // PERMISSION LOGIC 
+    // Lấy System Role
     const systemRole = user?.role || 'Member';
     const isSystemAdmin = systemRole === 'Admin';
     
-    // 2. Lấy Project Role từ context (đã được fetch từ API)
+    // Lấy Project Role từ context (đã được fetch từ API)
     const projectRole = currentProjectRole || 'Member';
     
-    // 3. Tính toán effective role
+    // Tính toán effective role
     // - System Admin luôn có quyền cao nhất
     // - Nếu không phải System Admin, dùng project role
     const effectiveRole = isSystemAdmin ? 'Admin' : projectRole;
     
-    // 4. Check quyền quản lý tasks
+    //  Check quyền quản lý tasks
     const isManagerOrAdmin = ['Admin', 'Manager'].includes(effectiveRole);
     const canManageTasks = isManagerOrAdmin && selectedProjectId && selectedProjectId !== 'all';
     
     // Debug log
     useEffect(() => {
-        console.log('🔐 [MyTasks] Permission check:', {
+        console.log(' [MyTasks] Permission check:', {
             systemRole,
             isSystemAdmin,
             projectRole,
@@ -228,7 +227,7 @@ const MyTasks = () => {
       Done: 'DONE',
     };
 
-    // 1. FETCH PROJECTS
+    //  FETCH PROJECTS
     useEffect(() => {
         const fetchProjects = async () => {
             try {
@@ -245,7 +244,7 @@ const MyTasks = () => {
         fetchProjects();
     }, []);
 
-    // 2. Lấy Members, Labels & Fill Dropdown
+    //  Lấy Members, Labels & Fill Dropdown
     useEffect(() => {
         if (!selectedProjectId || selectedProjectId === 'all') {
             setTasks([]);
@@ -274,7 +273,7 @@ const MyTasks = () => {
         fetchMeta();
     }, [selectedProjectId]);
 
-    // 3. FETCH TASKS
+    //  FETCH TASKS
     useEffect(() => {
         if (!selectedProjectId || selectedProjectId === 'all') {
             setTasks([]);
@@ -405,7 +404,7 @@ const MyTasks = () => {
     // Create Task
     const openCreateModal = (statusColumn = 'Todo') => {
         if (!canManageTasks) {
-            console.warn('⚠️ No permission to create task. Role:', effectiveRole);
+            console.warn(' No permission to create task. Role:', effectiveRole);
             return;
         }
         setNewTaskForm({
@@ -490,10 +489,10 @@ const MyTasks = () => {
       if (!result.isConfirmed) return;
 
       try {
-          // 1. Gọi API xóa
+          // Gọi API xóa
           await deleteTask(taskToDelete.id);
 
-          // 2. Cập nhật State để task biến mất ngay lập tức
+          //  Cập nhật State để task biến mất ngay lập tức
           setTasks((prev) => prev.filter(t => t.id !== taskToDelete.id));
 
           Swal.fire('Deleted!', 'The task has been deleted.', 'success');

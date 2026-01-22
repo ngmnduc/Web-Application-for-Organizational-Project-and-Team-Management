@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom'; // Import Portal
+import { createPortal } from 'react-dom';
 import { 
     XMarkIcon, 
     PaperAirplaneIcon,
@@ -17,7 +17,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
     const socketRef = useRef(null);
     const inputRef = useRef(null);
 
-    // --- Hàm kiểm tra chính xác người gửi (Xử lý cả _id và id) ---
+    // --- Hàm kiểm tra chính xác người gửi 
     const checkIsMe = (senderId) => {
         if (!currentUser || !senderId) return false;
         
@@ -99,7 +99,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
     return createPortal(
         <div className="fixed bottom-4 right-4 w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-[9999] animate-in slide-in-from-bottom-5 duration-300 font-sans">
             
-            {/* --- HEADER --- */}
+            {/* HEADER */}
             <div 
                 className="px-4 py-3 text-white rounded-t-2xl flex justify-between items-center shadow-sm"
                 style={{ backgroundColor: 'var(--color-brand)' }}
@@ -120,7 +120,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
                 </button>
             </div>
 
-            {/* --- BODY --- */}
+            {/* BODY */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-1 custom-scrollbar">
                 {isLoading ? (
                     <div className="flex justify-center items-center h-full">
@@ -160,7 +160,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
                                     className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2 group ${isFirstInSequence ? 'mt-3' : 'mt-1'}`}
                                 >
                                     
-                                    {/* --- AVATAR AREA (Bên trái) --- */}
+                                    {/* AVATAR AREA */}
                                     {!isMe && (
                                         <div className="w-8 h-8 shrink-0 flex flex-col justify-end">
                                             {showAvatar ? (
@@ -172,7 +172,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
                                                         onError={(e) => {e.target.style.display='none'; e.target.nextSibling.style.display='flex'}} // Fallback nếu ảnh lỗi
                                                     />
                                                 ) : (
-                                                    // Fallback Avatar dạng chữ cái (Initials)
+                                                    // Fallback Avatar dạng chữ cái 
                                                     <div 
                                                         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border bg-white shadow-sm"
                                                         style={{ color: 'var(--color-brand)', borderColor: 'var(--color-brand)' }}
@@ -187,7 +187,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
                                         </div>
                                     )}
 
-                                    {/* --- MESSAGE CONTENT --- */}
+                                    {/* MESSAGE CONTENT */}
                                     <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                         
                                         {/* Tên người gửi (Chỉ hiện ở tin đầu tiên của nhóm) */}
@@ -222,7 +222,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
                 )}
             </div>
 
-            {/* --- FOOTER --- */}
+            {/* FOOTER */}
             <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-gray-100 rounded-b-2xl flex items-center gap-2">
                 <input
                     ref={inputRef}

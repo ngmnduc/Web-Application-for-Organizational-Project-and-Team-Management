@@ -3,30 +3,26 @@ import { useOutletContext } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import { formatDistanceToNow } from 'date-fns';
 import axiosInstance from '../services/api';
-import { getProjects } from "../services/projectService"; // 🔵 Thêm
+import { getProjects } from "../services/projectService";
 import TaskSummary from '../components/TaskSummary';
 import { ChevronDownIcon, SparklesIcon,XMarkIcon, 
   LightBulbIcon, 
   CalendarIcon, 
   CheckCircleIcon,
   ExclamationTriangleIcon, 
-  FolderIcon,
   ClipboardDocumentListIcon as TotalSolid, 
   ClockIcon as ClockSolid, 
   ArrowPathIcon as ProgressSolid, 
   CheckCircleIcon as DoneSolid,
   ExclamationTriangleIcon as WarningSolid, } from '@heroicons/react/24/outline';
-  // 🔵 THÊM MỚI: Import Ant Design Components cho Dashboard Block mới
 import { Card, Row, Col, Statistic, Progress, List, Tag, Spin } from "antd";
 import { 
   ProjectOutlined, TeamOutlined, CheckCircleOutlined as AntCheckCircleOutlined,  LoadingOutlined 
 } from "@ant-design/icons";
-// 🔵 THÊM MỚI: Import Service Dashboard (đã tạo ở bước trước)
 import dashboardService from "../services/dashboardService";
 import { useProject } from '../context/ProjectContext';
-// ==================================================================================
-// 🔵 AI DAILY WIDGET COMPONENT
-// ==================================================================================
+
+// AI DAILY WIDGET COMPONENT
 const AIDailyWidget = ({ onClose }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +63,7 @@ const AIDailyWidget = ({ onClose }) => {
         {/* Content Area */}
         <div className="p-6 overflow-y-auto custom-scrollbar bg-gray-50/50 h-full">
           {loading ? (
-            // --- SKELETON LOADING UI ---
+            // SKELETON LOADING UI 
             <div className="space-y-5 animate-pulse">
               <div className="h-20 bg-gray-200 rounded-xl w-full"></div>
               <div className="space-y-3">
@@ -83,7 +79,7 @@ const AIDailyWidget = ({ onClose }) => {
               <button onClick={onClose} className="mt-4 text-sm font-semibold underline text-gray-500">Close</button>
             </div>
           ) : (
-            // --- MAIN CONTENT ---
+            // MAIN CONTENT 
             <div className="space-y-6">
               
               {/* Greeting */}
@@ -155,17 +151,70 @@ const AIDailyWidget = ({ onClose }) => {
   );
 };
 
+const formatActivityContent = (act) => {
+  const userName = act.userId?.name || "Unknown User";
+  
+  //  Content 
+  if (act.content && act.content.length > 5 && !act.content.match(/^(created|updated|deleted|reordered)/i)) {
+      return (
+          <span>
+              <span className="font-semibold text-gray-900">{userName}</span> {act.content}
+          </span>
+      );
+  }
+
+  //  Map Action
+  let actionText = "performed an action";
+  switch (act.action) {
+      case "CREATE_PROJECT": actionText = "created project"; break;
+      case "UPDATE_PROJECT": actionText = "updated project settings"; break;
+      case "DELETE_PROJECT": actionText = "deleted project"; break;
+      case "ARCHIVE_PROJECT": actionText = "archived project"; break;
+      case "JOIN_PROJECT": actionText = "joined the project"; break;
+      case "LEAVE_PROJECT": actionText = "left the project"; break;
+      
+      case "CREATE_TASK": actionText = "created task"; break;
+      case "UPDATE_TASK": actionText = "updated task"; break;
+      case "DELETE_TASK": actionText = "deleted task"; break;
+      case "COMPLETE_TASK": actionText = "completed task"; break;
+      case "REORDER_TASK": actionText = "reordered task"; break;
+  }
+
+  //  Entity Name từ Metadata
+  let entityName = "";
+  if (act.metadata?.snapshot) {
+      entityName = act.metadata.snapshot.title || act.metadata.snapshot.name || "";
+  } else if (act.metadata?.changes) {
+      const nameChange = act.metadata.changes.find(c => c.field === 'name' || c.field === 'title');
+      if (nameChange) entityName = nameChange.new;
+      
+      const statusChange = act.metadata.changes.find(c => c.field === 'status');
+      if (statusChange) actionText = `moved task to ${statusChange.new}`;
+  }
+  
+  if (!entityName && act.content) {
+      const match = act.content.match(/"([^"]+)"/);
+      if (match) entityName = match[1];
+  }
+
+  return (
+      <span>
+          <span className="font-semibold text-gray-900">{userName}</span> {actionText} 
+          {entityName && <span className="font-semibold text-brand"> "{entityName}"</span>}
+      </span>
+  );
+};
 
 const HomePage = () => {
-  const { selectedProjectId, selectedProjectName, switchProject } = useProject();
+  const { selectedProjectId } = useProject();
   const { dynamicTasksSummary } = useOutletContext() || {};
-  // 🔵 THÊM MỚI: State cho User Role và Dashboard Data mới
+  // State cho User Role và Dashboard Data 
   const [user, setUser] = useState(null);
   const [adminStats, setAdminStats] = useState(null);
   const [managerStats, setManagerStats] = useState(null);
   const [memberStats, setMemberStats] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
-// 🔵 NEW: State để xác định User đang xem Dashboard với tư cách gì (Admin/Manager/Member)
+// State để xác định User đang xem Dashboard với tư cách gì (Admin/Manager/Member)
   const [dashboardViewRole, setDashboardViewRole] = useState(null);
 
   const [stats, setStats] = useState(null);
@@ -177,19 +226,15 @@ const HomePage = () => {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1); // 1-12
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
 
-  // 🔵 THÊM MỚI: Lấy User từ LocalStorage để phân quyền
+  // Lấy User từ LocalStorage để phân quyền
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
      const parsedUser = JSON.parse(storedUser);
-      console.log(">>> CURRENT USER:", parsedUser); // 🔵 Debug: Xem Role là gì
+      console.log("CURRENT USER:", parsedUser); // Debug: Xem Role là gì
       setUser(parsedUser);
     }
   }, []);
-
-  // ✅ ĐOẠN CODE KÍCH HOẠT RELOAD DỮ LIỆU
-   useEffect(() => {
-    if (!user) return;
 
     const fetchDashboardData = async () => {
       setDashboardLoading(true);
@@ -198,6 +243,7 @@ const HomePage = () => {
       setAdminStats(null);
       setManagerStats(null);
       setMemberStats(null);
+      setActivities([]);
 
       try {
         const projectIdParam = selectedProjectId || 'all';
@@ -207,11 +253,12 @@ const HomePage = () => {
           setDashboardViewRole('Admin');
           const data = await dashboardService.getAdminStats(projectIdParam, selectedMonth, selectedYear);
           setAdminStats(data);
+          setActivities(data.activities || []);
         }
         
         // CASE 2: MANAGER HOẶC MEMBER (Cần kiểm tra quyền trong Project)
         else {
-          // Bước 1: Thử lấy Manager Stats trước để xem User có quyền quản lý project này không
+          // Thử lấy Manager Stats trước để xem User có quyền quản lý project này không
           // (API getManagerStats sẽ trả về kpi.myProjects = 0 nếu không phải Manager)
           const managerData = await dashboardService.getManagerStats(projectIdParam, selectedMonth, selectedYear);
           
@@ -221,11 +268,13 @@ const HomePage = () => {
           if (isManagerInContext) {
             setDashboardViewRole('Manager');
             setManagerStats(managerData);
+            setActivities(managerData.activities || []);
           } else {
             // Nếu không phải Manager -> Chuyển sang Member View và lấy Member Stats
             setDashboardViewRole('Member');
             const memberData = await dashboardService.getMemberStats(projectIdParam, selectedMonth, selectedYear);
             setMemberStats(memberData);
+            setActivities(memberData.activities || []);
           }
         }
 
@@ -236,45 +285,32 @@ const HomePage = () => {
       }
     };
 
+    useEffect(() => {
+    if (!user) return;
     fetchDashboardData();
-  }, [user, selectedProjectId, selectedMonth, selectedYear]); // Re-run khi đổi dự án
+  }, [user, selectedProjectId, selectedMonth, selectedYear]); 
 
-  // ----------------------------------------------------------
 
-  // ----------------------------------------------------------
-  // 🔵 LOAD SUMMARY + ACTIVITY MỖI KHI currentProjectId THAY ĐỔI
-  // ----------------------------------------------------------
   useEffect(() => {
     if (selectedProjectId === 'all' || !selectedProjectId) {
         setStats(null);
-        setActivities([]);
         return;
     }
-    
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [summaryRes, activityRes] = await Promise.all([
-          axiosInstance.get(`/projects/${selectedProjectId}/summary`),
-          axiosInstance.get(`/projects/${selectedProjectId}/activities`)
-        ]);
-        
+        const summaryRes = await axiosInstance.get(`/projects/${selectedProjectId}/summary`);
         setStats(summaryRes.data.data);
-        setActivities(activityRes.data.data || []);
       } catch (error) {
-        console.error("Error:", error);
+        console.error("Error fetching legacy stats:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
-  }, [selectedProjectId, user]);
-  // ----------------------------------------------------------
+  }, [selectedProjectId,user]);
 
-
-
-  // --- CONFIG HELPER CHO CHART & COLOR ---
+  // CONFIG HELPER CHO CHART & COLOR 
   const getStatusConfig = (status) => {
     const s = status?.toLowerCase();
     if (s === 'completed' || s === 'done') return { color: '#22c55e', tailwind: 'bg-green-500', label: 'Completed' };
@@ -283,14 +319,7 @@ const HomePage = () => {
     return { color: '#9ca3af', tailwind: 'bg-gray-400', label: status };
   };
 
-  const getPriorityConfig = (priority) => {
-    const p = priority?.toLowerCase();
-    if (p === 'high') return 'bg-red-500';
-    if (p === 'medium') return 'bg-orange-500';
-    return 'bg-green-500';
-  };
-
-  // --- CHART CONFIG ---
+  // CHART CONFIG 
   const getChartOption = () => {
   // Kiểm tra đúng path
   if (!stats || !stats.tasksByStatus) {
@@ -351,7 +380,7 @@ const HomePage = () => {
   };
   
 };
-// 🔵 THÊM MỚI: Helpers cho biểu đồ mới (Admin/Manager)
+// Helpers cho biểu đồ mới (Admin/Manager)
   const getAdminPieOption = () => ({
     tooltip: { trigger: 'item' },
     legend: { bottom: '0%' },
@@ -388,7 +417,19 @@ const HomePage = () => {
     }]
   });
 
-  // 🔵 MEMBER PIE CHART OPTION (Dùng dữ liệu memberStats)
+  const getMemberBarOption = () => ({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'value', minInterval: 1, boundaryGap: [0, 0.01] },
+    yAxis: { type: 'category', data: memberStats?.charts?.priorityDistribution?.map(i => i.name) || [] },
+    series: [{
+        name: 'Tasks', type: 'bar',
+        data: memberStats?.charts?.priorityDistribution?.map(i => i.value) || [],
+        itemStyle: { color: '#f35640', borderRadius: [0, 4, 4, 0] }
+    }]
+  });
+
+  //  MEMBER PIE CHART OPTION (Dùng dữ liệu memberStats)
   const getMemberPieOption = () => {
     if (!memberStats || !memberStats.kpi) return {
       title: { text: 'No Data', left: 'center', top: 'center', textStyle: { color: '#ccc', fontSize: 14 } },
@@ -412,42 +453,24 @@ const HomePage = () => {
     };
   };
 
-  // 🔵 CONFIG BIỂU ĐỒ CỘT (WEEKLY ACTIVITY)
-  const getWeeklyActivityOption = () => {
-    return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
-      xAxis: { 
-        type: 'category', 
-        data: memberStats?.charts?.last7DaysActivity?.map(d => d.day) || [], 
-        axisTick: { show: false }, 
-        axisLine: { lineStyle: { color: '#e5e7eb' } },
-        axisLabel: { color: '#6b7280' } 
-      },
-      yAxis: { 
-        type: 'value',
-        minInterval: 1, 
-        splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } },
-        axisLabel: { color: '#6b7280' } 
-      },
-      series: [{ 
-        name: 'Tasks Done', 
-        type: 'bar', 
-        barWidth: '40%', 
-        data: memberStats?.charts?.last7DaysActivity?.map(d => d.value) || [], 
-        itemStyle: { color: '#f35640', borderRadius: [4, 4, 0, 0] },
-        showBackground: true,
-        backgroundStyle: { color: '#f9fafb', borderRadius: [4, 4, 0, 0] }
-      }]
-    };
-  };
-
-  // --- RENDER HELPERS: Sử dụng dashboardViewRole thay vì user.role ---
+  //  CONFIG BIỂU ĐỒ CỘT (WEEKLY ACTIVITY)
+   const getWeeklyActivityOption = () => ({
+    tooltip: { trigger: 'axis' },
+    grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+    xAxis: { type: 'category', data: memberStats?.charts?.taskActivity?.map(d => d.name) || [] },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{ 
+        name: 'Tasks', type: 'bar', barWidth: '40%', 
+        data: memberStats?.charts?.taskActivity?.map(d => d.value) || [],
+        itemStyle: { color: '#f35640', borderRadius: [4, 4, 0, 0] }
+    }]
+  });
+  // RENDER HELPERS: Sử dụng dashboardViewRole thay vì user.role 
   const isAdminView = dashboardViewRole === 'Admin';
   const isManagerView = dashboardViewRole === 'Manager';
   const isMemberView = dashboardViewRole === 'Member';
   
-  // 🔵 UPDATE: Xử lý khi chọn dropdown gộp Month/Year
+  // Xử lý khi chọn dropdown gộp Month/Year
   const handleDateChange = (e) => {
     const value = e.target.value;
     if (!value) return;
@@ -460,32 +483,38 @@ const HomePage = () => {
     }
   };
 
-  // 🔵 Helper: Tạo danh sách tháng/năm cho dropdown
-  // Tạo 12 tháng cho 2 năm gần nhất (Năm hiện tại và năm ngoái)
+  // Helper: Tạo danh sách tháng/năm cho dropdown
+  // Tạo 12 tháng cho 2 năm gần nhất (Năm nay và năm ngoái)
   const generateMonthYearOptions = () => {
     const options = [];
     const now = new Date();
     const currentYear = now.getFullYear();
-    const yearsToGenerate = [currentYear, currentYear - 1]; // 2 năm
+    const currentMonth = now.getMonth() + 1; // 1-12
+    
+    // Năm hiện tại: Từ tháng hiện tại trở về tháng 1
+    for (let month = currentMonth; month >= 1; month--) {
+        options.push({
+            value: `${month}-${currentYear}`,
+            label: `Month ${month}/${currentYear}`
+        });
+    }
 
-    yearsToGenerate.forEach(year => {
-        for (let month = 12; month >= 1; month--) {
-            // Chỉ hiện các tháng trong tương lai nếu muốn, ở đây ta hiện hết
-            // Hoặc giới hạn không hiện tháng tương lai của năm nay? (Tùy logic)
-            // Logic đơn giản: Hiện tất cả 12 tháng
-            options.push({
-                value: `${month}-${year}`,
-                label: `Month ${month}/${year}`
-            });
-        }
-    });
+    // Năm ngoái: Lấy cả 12 tháng
+    const lastYear = currentYear - 1;
+    for (let month = 12; month >= 1; month--) {
+        options.push({
+            value: `${month}-${lastYear}`,
+            label: `Month ${month}/${lastYear}`
+        });
+    }
+
     return options;
   };
 
   const monthYearOptions = generateMonthYearOptions();
 
 
-// 🔵 FIX ERROR: Helper chuyển đổi Object số liệu thành Array cho TaskSummary Component
+// Helper chuyển đổi Object số liệu thành Array cho TaskSummary Component
   const formatTaskSummaryData = (data) => {
     if (!data) return [];
     // Nếu đã là Array (ví dụ dynamicTasksSummary) thì trả về luôn
@@ -508,17 +537,17 @@ const HomePage = () => {
     ];
   };
 
-  // --- PREPARE DATA FOR MEMBER SUMMARY (Mapping từ memberStats) ---
+  //PREPARE DATA FOR MEMBER SUMMARY (Mapping từ memberStats)
   const memberSummaryData = memberStats?.kpi 
     ? formatTaskSummaryData(memberStats.kpi) 
     : dynamicTasksSummary;
 
-  const managerSummaryData = managerStats?.kpi
-    ? formatTaskSummaryData(managerStats.kpi)
+  const managerSummaryData = managerStats?.kpi?.taskSummary
+    ? formatTaskSummaryData(managerStats.kpi.taskSummary)
     : dynamicTasksSummary;  
 
   if (dashboardLoading) {
-      // 🔵 UPDATE: Tạo icon loading màu cam
+      // Tạo icon loading màu cam
       const antIcon = <LoadingOutlined style={{ fontSize: 48, color: '#f35640' }} spin />;
       return <div className="flex h-screen items-center justify-center"><Spin indicator={antIcon} /></div>;
   }
@@ -526,9 +555,7 @@ const HomePage = () => {
   return (
     <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
 
-      {/* ================================================================================== */}
-      {/* 🔵 BLOCK 1: ADMIN DASHBOARD (Chỉ hiện cho ORG_ADMIN)                               */}
-      {/* ================================================================================== */}
+      {/* ADMIN DASHBOARD */}
       {isAdminView && adminStats && (
         <section className="animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="mb-4 flex items-center gap-2">
@@ -640,7 +667,7 @@ const HomePage = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Status */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col"> {/*pie chart hiển thị task status cho member, AM và MN giuwx nguyên*/}
+            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col"> 
               <h2 className="text-lg font-semibold mb-4">Project Status</h2>
               {loading ? (
                 <div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>
@@ -670,51 +697,50 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Recent Activity (Code Gốc) */}
-          <div className="bg-white rounded-xl p-6 shadow border border-gray-100 ">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Recent Activity</h2>
-              <button className="text-blue-500 text-sm hover:underline">View all activity</button>
-            </div>
-            <div className="space-y-4">
-              {loading ? (
-                 <p className="text-gray-400 text-sm">Loading activities...</p>
-              ) : activities.length > 0 ? (
-                activities.slice(0, 5).map((act) => (
-                  <div key={act._id} className="flex items-start gap-3">
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-bold uppercase text-sm">
-                      {act.userId?.name?.charAt(0) || "U"}
+            {/* Recent Activity List */}
+              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                </div>
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ maxHeight: '320px' }}>
+                  {activities.length > 0 ? (
+                    activities.slice(0, 15).map((act) => (
+                      <div key={act._id} className="flex gap-3 group items-start transition-colors hover:bg-gray-50/50 p-1.5 rounded-lg -mx-1.5">
+                        <div className="flex-shrink-0 mt-0.5">
+                            {act.userId?.avatar ? (
+                                <img src={act.userId.avatar} alt={act.userId.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" />
+                            ) : (
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold " style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                                    {act.userId?.name?.charAt(0).toUpperCase() || "U"}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-600 leading-snug break-words">
+                                {formatActivityContent(act)}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                                <ClockSolid className="w-3 h-3 text-gray-300" />
+                                {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                            </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                        <TotalSolid className="w-8 h-8 text-gray-300" />
+                        <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{act.userId?.name || "Unknown"}</span> 
-                        {' '}{act.content || act.action || "updated a task"} 
-                        {act.taskName && <strong> "{act.taskName}"</strong>}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {act.createdAt ? formatDistanceToNow(new Date(act.createdAt), { addSuffix: true }) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-sm">No recent activities found.</p>
-              )}
-            </div>
+                  )}
+                </div>
+              </div>
           </div>
-          </div>
-          
-
         </section>
       )}
 
-      {/* ================================================================================== */}
-      {/* 🔵 BLOCK 2: MANAGER DASHBOARD (Hiện cho Manager)                           */}
-      {/* ================================================================================== */}
+      {/* MANAGER DASHBOARD */}
       {isManagerView && managerStats && (
         <section className="animate-in fade-in slide-in-from-top-4 duration-700 delay-100 ">
-           {/* Dùng Divider hoặc khoảng cách để phân tách */}
-          
           <div className="mb-2 flex items-center gap-2  border-gray-200 pt-6 justify-between">
             <h2 className="text-xl font-bold text-gray-800 uppercase tracking-wide"> Management Overview</h2>
             <div className="flex items-center gap-3 mb-6">
@@ -741,7 +767,7 @@ const HomePage = () => {
           <Row gutter={[16, 16]} className="mb-6">
             <Col xs={24} sm={8}>
               <Card bordered={false} className="shadow-sm hover:shadow-md transition-all">
-                 <Statistic title="My Projects" value={managerStats.kpi.myProjects} /> {/* // admin ẩn cái này đi */}
+                 <Statistic title="My Projects" value={managerStats.kpi.myProjects} /> 
               </Card>
             </Col>
             <Col xs={24} sm={8}>
@@ -782,7 +808,7 @@ const HomePage = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Status */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col"> {/*pie chart hiển thị task status cho member, AM và MN giuwx nguyên*/}
+            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col">
               <h2 className="text-lg font-semibold mb-4">Project Status</h2>
               {loading ? (
                 <div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>
@@ -812,46 +838,48 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Recent Activity (Code Gốc) */}
-          <div className="bg-white rounded-xl p-6 shadow border border-gray-100 ">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Recent Activity</h2>
-              <button className="text-brand text-sm hover:underline">View all activity</button>
-            </div>
-            <div className="space-y-4">
-              {loading ? (
-                 <p className="text-gray-400 text-sm">Loading activities...</p>
-              ) : activities.length > 0 ? (
-                activities.slice(0, 5).map((act) => (
-                  <div key={act._id} className="flex items-start gap-3">
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-bold uppercase text-sm">
-                      {act.userId?.name?.charAt(0) || "U"}
+            {/* Recent Activity List */}
+              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                </div>
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ maxHeight: '320px' }}>
+                  {activities.length > 0 ? (
+                    activities.slice(0, 15).map((act) => (
+                      <div key={act._id} className="flex gap-3 group items-start transition-colors hover:bg-gray-50/50 p-1.5 rounded-lg -mx-1.5">
+                        <div className="flex-shrink-0 mt-0.5">
+                            {act.userId?.avatar ? (
+                                <img src={act.userId.avatar} alt={act.userId.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" />
+                            ) : (
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold " style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                                    {act.userId?.name?.charAt(0).toUpperCase() || "U"}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-600 leading-snug break-words">
+                                {formatActivityContent(act)}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                                <ClockSolid className="w-3 h-3 text-gray-300" />
+                                {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                            </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                        <TotalSolid className="w-8 h-8 text-gray-300" />
+                        <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{act.userId?.name || "Unknown"}</span> 
-                        {' '}{act.content || act.action || "updated a task"} 
-                        {act.taskName && <strong> "{act.taskName}"</strong>}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {act.createdAt ? formatDistanceToNow(new Date(act.createdAt), { addSuffix: true }) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-sm">No recent activities found.</p>
-              )}
-            </div>
-          </div>
-          </div>
-
+                  )}
+                </div>
+              </div>
+           </div>
         </section>
       )}
 
-      {/* ================================================================================== */}
-      {/* 🔵 BLOCK 3: MEMBER AREA */}
-      {/* ================================================================================== */}
+      {/* MEMBER AREA */}
       {isMemberView && memberStats && (
       <section className='relative'>
       <section className="animate-in fade-in slide-in-from-top-4 duration-700 delay-200">
@@ -861,7 +889,7 @@ const HomePage = () => {
           <div className="mb-4 mt-8 flex items-center justify-between border-t border-gray-200 pt-6">
              <h2 className="text-xl font-bold text-gray-800 uppercase tracking-wide"> Project Analytics</h2>
              
-             {/* Filter + Export (Code Gốc) */}
+             {/* Filter + Export  */}
              <div className="flex items-center gap-3">
                 <div className='relative'>
                     <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -882,10 +910,10 @@ const HomePage = () => {
               </div>
           </div>
 
-          {/* --------- MAIN GRID (Code Gốc) --------- */}
+          {/*  MAIN GRID */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
-            {/* 🔵 MODIFIED: PROGRESS STATUS (USER DATA) */}
+            {/*  PROGRESS STATUS (USER DATA) */}
             <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col">
               <h2 className="text-lg font-semibold mb-4">Progress Status</h2>
               {/* Sử dụng !memberStats để check loading thay vì biến 'loading' chung */}
@@ -912,79 +940,74 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* 🔵 MODIFIED: TASK PRIORITY (USER DATA) */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100">
-              <h2 className="text-lg font-semibold mb-4">Task Priority</h2>
-              {!memberStats ? (
-                 <div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>
-              ) : (memberStats.priority) ? (
-                 <div className="space-y-6 pt-2">
-                    <Priority label="High" count={memberStats.priority.high || 0} total={memberStats.kpi?.totalTasks} color="bg-red-500" />
-                    <Priority label="Medium" count={memberStats.priority.medium || 0} total={memberStats.kpi?.totalTasks} color="bg-orange-500" />
-                    <Priority label="Low" count={memberStats.priority.low || 0} total={memberStats.kpi?.totalTasks} color="bg-green-500" />
-                 </div>
-              ) : (
-                <div className="text-center text-gray-500 py-10">No priority data</div>
-              )}
+            {/*  TASK PRIORITY (USER DATA) */}
+            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col">
+              <h2 className="text-lg font-semibold mb-4">Task Priority Distribution</h2>             
+                <ReactECharts option={getMemberBarOption()} style={{ height: 250 }} />          
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* 3. 🔵 NEW: Weekly Activity Chart */}
+          {/* Weekly Activity Chart */}
             <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full">
                 <div className="flex items-center gap-2 mb-4">
                     <h2 className="text-lg font-semibold text-gray-800">Weekly Activity</h2>
                 </div>
                 
                     <div className="flex-1">
-                      <ReactECharts option={getWeeklyActivityOption()} style={{ height: '100%', width: '100%' }} />
+                      <ReactECharts option={getWeeklyActivityOption()} style={{ height: 250, width: '100%' }} />
                     </div>
                 
             </div>
 
-          {/* Recent Activity (Code Gốc) */}
-          <div className="bg-white rounded-xl p-6 shadow border border-gray-100 ">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Recent Activity</h2>
-              <button className="text-brand text-sm hover:underline">View all activity</button>
-            </div>
-            <div className="space-y-4">
-              {loading ? (
-                 <p className="text-gray-400 text-sm">Loading activities...</p>
-              ) : activities.length > 0 ? (
-                activities.slice(0, 5).map((act) => (
-                  <div key={act._id} className="flex items-start gap-3">
-                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full font-bold uppercase text-sm">
-                      {act.userId?.name?.charAt(0) || "U"}
+          {/* Recent Activity List */}
+              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                </div>
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ maxHeight: '320px' }}>
+                  {activities.length > 0 ? (
+                    activities.slice(0, 15).map((act) => (
+                      <div key={act._id} className="flex gap-3 group items-start transition-colors hover:bg-gray-50/50 p-1.5 rounded-lg -mx-1.5">
+                        <div className="flex-shrink-0 mt-0.5">
+                            {act.userId?.avatar ? (
+                                <img src={act.userId.avatar} alt={act.userId.name} className="w-9 h-9 rounded-full object-cover border border-gray-200 shadow-sm" />
+                            ) : (
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold " style={{ backgroundColor: 'color-mix(in srgb, var(--color-brand) 12%, white)', color: 'var(--color-brand, #3b82f6)' }}>
+                                    {act.userId?.name?.charAt(0).toUpperCase() || "U"}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-600 leading-snug break-words">
+                                {formatActivityContent(act)}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                                <ClockSolid className="w-3 h-3 text-gray-300" />
+                                {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                            </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                        <TotalSolid className="w-8 h-8 text-gray-300" />
+                        <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{act.userId?.name || "Unknown"}</span> 
-                        {' '}{act.content || act.action || "updated a task"} 
-                        {act.taskName && <strong> "{act.taskName}"</strong>}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {act.createdAt ? formatDistanceToNow(new Date(act.createdAt), { addSuffix: true }) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-sm">No recent activities found.</p>
-              )}
-            </div>
-            </div>
+                  )}
+                </div>
+              </div>
           </div>
         </section>
       </section>
       )}
 
-      {/* 🔵 AI Widget (Giữ nguyên - Ai cũng có quyền dùng) */}
+      {/* AI Widget  */}
       {showAIBrief && (
         <AIDailyWidget onClose={() => setShowAIBrief(false)} />
       )}
 
-      {/* Floating Action Button (Giữ nguyên) */}
+      {/* Floating Action Button  */}
       <button
         onClick={() => setShowAIBrief(!showAIBrief)}
         className="fixed bottom-6 right-6 z-50 p-5 bg-gradient-to-r from-[#3b064d] to-[#f35640] text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 group ring-4 ring-white/50"
@@ -997,37 +1020,6 @@ const HomePage = () => {
         )}
       </button>
 
-    </div>
-  );
-};
-
-// --- Component con để render (Clean code) ---
-
-const StatusItem = ({ label, count, total, color }) => {
-    const val = count || 0;
-    const percent = total > 0 ? Math.round((val / total) * 100) : 0;
-    return (
-        <li className="flex justify-between text-sm">
-            <span className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${color}`}></span> {label}
-            </span>
-            <span>{val} ({percent}%)</span>
-        </li>
-    );
-}
-
-const Priority = ({ label, count, total, color }) => {
-  const val = count || 0;
-  const percent = total > 0 ? Math.round((val / total) * 100) : 0;
-  return (
-    <div className="mb-6 last:mb-0">
-        <div className="flex justify-between mb-1 text-sm text-gray-600">
-        <span>{label}</span>
-        <span>{val} ({percent}%)</span>
-        </div>
-        <div className="w-full h-3 bg-gray-100 rounded-full">
-        <div className={`h-3 ${color} rounded-full transition-all duration-500`} style={{ width: `${percent}%` }}></div>
-        </div>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import * as taskService from "../services/task.service.js";
 import mongoose from "mongoose";
 import Task from "../models/task.model.js"; 
 import { createNotification } from "../services/notification.service.js";
+import { logActivity } from "../services/activityLog.service.js";
 
 /**
  * @desc    Get all tasks in a project
@@ -10,6 +11,7 @@ import { createNotification } from "../services/notification.service.js";
  */
 export const getTasksByProject = async (req, res) => {
   try {
+    console.log('[getTasksByProject] Request:', { projectId: req.params.id, user: req.user?._id });
     const { id } = req.params;
     const tasks = await taskService.getTasksByProject(id);
     
@@ -19,6 +21,7 @@ export const getTasksByProject = async (req, res) => {
       data: tasks,
     });
   } catch (err) {
+    console.error('[getTasksByProject] Error:', err.message);
     if (err.message === 'PROJECT_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Project not found" });
     }
@@ -33,6 +36,7 @@ export const getTasksByProject = async (req, res) => {
  */
 export const getFilteredTasks = async (req, res) => {
   try {
+    console.log('[getFilteredTasks] Query:', req.query);
     const tasks = await taskService.getFilteredTasks(req.query);
     res.status(200).json({
       success: true,
@@ -40,6 +44,7 @@ export const getFilteredTasks = async (req, res) => {
       data: tasks,
     });
   } catch (err) {
+    console.error('[getFilteredTasks] Error:', err.message);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -54,13 +59,12 @@ export const getTasksById = async (req, res) => {
     const userId = req.user._id || req.user.id;
     const userRole = req.user.role;
 
-    
-    console.log(' [getTasksById] Request:', {
+    console.log('[getTasksById] Request:', {
       taskId: req.params.id,
       userId,
-      userRole,
-      userFromToken: req.user
+      userRole
     });
+    
     const task = await taskService.getTaskById(
       req.params.id, 
       userId, 
@@ -72,6 +76,7 @@ export const getTasksById = async (req, res) => {
       data: task,
     });
   } catch (err) {
+    console.error('[getTasksById] Error:', err.message);
     if (err.message === 'INVALID_TASK_ID') {
       return res.status(400).json({ success: false, error: "ValidationError", message: "Invalid Task ID" });
     }
@@ -96,6 +101,12 @@ export const createTask = async (req, res) => {
     const userId = req.user?._id;
     const projectId = req.params.id;
     
+    console.log('[createTask] Request:', { 
+      projectId, 
+      userId, 
+      body: req.body 
+    });
+
     if (!projectId || projectId === 'null' || !mongoose.isValidObjectId(projectId)) {
         return res.status(400).json({ 
             success: false, 
@@ -110,6 +121,24 @@ export const createTask = async (req, res) => {
       currentOrgId
     );
     
+    // Ghi log hoạt động ngay sau khi tạo task thành công
+    try {
+        console.log('[createTask] Logging activity...');
+        await logActivity({
+            userId: userId,
+            projectId: projectId,
+            organizationId: currentOrgId,
+            action: "CREATE_TASK",
+            entityType: "Task",
+            entityId: task._id,
+            description: `created task "${task.title}"`,
+            newData: task,
+            metadata: { snapshot: task }
+        });
+    } catch (logError) {
+        console.error("[createTask] Failed to log activity:", logError);
+    }
+
     if (task.assigneeId && task.assigneeId.toString() !== userId.toString()) {
         await createNotification({
             userId: task.assigneeId, 
@@ -128,6 +157,7 @@ export const createTask = async (req, res) => {
       data: task,
     });
   } catch (err) {
+    console.error('[createTask] Error:', err.message);
     if (err.message === 'TITLE_REQUIRED') {
       return res.status(400).json({ success: false, message: "Title is required" });
     }
@@ -151,12 +181,32 @@ export const createTask = async (req, res) => {
 */
 export const updateTask = async (req, res) => {
   try {
+    console.log('[updateTask] Request:', { taskId: req.params.id, body: req.body, user: req.user._id });
+
     const oldTask = await Task.findById(req.params.id);
     const updatedTask = await taskService.updateTask(
       req.params.id,
       req.body,
       req.user
     );
+
+    // Ghi log hoạt động khi update task
+    try {
+        console.log('[updateTask] Logging activity...');
+        await logActivity({
+            userId: req.user._id,
+            projectId: updatedTask.projectId,
+            organizationId: req.user.currentOrganizationId,
+            action: "UPDATE_TASK",
+            entityType: "Task",
+            entityId: updatedTask._id,
+            description: `updated task "${updatedTask.title}"`,
+            oldData: oldTask ? oldTask.toObject() : null,
+            newData: updatedTask.toObject()
+        });
+    } catch (logError) {
+        console.error("[updateTask] Failed to log activity:", logError);
+    }
 
     if (updatedTask && req.body.assigneeId) {
         const newAssigneeId = updatedTask.assigneeId?.toString();
@@ -182,13 +232,13 @@ export const updateTask = async (req, res) => {
       data: updatedTask,
     });
   } catch (err) {
+    console.error('[updateTask] Error:', err.message);
     if (err.message === 'INVALID_TASK_ID') {
       return res.status(400).json({ success: false, message: "Invalid Task ID" });
     }
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
-    //  Handle FORBIDDEN
     if (err.message === 'FORBIDDEN') {
       return res.status(403).json({ success: false, message: "You are not a member of this project" });
     }
@@ -209,21 +259,41 @@ export const updateTask = async (req, res) => {
  */
 export const updateTaskStatus = async (req, res) => {
   try {
+    console.log('[updateTaskStatus] Request:', { taskId: req.params.id, status: req.body.status, user: req.user._id });
+
+    const oldTask = await Task.findById(req.params.id); 
     const task = await taskService.updateTaskStatus(
       req.params.id,
       req.body.status,
       req.user
     );
+
+    // Ghi log thay đổi trạng thái
+    try {
+        console.log('[updateTaskStatus] Logging activity...');
+        await logActivity({
+            userId: req.user._id,
+            projectId: task.projectId,
+            organizationId: req.user.currentOrganizationId,
+            action: "UPDATE_TASK",
+            entityType: "Task",
+            entityId: task._id,
+            description: `updated status to "${task.status}"`,
+            oldData: oldTask ? oldTask.toObject() : null,
+            newData: task.toObject()
+        });
+    } catch (logError) { console.error("[updateTaskStatus] Log Error:", logError); }
+
     res.status(200).json({
       success: true,
       message: "Task status updated successfully",
       data: task,
     });
   } catch (err) {
+    console.error('[updateTaskStatus] Error:', err.message);
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
-    // Handle FORBIDDEN
     if (err.message === 'FORBIDDEN') {
       return res.status(403).json({ success: false, message: "You are not a member of this project" });
     }
@@ -249,22 +319,38 @@ export const reorderTask = async (req, res) => {
       role: req.user.role
     };
 
-    console.log('[reorderTask Controller] Request:', {
+    console.log('[reorderTask] Request:', {
       taskId,
       newStatus,
       newPosition,
       currentUserId: currentUser._id
     });
 
-    const updatedTask = await taskService.reorderTask(taskId, newStatus, newPosition, currentUser);
+    const reorderTask = await taskService.reorderTask(taskId, newStatus, newPosition, currentUser);
+
+    try {
+        console.log('[reorderTask] Logging activity...');
+        await logActivity({
+            userId: req.user._id,
+            projectId: reorderTask.projectId,
+            organizationId: req.user.currentOrganizationId,
+            action: "REORDER_TASK",
+            entityType: "Task",
+            entityId: reorderTask._id,
+            description: `reordered task "${reorderTask.title}"`,
+            newData: reorderTask.toObject()
+        });
+    } catch (logError) {
+        console.error("[reorderTask] Failed to log activity:", logError);
+    }
     
     res.json({ 
       success: true, 
       message: "Task reordered successfully", 
-      data: updatedTask 
+      data: reorderTask 
     });
   } catch (err) {
-    console.error('[reorderTask Controller] Error:', err.message);
+    console.error('[reorderTask] Error:', err.message);
     
     if (err.message === 'MISSING_REQUIRED_FIELDS') {
       return res.status(400).json({ success: false, message: "Missing taskId or newPosition" });
@@ -287,13 +373,30 @@ export const reorderTask = async (req, res) => {
  */
 export const deleteTask = async (req, res) => {
   try {
+    console.log('[deleteTask] Request:', { taskId: req.params.id, user: req.user._id });
     const deletedTask = await taskService.deleteTask(req.params.id, req.user);
+    
+    // Ghi log xóa task
+    try {
+        console.log('[deleteTask] Logging activity...');
+        await logActivity({
+            userId: req.user._id,
+            projectId: deletedTask.projectId,
+            organizationId: req.user.currentOrganizationId,
+            action: "DELETE_TASK",
+            entityType: "Task",
+            entityId: deletedTask._id,
+            description: `deleted task "${deletedTask.title}"`,
+        });
+    } catch (logError) { console.error("[deleteTask] Log Error:", logError); }
+
     res.status(200).json({
       success: true,
       message: "Task soft-deleted successfully",
       data: deletedTask,
     });
   } catch (err) {
+    console.error('[deleteTask] Error:', err.message);
     if (err.message === 'PERMISSION_DENIED') {
       return res.status(403).json({ success: false, message: "You don't have permission to delete tasks" });
     }
@@ -311,13 +414,27 @@ export const deleteTask = async (req, res) => {
  */
 export const createSubtask = async (req, res) => {
   try {
+    console.log('[createSubtask] Request:', { taskId: req.params.taskId, body: req.body });
     const subtask = await taskService.createSubtask(req.params.taskId, req.body.title);
+    try {
+        console.log('[subTask] Logging activity...');
+        await logActivity({
+            userId: req.user._id,
+            projectId: subtask.projectId,
+            organizationId: req.user.currentOrganizationId,
+            action: "CREATE_SUBTASK",
+            entityType: "Task",
+            entityId: subtask._id,
+            description: `create subtask "${subtask.title}"`,
+        });
+    } catch (logError) { console.error("[deleteTask] Log Error:", logError); }
     res.status(201).json({
       success: true,
       message: "Subtask created successfully",
       data: subtask,
     });
   } catch (err) {
+    console.error('[createSubtask] Error:', err.message);
     if (err.message === 'TITLE_REQUIRED') {
       return res.status(400).json({ success: false, message: "Title is required" });
     }
@@ -335,6 +452,7 @@ export const createSubtask = async (req, res) => {
 */
 export const toggleSubtask = async (req, res) => {
   try {
+    console.log('[toggleSubtask] Request:', { taskId: req.params.taskId, subtaskId: req.params.subtaskId, isCompleted: req.body.isCompleted });
     const updatedTask = await taskService.toggleSubtask(
       req.params.taskId, 
       req.params.subtaskId, 
@@ -346,6 +464,7 @@ export const toggleSubtask = async (req, res) => {
       data: updatedTask 
     });
   } catch (err) {
+    console.error('[toggleSubtask] Error:', err.message);
     if (err.message === 'TASK_OR_SUBTASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task or Subtask not found" });
     }
@@ -360,6 +479,7 @@ export const toggleSubtask = async (req, res) => {
  */
 export const deleteSubtask = async (req, res) => {
   try {
+    console.log('[deleteSubtask] Request:', { taskId: req.params.taskId, subtaskId: req.params.subtaskId });
     const updatedTask = await taskService.deleteSubtask(req.params.taskId, req.params.subtaskId);
     res.status(200).json({ 
       success: true, 
@@ -367,6 +487,7 @@ export const deleteSubtask = async (req, res) => {
       data: updatedTask 
     });
   } catch (err) {
+    console.error('[deleteSubtask] Error:', err.message);
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
@@ -381,6 +502,7 @@ export const deleteSubtask = async (req, res) => {
  */
 export const magicSubtasks = async (req, res) => {
   try {
+    console.log('[magicSubtasks] Request:', { taskId: req.params.taskId, user: req.user._id });
     const newSubtasks = await taskService.magicSubtasks(req.params.taskId, req.user._id);
     
     const msg = newSubtasks.length > 0 
@@ -393,6 +515,7 @@ export const magicSubtasks = async (req, res) => {
       data: newSubtasks 
     });
   } catch (err) {
+    console.error('[magicSubtasks] Error:', err.message);
     if (err.message === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
@@ -407,6 +530,7 @@ export const magicSubtasks = async (req, res) => {
  */
 export const addAttachment = async (req, res) => {
   try {
+    console.log('[addAttachment] Request:', { taskId: req.params.taskId, body: req.body });
     const { taskId } = req.params;
     const { name, url } = req.body;
 
@@ -435,6 +559,7 @@ export const addAttachment = async (req, res) => {
       data: newAttachment 
     });
   } catch (error) {
+    console.error('[addAttachment] Error:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -446,6 +571,7 @@ export const addAttachment = async (req, res) => {
  */
 export const removeAttachment = async (req, res) => {
   try {
+    console.log('[removeAttachment] Request:', { taskId: req.params.taskId, attachmentId: req.params.attachmentId });
     const { taskId, attachmentId } = req.params;
 
     const task = await Task.findById(taskId);
@@ -458,6 +584,7 @@ export const removeAttachment = async (req, res) => {
 
     res.json({ success: true, message: "Attachment removed successfully" });
   } catch (error) {
+    console.error('[removeAttachment] Error:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -3,7 +3,7 @@ import Task from '../models/task.model.js';
 import { createNotification } from '../services/notification.service.js';
 
 const setupCronJobs = () => {
-  // 1. Quét Task quá hạn (Chạy lúc 00:00 hàng ngày)
+  // Quét Task quá hạn (Chạy lúc 00:00 hàng ngày)
   // Cú pháp: Phút(0) Giờ(0) Ngày(*) Tháng(*) Thứ(*)
   cron.schedule('0 0 * * *', async () => {
     console.log('--- Daily Job: Starting Overdue Task Scan ---');
@@ -23,7 +23,7 @@ const setupCronJobs = () => {
         console.log(`Found ${overdueTasks.length} overdue tasks. Processing...`);
 
         for (const task of overdueTasks) {
-           // A. Tạo Notification + Bắn Socket
+           //Tạo Notification + Bắn Socket
            if (task.assigneeId) {
              await createNotification({
                userId: task.assigneeId._id,
@@ -36,7 +36,7 @@ const setupCronJobs = () => {
              });
            }
 
-           // B. Update cờ để không báo lại nữa
+           //Update cờ để không báo lại nữa
            task.isOverdueNotified = true;
            await task.save();
            console.log(` -> Sent alert for task: "${task.title}"`);

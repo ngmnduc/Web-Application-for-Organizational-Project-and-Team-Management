@@ -37,44 +37,44 @@ export default function NotificationBell() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [dropdownRef]);
 
-    // --- LOGIC ĐIỀU HƯỚNG MỚI ---
+    // LOGIC ĐIỀU HƯỚNG 
     const handleItemClick = (noti) => {
         if (!noti.read) markAsRead(noti._id);
         setIsOpen(false); 
 
         const meta = noti.metadata || {};
 
-        // THÊM: Nếu là NEW_MEMBER -> Vào trang Members
+        // Nếu là NEW_MEMBER -> Vào trang Members
         if (noti.type === 'NEW_MEMBER') {
             navigate(`${basePath}/members`);
             return;
         }
 
-        // 1. Nếu là MENTION -> Vào thẳng chi tiết Task
+        // Nếu là MENTION -> Vào thẳng chi tiết Task
         if (noti.type === 'MENTION' && meta.taskId) {
             navigate(`${basePath}/tasks/${meta.taskId}`);
             return;
         }
 
-        // 2. Nếu là ASSIGN -> Vào trang My Tasks (Kanban)
+        // Nếu là ASSIGN -> Vào trang My Tasks (Kanban)
         if ((noti.type === 'ASSIGNED' || noti.type === 'TASK_ASSIGN')) {
             navigate(`${basePath}/tasks`);
             return;
         }
 
-        // 3. Các loại Task khác (Overdue, Due Soon...) -> Thường muốn xem chi tiết để xử lý
+        //Các loại Task khác (Overdue, Due Soon...)
         if (meta.taskId) {
              navigate(`${basePath}/tasks/${meta.taskId}`);
              return;
         }
 
-        // 4. Meeting
+        // Meeting
         if (meta.meetingId) {
             navigate(`${basePath}/calendar`);
             return;
         }
 
-        // 5. Project
+        // Project
         if (meta.projectId) {
             navigate(`${basePath}/projects`);
             return;

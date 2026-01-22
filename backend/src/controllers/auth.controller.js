@@ -152,7 +152,7 @@ export async function signup(req, res, next) {
                     userId: user._id.toString(),
                     targetPlan: "PREMIUM"
                 },
-                // [FIX] Thêm metadata vào subscription để webhook invoice.payment_succeeded tìm được org
+                // Thêm metadata vào subscription để webhook invoice.payment_succeeded tìm được org
                 subscription_data: {
                     metadata: {
                         organizationId: finalOrganizationId.toString(),
