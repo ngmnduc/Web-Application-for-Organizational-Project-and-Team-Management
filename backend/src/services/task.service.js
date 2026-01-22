@@ -368,7 +368,7 @@ export const deleteTask = async (taskId, currentUser) => {
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');
 
-  // --- LOGIC PHÂN QUYỀN  ---
+  //  LOGIC PHÂN QUYỀN  
   
   //Nếu là System Admin (Role hệ thống) -> Có toàn quyền xóa
   if (currentUser.role !== 'Admin') {
@@ -395,7 +395,7 @@ export const deleteTask = async (taskId, currentUser) => {
       }
   }    
 
-  // --- THỰC HIỆN XÓA (SOFT DELETE) ---
+  //  THỰC HIỆN XÓA (SOFT DELETE) 
   task.deletedAt = new Date();
   await task.save();
 

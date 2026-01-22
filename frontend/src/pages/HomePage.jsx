@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import { formatDistanceToNow } from 'date-fns';
 import axiosInstance from '../services/api';
-import { getProjects } from "../services/projectService"; // 🔵 Thêm
+import { getProjects } from "../services/projectService";
 import TaskSummary from '../components/TaskSummary';
 import { ChevronDownIcon, SparklesIcon,XMarkIcon, 
   LightBulbIcon, 
