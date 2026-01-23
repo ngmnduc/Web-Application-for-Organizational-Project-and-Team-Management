@@ -291,10 +291,18 @@ const MyTasks = () => {
 
                 let filteredRawTasks = apiTasks || [];
 
-                if (filters.label) {
-                    filteredRawTasks = filteredRawTasks.filter((t) => 
-                        t.labels && t.labels.includes(filters.label)
-                    );
+                if (filters.label) {     
+                    const filterValue = filters.label.trim().toLowerCase();
+
+                    filteredRawTasks = filteredRawTasks.filter((t) => {   
+                        if (!t.labels || !Array.isArray(t.labels)) return false;
+
+                        return t.labels.some(labelItem => {
+                            const labelName = (labelItem.name || labelItem).toString();
+                            
+                            return labelName.trim().toLowerCase() === filterValue;
+                        });
+                    });
                 }
 
                 if (filters.assignee) {

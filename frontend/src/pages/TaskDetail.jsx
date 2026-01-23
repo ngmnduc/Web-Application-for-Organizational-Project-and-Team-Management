@@ -680,10 +680,10 @@ const TaskDetail = () => {
                   <li key={c.id || c._id} className="text-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-6 h-6 rounded-full bg-gray-200 text-[10px] flex items-center justify-center font-bold text-gray-600">
-                        {c.authorInitials || (c.userID?.name ? c.userID.name[0] : "?")}
+                        {c.authorInitials || (c.userId?.name ? c.userId.name[0] : "?")}
                       </div>
                       <span className="font-semibold text-gray-900">
-                        {c.authorName || c.userID?.name || "Unknown User"}
+                        {c.authorName || c.userId?.name || "Unknown User"}
                       </span>
                       
                       {c.createdAt && (
