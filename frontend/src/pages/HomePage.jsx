@@ -402,7 +402,7 @@ const HomePage = () => {
     series: [{
         name: 'Tasks', type: 'bar',
         data: adminStats?.charts?.priorityDistribution?.map(i => i.value) || [],
-        itemStyle: { color: '#f35640', borderRadius: [0, 4, 4, 0] }
+        itemStyle: { color: '#3b064d', borderRadius: [0, 4, 4, 0] }
     }]
   });
 
