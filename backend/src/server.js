@@ -14,8 +14,13 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer,{
   cors:{
-    origin: process.env.NODE_ENV === "production" ? false: 
-    ["http://localhost:5173", "http://localhost:4000"], 
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:4000",
+      process.env.CLIENT_URL, 
+      "https://web-application-for-organizational.vercel.app", 
+      "https://web-application-for-organizational-project-and-team.vercel.app"
+    ], 
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -31,9 +36,9 @@ io.on("connection", (socket) => {
   if (userId) {
     // Cho user tham gia vào "phòng" riêng của họ
     socket.join(userId);
-    console.log(`✅ User connected & joined room: ${userId}`);
+    console.log(` User connected & joined room: ${userId}`);
   } else {
-    console.log("⚠️ Socket connected without userId");
+    console.log(" Socket connected without userId");
   }
 
   socket.on("disconnect", () => {

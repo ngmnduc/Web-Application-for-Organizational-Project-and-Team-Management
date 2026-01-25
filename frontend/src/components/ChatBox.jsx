@@ -5,8 +5,7 @@ import {
     PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
 import io from 'socket.io-client';
-import { API_BASE_URL } from '../utils/constants';
-const SOCKET_URL = 'http://localhost:4000';
+import { API_BASE_URL, SOCKET_URL } from '../utils/constants';
 
 const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
     const [messages, setMessages] = useState([]);
