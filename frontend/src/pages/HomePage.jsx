@@ -642,7 +642,7 @@ const HomePage = () => {
               </div>
               </div>
 
-           <TaskSummary summaryData={stats ? formatTaskSummaryData(stats) : dynamicTasksSummary} />
+           <TaskSummary summaryData={ dynamicTasksSummary} />
 
           <Row gutter={[16, 16]} className='mb-6'>
             <Col xs={24} lg={16}>

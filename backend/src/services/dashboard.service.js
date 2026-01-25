@@ -109,7 +109,7 @@ class DashboardService {
     const orgIdObj = new mongoose.Types.ObjectId(currentOrganizationId);
     
     const dateMeta = this._getMetaDate(month, year);
-    const projectBaseFilter = { organizationId: currentOrganizationId, deletedAt: null };
+    const projectBaseFilter = { organizationId: orgIdObj, deletedAt: null };
     if (projectId && projectId !== 'all') {
       projectBaseFilter._id = new mongoose.Types.ObjectId(projectId);
     }
@@ -128,6 +128,13 @@ class DashboardService {
       taskSnapshotMatch["project._id"] = new mongoose.Types.ObjectId(projectId);
     }
 
+    // Sử dụng đầu ngày hiện tại để so sánh chính xác hơn
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+   
+
+
     const [
       totalProjects, 
       activeProjects,
@@ -137,16 +144,15 @@ class DashboardService {
       allTasksCount,
       doneTasksCount,
       tasksByPriority,
-      upcomingDeadlines,
       attendanceStats,
       dailyTaskChart,
       recentActivities 
     ] = await Promise.all([
       Project.countDocuments(projectBaseFilter),
-      Project.countDocuments({ ...projectBaseFilter, status: "ACTIVE" }),
-      Project.countDocuments({ ...projectBaseFilter, status: "ARCHIVE" }),
-      Project.countDocuments({ ...projectBaseFilter, status: "COMPLETED" }),
-      ProjectMember.distinct("userId", { organizationId: currentOrganizationId, status: "ACTIVE" }).then(res => res.length),
+      Project.countDocuments({ ...projectBaseFilter, status: "Active" }),
+      Project.countDocuments({ ...projectBaseFilter, status: "Archived" }),
+      Project.countDocuments({ ...projectBaseFilter, status: "Completed" }),
+      ProjectMember.distinct("userId", { organizationId: orgIdObj, status: "ACTIVE" }).then(res => res.length),
 
       // Task Counts (Snapshot - Không lọc theo ngày tạo để hiện đúng tổng số)
       Task.aggregate([
@@ -170,9 +176,7 @@ class DashboardService {
         { $group: { _id: "$priority", count: { $sum: 1 } } }
       ]),
 
-      // Upcoming Deadlines
-      Project.find({ ...projectBaseFilter, status: "active", deadline: { $gte: new Date() } })
-        .select("name deadline status").sort({ deadline: 1 }).limit(5),
+      
       
       this._getTodayAttendanceStats(currentOrganizationId, projectId && projectId !== 'all' ? [new mongoose.Types.ObjectId(projectId)] : null),
 
@@ -194,6 +198,22 @@ class DashboardService {
       const key = item._id ? item._id.toUpperCase() : "MEDIUM";
       if (priorityMap.hasOwnProperty(key)) priorityMap[key] = item.count;
     });
+
+     // Tạo một filter riêng cho Deadline, không bị phụ thuộc vào việc chọn 1 Project duy nhất
+const deadlineFilter = {
+    organizationId: orgIdObj,
+    deletedAt: null,
+    status: { $in: ["Active", "active", "COMPLETED", "completed"] }, // Mở rộng status
+    deadline: { $ne: null } // Chỉ cần có deadline là lấy để kiểm tra trước
+};
+
+    const upcomingDeadlines = await Project.find(deadlineFilter)
+      .select("name deadline status")
+      .sort({ deadline: 1 })
+      .limit(5)
+      .lean(); // Dùng lean để lấy plain object cho nhanh
+
+console.log("DEBUG DEADLINES:", upcomingDeadlines); // Log ra terminal của nodejs để xem có gì không
 
     return {
       success: true,

@@ -5,7 +5,7 @@ const projectSchema = new mongoose.Schema(
         name: { type: String, required: true, trim: true },
         description: { type: String, default: "" },
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-        status: { type: String, enum: ["active", "archived", "completed"], default: "active" },
+        status: { type: String, enum: ["Active", "Archived", "Completed"], default: "Active" },
         labels: [{ type: mongoose.Schema.Types.ObjectId, ref: "Label" }], 
         organizationId: { 
             type: mongoose.Schema.Types.ObjectId, 

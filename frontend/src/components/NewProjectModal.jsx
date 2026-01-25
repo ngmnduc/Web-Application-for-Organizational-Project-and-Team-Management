@@ -30,7 +30,7 @@ const NewProjectModal = ({ isOpen, onClose, onAddProject }) => {
             const fetchUsers = async () => {
                 try {
                     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
-                    const res = await fetch(`${VITE_API_BASE_URL}/users`, {
+                    const res = await fetch(`${API_BASE_URL}/users`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     const data = await res.json();
