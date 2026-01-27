@@ -145,7 +145,7 @@ const SignUpPage = () => {
           <p className="text-center text-white mt-6 text-sm">Already have an account? <a href="/login" className="text-[#f35640] font-medium hover:underline">Sign in</a></p>
         </div>
       </div>
-      <img src={tag} alt="logo" className="absolute top-1 right-1 w-40 h-auto" />
+      <img src={tag} alt="logo" className="absolute top-1 right-1 w-40 h-auto" onClick={() => {navigate('/',{replace: true})}} />
     </section>
   );
 };
