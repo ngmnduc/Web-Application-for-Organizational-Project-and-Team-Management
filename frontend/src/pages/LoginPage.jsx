@@ -377,7 +377,7 @@ const handleGoogleError = () => {
         </div>
       </div>
       
-      <img src={tag} alt="logo" className="absolute top-1 right-1 w-40 h-auto" />
+      <img src={tag} alt="logo" className="absolute top-1 right-1 w-40 h-auto" onClick={() => {navigate('/',{replace: true})}}/>
       </section>
   );
 };

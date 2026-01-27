@@ -149,17 +149,10 @@ class DashboardService {
       recentActivities 
     ] = await Promise.all([
       Project.countDocuments(projectBaseFilter),
-<<<<<<< HEAD
       Project.countDocuments({ ...projectBaseFilter, status: "Active" }),
       Project.countDocuments({ ...projectBaseFilter, status: "Archived" }),
       Project.countDocuments({ ...projectBaseFilter, status: "Completed" }),
       ProjectMember.distinct("userId", { organizationId: orgIdObj, status: "ACTIVE" }).then(res => res.length),
-=======
-      Project.countDocuments({ ...projectBaseFilter, status: "ACTIVE" }),
-      Project.countDocuments({ ...projectBaseFilter, status: "ARCHIVE" }),
-      Project.countDocuments({ ...projectBaseFilter, status: "COMPLETED" }),
-      ProjectMember.distinct("userId", { organizationId: currentOrganizationId, status: "ACTIVE" }).then(res => res.length),
->>>>>>> d3e3ecc0eb26be276f1fd06e21350d987e5db862
 
       // Task Counts (Snapshot - Không lọc theo ngày tạo để hiện đúng tổng số)
       Task.aggregate([
