@@ -5,6 +5,14 @@ import Task from "../models/task.model.js";
 import Attendance from "../models/attendance.model.js"; 
 import ActivityLog from "../models/activityLog.model.js";
 class DashboardService {
+  /**
+   * Helper tạo Regex bền bỉ: 
+   * - 'i': Không phân biệt hoa thường
+   * - trim(): Bỏ qua khoảng trắng thừa
+   */
+  _statusRegex(status) {
+    return new RegExp(`^\\s*${status}\\s*$`, 'i');
+  } 
   _getDateRange(month, year) {
     if (!month || !year) return null;
     const start = new Date(year, month - 1, 1);
@@ -129,10 +137,9 @@ class DashboardService {
     }
 
     // Sử dụng đầu ngày hiện tại để so sánh chính xác hơn
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-   
+    const startRange = new Date();
+    startRange.setDate(startRange.getDate() - 30); 
+    startRange.setHours(0, 0, 0, 0);
 
 
     const [
@@ -149,10 +156,10 @@ class DashboardService {
       recentActivities 
     ] = await Promise.all([
       Project.countDocuments(projectBaseFilter),
-      Project.countDocuments({ ...projectBaseFilter, status: "Active" }),
-      Project.countDocuments({ ...projectBaseFilter, status: "Archived" }),
-      Project.countDocuments({ ...projectBaseFilter, status: "Completed" }),
-      ProjectMember.distinct("userId", { organizationId: orgIdObj, status: "ACTIVE" }).then(res => res.length),
+      Project.countDocuments({ ...projectBaseFilter, status: this._statusRegex("ACTIVE")  }),
+      Project.countDocuments({ ...projectBaseFilter, status: this._statusRegex("ARCHIVED")  }),
+      Project.countDocuments({ ...projectBaseFilter, status: this._statusRegex("COMPLETED")  }),
+      ProjectMember.distinct("userId", { organizationId: orgIdObj, status: this._statusRegex("ACTIVE")  }).then(res => res.length),
 
       // Task Counts (Snapshot - Không lọc theo ngày tạo để hiện đúng tổng số)
       Task.aggregate([
@@ -202,10 +209,11 @@ class DashboardService {
      // Tạo một filter riêng cho Deadline, không bị phụ thuộc vào việc chọn 1 Project duy nhất
 const deadlineFilter = {
     organizationId: orgIdObj,
-    deletedAt: null,
-    status: { $in: ["Active", "active", "COMPLETED", "completed"] }, // Mở rộng status
-    deadline: { $ne: null } // Chỉ cần có deadline là lấy để kiểm tra trước
+        deletedAt: null,
+        status: this._statusRegex("ACTIVE"),
+        deadline: { $ne: null, $gte: startRange }
 };
+
 
     const upcomingDeadlines = await Project.find(deadlineFilter)
       .select("name deadline status")
