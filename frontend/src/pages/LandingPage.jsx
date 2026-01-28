@@ -1,5 +1,5 @@
 import { ArrowRight, Users, FolderKanban, BarChart3 } from 'lucide-react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import logoIcon from '../assets/images/logo.png';
 import logoText from '../assets/images/syncora-official.png';
 
@@ -17,7 +17,7 @@ export default function HomePage() {
 
         {/* Navigation */}
         <nav className="relative z-10 container mx-auto px-6 py-6 flex items-center justify-between">
-          {/* --- LOGO: Icon + Chữ --- */}
+          {/*  LOGO: Icon + Chữ */}
         <div className="flex items-center gap-2 group cursor-pointer">
           {/* Logo Biểu tượng */}
             <img 

@@ -139,7 +139,7 @@ export const createMeeting = async (req, res) => {
          return res.status(409).json({ success: false, message: "Meeting time conflicts with an existing meeting." });
     }
 
-    // 1. TỰ ĐỘNG LẤY TẤT CẢ THÀNH VIÊN DỰ ÁN
+    //  TỰ ĐỘNG LẤY TẤT CẢ THÀNH VIÊN DỰ ÁN
     const projectMembers = await ProjectMember.find({ 
         projectId, 
         status: "ACTIVE" 
@@ -148,7 +148,7 @@ export const createMeeting = async (req, res) => {
     // Tạo danh sách ID thành viên
     const allMemberIds = projectMembers.map(m => m.userId);
 
-    // 2. Tạo cuộc họp
+    //  Tạo cuộc họp
     const meeting = new Meeting({
       organizationId: currentOrgId,
       projectId,
@@ -163,7 +163,7 @@ export const createMeeting = async (req, res) => {
 
     await meeting.save();
 
-    // 3. GỬI THÔNG BÁO (Trừ người tạo)
+    //  GỬI THÔNG BÁO (Trừ người tạo)
     const recipients = allMemberIds.filter(id => id.toString() !== userId.toString());
 
     // Chạy song song để không block response

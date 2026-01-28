@@ -19,6 +19,7 @@ import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { handleWebhook } from "./controllers/payment.controller.js";
 
 dotenv.config();
 const app = express();
@@ -36,10 +37,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature'] 
 }));
 
-app.use(
+app.post(
   "/api/payment/webhook", 
   express.raw({ type: "application/json" }),
-  paymentRoutes 
+  handleWebhook 
 );
 
 app.use(express.json());

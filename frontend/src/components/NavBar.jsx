@@ -16,12 +16,12 @@ import io from 'socket.io-client';
 
 const SOCKET_URL = 'http://localhost:4000'; 
 
-// === TÁCH HEADERICONS VÀ NHẬN PROPS ===
+// TÁCH HEADERICONS VÀ NHẬN PROPS 
 const HeaderIcons = ({ unreadCount, onLogout }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const { user: contextUser } = useAuth();
     
-    // 🔴 FIX: Lazy Initialization - Đọc user ngay lập tức từ storage
+    // Lazy Initialization - Đọc user ngay lập tức từ storage
     const [user, setUser] = useState(() => {
         const stored = localStorage.getItem('user');
         return stored ? JSON.parse(stored) : contextUser;
@@ -29,7 +29,6 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
     
     const location = useLocation();
 
-    // --- State Chat Mới Thêm ---
     const [isOpenChat, setIsOpenChat] = useState(false); 
     const [currentProject, setCurrentProject] = useState(null); 
     const [chatNotificationCount, setChatNotificationCount] = useState(0); 
@@ -38,11 +37,11 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
     const socketRef = useRef(null);
     const isOpenChatRef = useRef(isOpenChat);
 
-    // 1. Lấy thông tin Org từ localStorage để check Plan
+    //  Lấy thông tin Org từ localStorage để check Plan
     const storedOrg = localStorage.getItem("organization");
     const currentOrg = storedOrg ? JSON.parse(storedOrg) : null;
 
-    // 🔴 FIX: Vẫn lắng nghe thay đổi để cập nhật
+    // Vẫn lắng nghe thay đổi để cập nhật
     useEffect(() => {
         const syncUser = () => {
             const stored = localStorage.getItem('user');
@@ -55,7 +54,7 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
         syncUser();
     }, [location.pathname, contextUser]); 
 
-    // 2. Logic check: Chỉ hiện nút nếu là Admin và đang dùng gói FREE
+    // Logic check: Chỉ hiện nút nếu là Admin và đang dùng gói FREE
     const isFreeAdmin = user?.role === 'Admin' && currentOrg?.plan === 'FREE';
 
     const canManageRequests = ['Admin', 'Manager'].includes(user?.role);
@@ -65,13 +64,13 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
         ? user.name.split(" ").map(word => word[0]).join("").toUpperCase()
         : "??";
 
-    // --- Đồng bộ Ref cho Chat ---
+    //  Đồng bộ Ref cho Chat 
     useEffect(() => {
         isOpenChatRef.current = isOpenChat;
         if (isOpenChat) setChatNotificationCount(0);
     }, [isOpenChat]);
 
-    // --- Lấy Project mặc định (Chạy ngầm) ---
+    // Lấy Project mặc định 
     useEffect(() => {
         if (!showNavbarChat) return;
 
@@ -89,7 +88,7 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
         fetchProject();
     }, [showNavbarChat]);
 
-    // --- Socket Connection ---
+    // Socket Connection
     useEffect(() => {
         if (!user || !currentProject) return;
         const token = localStorage.getItem('token');
@@ -166,7 +165,7 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
                 </button>
             )}
 
-            {/* --- BUTTON CHAT & BADGE --- */}
+            {/* BUTTON CHAT & BADGE */}
             {showNavbarChat && (
                 <div className="relative">
                     <button 

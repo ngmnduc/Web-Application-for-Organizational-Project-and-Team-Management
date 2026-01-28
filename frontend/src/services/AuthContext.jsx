@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
         if (data.success) {
           setUser(data.data.user);
           localStorage.setItem("user", JSON.stringify(data.data.user));
-          console.log("🔄 Auth Context: User data refreshed manually");
+          console.log("Auth Context: User data refreshed manually");
         }
       } catch (err) {
         console.error("Refresh user failed:", err);
@@ -38,12 +38,12 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       const savedUser = localStorage.getItem("user");
-      // 1. Hiển thị tạm dữ liệu cũ
+      //  Hiển thị tạm dữ liệu cũ
       if (savedUser) {
         setUser(JSON.parse(savedUser));
       }
       
-      await refreshUser(); // 2. Gọi API update
+      await refreshUser(); //  Gọi API update
       setLoading(false);
     };
 

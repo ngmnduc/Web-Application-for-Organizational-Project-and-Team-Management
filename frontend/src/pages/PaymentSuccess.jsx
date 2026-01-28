@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/AuthContext';
-import { refreshProfile } from '../services/authService'; // 👉 Import hàm mới
+import { refreshProfile } from '../services/authService'; 
 import Confetti from 'react-confetti'; 
 import { 
     CheckCircleIcon, 
@@ -70,7 +70,7 @@ const PaymentSuccess = () => {
 
             <div className="w-full max-w-md flex flex-col items-center z-10 animate-fade-in-up">
                 
-                {/* --- LOADING --- */}
+                {/*  LOADING  */}
                 {status === 'loading' && (
                     <div className="flex flex-col items-center space-y-6">
                         <div className="relative">
@@ -86,7 +86,7 @@ const PaymentSuccess = () => {
                     </div>
                 )}
 
-                {/* --- SUCCESS --- */}
+                {/*  SUCCESS  */}
                 {status === 'success' && (
                     <>
                         <div className="mb-10 relative group cursor-default">
@@ -126,7 +126,7 @@ const PaymentSuccess = () => {
                     </>
                 )}
 
-                {/* --- ERROR --- */}
+                {/*  ERROR  */}
                 {status === 'error' && (
                     <div className="flex flex-col items-center text-center">
                         <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-6">

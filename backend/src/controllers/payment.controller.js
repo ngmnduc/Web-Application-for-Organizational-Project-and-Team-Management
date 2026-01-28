@@ -67,7 +67,7 @@ export const createCheckoutSession = async (req, res) => {
         targetPlan: planName 
       },
 
-      // [FIX] Truyền metadata vào subscription để invoice.payment_succeeded có thể tìm org
+      // Truyền metadata vào subscription để invoice.payment_succeeded có thể tìm org
       subscription_data: {
         metadata: {
           userId: userId.toString(),
@@ -104,17 +104,16 @@ export const handleWebhook = async (req, res) => {
       sig, 
       process.env.STRIPE_WEBHOOK_SECRET
     );
-    // [DEBUG LOG] Bố xem terminal có hiện dòng này không khi thanh toán xong
-    console.log("🔔 [Webhook Received]", event.type);
+    console.log("[Webhook Received]", event.type);
   } catch (err) {
-    console.error(`❌ Webhook Signature Error: ${err.message}`);
+    console.error(` Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
   
   switch (event.type) {
     case "checkout.session.completed": {
         const session = event.data.object;
-        console.log("📦 [Session Data]:", {
+        console.log("[Session Data]:", {
             metadata: session.metadata,
             subscription: session.subscription,
             mode: session.mode
@@ -131,7 +130,7 @@ export const handleWebhook = async (req, res) => {
                 if (subscriptionId) {
                     try {
                         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                        console.log("📅 [Stripe Subscription]:", {
+                        console.log(" [Stripe Subscription]:", {
                             id: subscription.id,
                             status: subscription.status,
                             current_period_end: subscription.current_period_end
@@ -139,17 +138,17 @@ export const handleWebhook = async (req, res) => {
                         
                         if (subscription.current_period_end) {
                             subscriptionExpiredAt = new Date(subscription.current_period_end * 1000);
-                            console.log("✅ [ExpiredAt from Stripe]:", subscriptionExpiredAt);
+                            console.log(" [ExpiredAt from Stripe]:", subscriptionExpiredAt);
                         }
                     } catch (stripeErr) {
-                        console.error("⚠️ [Stripe API Error]:", stripeErr.message);
+                        console.error(" [Stripe API Error]:", stripeErr.message);
                     }
                 }
                 
                 // [FALLBACK] Nếu không lấy được từ Stripe, set 30 ngày từ bây giờ
                 if (!subscriptionExpiredAt) {
                     subscriptionExpiredAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                    console.log("⚠️ [Fallback ExpiredAt]:", subscriptionExpiredAt);
+                    console.log(" [Fallback ExpiredAt]:", subscriptionExpiredAt);
                 }
 
                 const updatedOrg = await Organization.findByIdAndUpdate(organizationId, { 
@@ -160,7 +159,7 @@ export const handleWebhook = async (req, res) => {
                     updatedAt: new Date()
                 }, { new: true });
 
-                console.log(`✅ [DB Update Complete] Org ${organizationId}:`, {
+                console.log(` [DB Update Complete] Org ${organizationId}:`, {
                     plan: updatedOrg?.plan,
                     subscriptionStatus: updatedOrg?.subscriptionStatus,
                     subscriptionExpiredAt: updatedOrg?.subscriptionExpiredAt
@@ -179,10 +178,10 @@ export const handleWebhook = async (req, res) => {
                      });
                 }
             } catch (err) {
-                console.error("❌ Database update failed:", err);
+                console.error("Database update failed:", err);
             }
         } else {
-             console.error("⚠️ [WARNING] Missing organizationId in metadata! Cannot update DB.");
+             console.error("[WARNING] Missing organizationId in metadata! Cannot update DB.");
         }
         break;
     }
@@ -191,7 +190,7 @@ export const handleWebhook = async (req, res) => {
         const invoice = event.data.object;
         const subscriptionId = invoice.subscription;
         
-        console.log("💰 [Invoice Payment Succeeded]:", {
+        console.log("[Invoice Payment Succeeded]:", {
             subscriptionId,
             invoiceId: invoice.id,
             billing_reason: invoice.billing_reason
@@ -203,7 +202,7 @@ export const handleWebhook = async (req, res) => {
                 const subscription = await stripe.subscriptions.retrieve(subscriptionId);
                 const expiredAt = new Date(subscription.current_period_end * 1000);
                 
-                console.log("📅 [Subscription Period End]:", expiredAt);
+                console.log("[Subscription Period End]:", expiredAt);
 
                 // Tìm org bằng subscriptionId
                 let org = await Organization.findOne({ subscriptionId: subscriptionId });
@@ -211,7 +210,7 @@ export const handleWebhook = async (req, res) => {
                 // [FALLBACK] Nếu không tìm được bằng subscriptionId, thử tìm bằng metadata từ subscription
                 if (!org && subscription.metadata?.organizationId) {
                     org = await Organization.findById(subscription.metadata.organizationId);
-                    console.log("🔍 [Found org via metadata]:", org?._id);
+                    console.log("[Found org via metadata]:", org?._id);
                 }
 
                 if (org) {
@@ -221,7 +220,7 @@ export const handleWebhook = async (req, res) => {
                         subscriptionId: subscriptionId // Đảm bảo subscriptionId được lưu
                     });
                     
-                    console.log(`✅ [Invoice Update] Org ${org._id} expiredAt set to ${expiredAt}`);
+                    console.log(`[Invoice Update] Org ${org._id} expiredAt set to ${expiredAt}`);
                     
                     await createNotification({
                         userId: org.ownerId,
@@ -230,10 +229,10 @@ export const handleWebhook = async (req, res) => {
                         type: "INFO"
                     });
                 } else {
-                    console.log("⚠️ [Invoice] No org found for subscriptionId:", subscriptionId);
+                    console.log("[Invoice] No org found for subscriptionId:", subscriptionId);
                 }
             } catch (err) {
-                console.error("❌ Invoice update failed:", err);
+                console.error("Invoice update failed:", err);
             }
         }
         break;
@@ -252,7 +251,7 @@ export const handleWebhook = async (req, res) => {
                 );
 
                 if (org) {
-                    console.log(`⚠️ [Payment Failed] Org ${org._id} marked as PAST_DUE`);
+                    console.log(`[Payment Failed] Org ${org._id} marked as PAST_DUE`);
                     await createNotification({
                         userId: org.ownerId,
                         title: "Payment Failed",
@@ -285,7 +284,7 @@ export const handleWebhook = async (req, res) => {
                 );
 
                 if (org) {
-                    console.log(`🚫 [Expired] Org ${org._id} downgraded to FREE`);
+                    console.log(`[Expired] Org ${org._id} downgraded to FREE`);
                     await createNotification({
                         userId: org.ownerId,
                         title: "Premium Expired",

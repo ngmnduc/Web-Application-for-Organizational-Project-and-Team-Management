@@ -43,7 +43,7 @@ router.post("/projects/join", verifyToken, joinProjectByCode);
 
 /**
  * @route   GET /projects/pending-requests
- * @desc    Get all pending join requests (QUAN TRỌNG: Phải đặt trước /projects/:id)
+ * @desc    Get all pending join requests 
  */
 router.get("/projects/pending-requests", verifyToken, checkRole("Admin", "Manager"), getPendingRequests);
 

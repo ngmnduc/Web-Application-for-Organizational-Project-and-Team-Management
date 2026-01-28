@@ -7,7 +7,7 @@ import TaskDetail from "../pages/TaskDetail";
 const AppRouter = ({ children, requiredRole }) => {
   const location = useLocation();
   
-  // 1. Lấy data an toàn (tránh crash nếu JSON lỗi)
+  //  Lấy data an toàn (tránh crash nếu JSON lỗi)
   const { token, user } = useMemo(() => {
     const token = localStorage.getItem("token");
     const userStr = localStorage.getItem("user");
@@ -28,7 +28,7 @@ const AppRouter = ({ children, requiredRole }) => {
     console.log(` - Required:`, requiredRole);
   }
 
-  // 2. CHECK 1: Chưa đăng nhập -> Về Login
+  // CHECK 1: Chưa đăng nhập -> Về Login
   // Thêm state={{ from: location }} để sau khi login xong thì redirect lại đúng trang cũ
   if (!token || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
@@ -37,13 +37,12 @@ const AppRouter = ({ children, requiredRole }) => {
   // Chuẩn hóa input về mảng để dễ xử lý
   const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
 
-  // 3. CHECK 2: Sai quyền (Unauthorized)
+  // CHECK 2: Sai quyền (Unauthorized)
   // So sánh user.role với danh sách cho phép
-  // Lưu ý: Đảm bảo user.role trong DB và requiredRole trong code giống hệt nhau (Admin vs Admin)
   if (requiredRole && !allowedRoles.includes(user.role)) {
     console.warn(` ACCESS DENIED: User '${user.role}' tried to access restricted route.`);
     
-    // Logic Redirect thông minh hơn:
+    // Logic Redirect:
     // Nếu user là Admin mà lỡ lạc vào trang Member -> Về Admin Dashboard
     if (user.role === 'Admin') {
       return <Navigate to="/admin/home" replace />;
@@ -52,7 +51,6 @@ const AppRouter = ({ children, requiredRole }) => {
     return <Navigate to="/home" replace />;
   }
 
-  // 4. Hợp lệ -> Render
   return children;
 };
 

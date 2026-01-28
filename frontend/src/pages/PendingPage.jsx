@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, RefreshCw, LogOut, Clock, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '../services/AuthContext'; // 🟢 Import useAuth
+import { useAuth } from '../services/AuthContext'; 
 import logoIcon from '../assets/images/logo.png'; 
 import logoText from '../assets/images/syncora-official.png'; 
 import { API_BASE_URL } from '../utils/constants';
 
 const PendingPage = () => {
   const navigate = useNavigate();
-  const { user, logout, refreshUser } = useAuth(); // 🟢 Lấy refreshUser
+  const { user, logout, refreshUser } = useAuth(); 
   const [isChecking, setIsChecking] = useState(false);
   const [status, setStatus] = useState('pending'); 
 
@@ -25,7 +25,7 @@ const PendingPage = () => {
       if (response.ok && data.data && data.data.length > 0) {
         setStatus('approved');
         
-        // 🟢 Cập nhật lại thông tin User (để lấy role mới) trước khi vào Home
+        // Cập nhật lại thông tin User (để lấy role mới) trước khi vào Home
         await refreshUser();
         
         setTimeout(() => navigate('/home'), 1500); 

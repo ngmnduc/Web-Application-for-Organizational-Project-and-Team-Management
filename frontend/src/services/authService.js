@@ -73,7 +73,7 @@ export const getMe = async () => {
   }
 };
 
-// [UPDATED] Hàm refresh profile có chống Cache
+//  Hàm refresh profile có chống Cache
 export const refreshProfile = async () => {
   try {
     const token = localStorage.getItem("token");
@@ -81,14 +81,14 @@ export const refreshProfile = async () => {
 
     axiosInstance.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-    // [FIX] Thêm timestamp để chặn Cache (Browser sẽ tưởng đây là URL mới và tải lại từ đầu)
+    //  Thêm timestamp để chặn Cache 
     const response = await axiosInstance.get(`/auth/me?t=${new Date().getTime()}`);
 
     if (response.data?.data) {
         const { user, organization } = response.data.data;
 
         // Debug log để bố yên tâm là data mới đã về
-        console.log("🔥 [Fresh Data Loaded]", { 
+        console.log(" [Fresh Data Loaded]", { 
             plan: organization?.plan, 
             status: organization?.subscriptionStatus 
         });
@@ -98,7 +98,7 @@ export const refreshProfile = async () => {
             localStorage.setItem("user", JSON.stringify(user));
         }
         
-        // Cập nhật Organization (để lấy Plan mới: PREMIUM)
+        // Cập nhật Organization 
         if (organization) {
             localStorage.setItem("organization", JSON.stringify(organization));
         }
@@ -200,7 +200,7 @@ export const resumeSubscription = async () => {
 export const getPortalUrl = async () => {
   try {
     const response = await axiosInstance.post('/payment/portal');
-    return response.data; // { success: true, url: "..." }
+    return response.data; 
   } catch (error) {
     throw error.response?.data || error.message;
   }

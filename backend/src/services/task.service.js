@@ -368,30 +368,49 @@ export const deleteTask = async (taskId, currentUser) => {
   const task = await Task.findById(taskId);
   if (!task) throw new Error('TASK_NOT_FOUND');
 
+  //  LOGIC PHÂN QUYỀN  
+  
+  //Nếu là System Admin (Role hệ thống) -> Có toàn quyền xóa
   if (currentUser.role !== 'Admin') {
+      
+      // Nếu không phải System Admin, kiểm tra vai trò trong dự án
       const member = await ProjectMember.findOne({
         projectId: task.projectId,
-        userId: currentUser._id || currentUser.id
+        userId: currentUser._id || currentUser.id,
+        status: 'ACTIVE' // Chỉ thành viên đang hoạt động mới được xét quyền
       });
 
-      const roleInProject = member?.roleInProject || member?.role || 'Member';
-      if (!member || !["Admin", "Manager"].includes(currentUser.role)) {
+      // Nếu không tìm thấy hoặc không phải member -> Chặn
+      if (!member) {
+        throw new Error('PERMISSION_DENIED');
+      }
+
+      // Lấy role trong dự án (Project Role)
+      const roleInProject = member.roleInProject || 'Member';
+
+      //  Chỉ cho phép "Manager" hoặc "Admin" (của dự án) xóa task
+      // "Member" bình thường sẽ bị chặn
+      if (!['Manager', 'Admin'].includes(roleInProject)) {
         throw new Error('PERMISSION_DENIED');
       }
   }    
 
+  //  THỰC HIỆN XÓA (SOFT DELETE) 
   task.deletedAt = new Date();
   await task.save();
 
   try {
     await ActivityLog.create({
       projectId: task.projectId,
-      userId: currentUser._id,
+      userId: currentUser._id || currentUser.id,
       taskId: task._id,
       action: "DELETE_TASK",
-      content: `deleted task "${task.title}"`
+      content: `deleted task "${task.title}"`,
+      entityType: 'Task',     
+      entityId: task._id,     
+      organizationId: task.organizationId 
     });
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error("[TaskService] Log delete failed:", e); }
 
   return task;
 };

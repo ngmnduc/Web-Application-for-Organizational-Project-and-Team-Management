@@ -16,7 +16,7 @@ export const NotificationProvider = ({ children }) => {
 
     const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken');
 
-    // 1. Fetch dữ liệu lần đầu
+    // Fetch dữ liệu lần đầu
     const fetchNotifications = useCallback(async () => {
         try {
             const token = getToken();
@@ -45,7 +45,7 @@ export const NotificationProvider = ({ children }) => {
         }
     }, [user]);
 
-    // 2. Kết nối Socket & Lắng nghe Realtime
+    // Kết nối Socket & Lắng nghe Realtime
     useEffect(() => {
         if (!user) return;
 
@@ -61,7 +61,6 @@ export const NotificationProvider = ({ children }) => {
         socketRef.current.on("NEW_NOTIFICATION", (newNoti) => {
             setNotifications(prev => [newNoti, ...prev]);
             setUnreadCount(prev => prev + 1);
-            // Có thể thêm âm thanh ting ting ở đây
         });
 
         return () => {
@@ -69,13 +68,13 @@ export const NotificationProvider = ({ children }) => {
         };
     }, [user, fetchNotifications]);
 
-    // 3. Mark As Read (Cập nhật ngay lập tức cho TẤT CẢ nơi dùng context)
+    // Mark As Read (Cập nhật ngay lập tức cho tất cả nơi dùng context)
     const markAsRead = async (id) => {
         // Tìm xem thông báo này có đang unread không
         const target = notifications.find(n => n._id === id);
         if (target && target.read) return; // Đã đọc rồi thì thôi
 
-        // Optimistic Update: Cập nhật giao diện ngay lập tức
+        // Cập nhật giao diện ngay lập tức
         setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
         setUnreadCount(prev => Math.max(0, prev - 1));
 
@@ -88,7 +87,7 @@ export const NotificationProvider = ({ children }) => {
         } catch (error) { console.error(error); }
     };
 
-    // 4. Mark All Read
+    // Mark All Read
     const markAllAsRead = async () => {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         setUnreadCount(0);
