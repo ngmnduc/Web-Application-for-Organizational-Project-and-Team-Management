@@ -292,7 +292,9 @@ const Members = () => {
     const isAdminView = selectedProjectId === 'all';
     
     // ✅ FIX: Nếu là System Admin -> Luôn có quyền Admin trong Project
-    const effectiveProjectRole = isSystemAdmin ? 'Admin' : projectRole;
+    // Ưu tiên System Admin, sau đó đến role lấy từ API (myProjectRole)
+    // Nếu myProjectRole là null -> coi như Member
+    const effectiveProjectRole = isSystemAdmin ? 'Admin' : (myProjectRole || 'Member');
     
     const isProjectAdmin = effectiveProjectRole === 'Admin';
     const isProjectManager = effectiveProjectRole === 'Manager';
@@ -337,7 +339,7 @@ const fetchData = useCallback(async () => {
                 role: m.role, // Role dự án (Admin/Manager/Member)
                 systemRole: m.user.role, 
                 avatarUrl: m.user.avatar,
-                createdAt: m.createdAt,
+                createdAt: m.joinedAt,
                 projects: [],
                 membershipId: m._id 
             }));
