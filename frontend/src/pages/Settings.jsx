@@ -3,7 +3,7 @@ import {
     CameraIcon, 
     XMarkIcon, CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
     ShieldCheckIcon,
-    CreditCardIcon, CalendarDaysIcon, BanknotesIcon 
+    CreditCardIcon, CalendarDaysIcon, BanknotesIcon, SunIcon, MoonIcon, TrashIcon
 } from '@heroicons/react/24/outline'; 
 import { useAuth } from '../services/AuthContext';
 import { 
