@@ -129,9 +129,9 @@
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #52525b; 
   }
- /* ---  FIX AVATAR (Làm sáng lên) --- */
+ /* FIX AVATAR (Làm sáng lên)
 
-/* Avatar tạo tự động (Initials) ở trang Members & Navbar */
+/* Avatar tạo tự động ở trang Members & Navbar */
 .dark div[style*="color-mix"] {
   background-color: #3f3f46 !important; 
   /* Chữ màu trắng hoặc Brand color sáng để dễ đọc */
@@ -153,7 +153,7 @@
 }
 
 
-/* --- FIX PROJECT DETAIL DRAWER --- */
+/* FIX PROJECT DETAIL DRAWER */
 
 /* Fix nền của chính cái Modal (Drawer) */
 .dark .bg-white.rounded-3xl.shadow-2xl {
@@ -190,7 +190,7 @@
 }
 
 
-/* --- 3. FIX OVERALL PROGRESS --- */
+/* FIX OVERALL PROGRESS */
 
 /* Chữ phần trăm */
 .dark .ant-progress-text {
@@ -203,7 +203,7 @@
     color: #ffffff !important;
 }
 
-/* --- FIX MÀU CHỮ CHUNG TRONG CARD --- */
+/* FIX MÀU CHỮ CHUNG TRONG CARD */
 /* Đảm bảo tên project, tên member chuyển sang trắng */
 .dark .text-gray-900, 
 .dark .text-gray-800 {

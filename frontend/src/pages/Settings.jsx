@@ -135,7 +135,7 @@ const ImageCropperModal = ({ imageSrc, onCancel, onSave }) => {
     );
 };
 
-// --- COMPONENT: PROFILE INFO (ĐÃ CẬP NHẬT) ---
+// COMPONENT: PROFILE INFO
 const ProfileInfo = () => {
     const { user, setUser } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
