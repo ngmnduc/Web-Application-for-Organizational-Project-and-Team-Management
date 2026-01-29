@@ -169,46 +169,6 @@ export async function signup(req, res, next) {
 
     await session.commitTransaction();
 
-    let paymentUrl = null;
-    if (!projectToJoin && plan === "PREMIUM") {
-      try {
-        const sessionStripe = await stripe.checkout.sessions.create({
-          payment_method_types: ["card"],
-          customer_email: email, 
-          line_items: [{
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: "Premium Plan Subscription",
-                description: "Unlock unlimited projects (Signup Upgrade)",
-              },
-              unit_amount: 2000, 
-              recurring: { interval: "month" },
-            },
-            quantity: 1,
-          }],
-          mode: "subscription",
-          success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
-          metadata: {
-            organizationId: finalOrganizationId.toString(),
-            userId: userId.toString(),
-            targetPlan: "PREMIUM"
-          },
-          subscription_data: {
-            metadata: {
-              organizationId: finalOrganizationId.toString(),
-              userId: userId.toString(),
-              targetPlan: "PREMIUM"
-            }
-          },
-        });
-        paymentUrl = sessionStripe.url;
-      } catch (stripeError) {
-        console.error("Stripe Session Creation Failed:", stripeError);
-      }
-    }
-
     const tokenPayload = { 
       sub: userId.toString(), 
       email: userDoc.email, 
@@ -217,14 +177,12 @@ export async function signup(req, res, next) {
     };
     const newToken = signToken(tokenPayload);
 
-    sendWelcomeEmail(userDoc.email, userDoc.name).catch(emailErr => {
-      console.error("Failed to send welcome email:", emailErr);
-    });
+    const needsPayment = !projectToJoin && plan === "PREMIUM";
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       message: projectToJoin ? "Joined project successfully" : "User created successfully",
-      paymentUrl,
+      paymentPending: needsPayment, 
       data: {
         token: newToken,
         tokenType: "Bearer",
@@ -247,6 +205,63 @@ export async function signup(req, res, next) {
         })
       },
     });
+
+    setImmediate(() => {
+      sendWelcomeEmail(userDoc.email, userDoc.name)
+        .then(() => {
+          console.log(`[SIGNUP] Welcome email sent to: ${userDoc.email}`);
+        })
+        .catch((emailErr) => {
+          console.error(`[SIGNUP] Failed to send welcome email to ${userDoc.email}:`, emailErr.message);
+        });
+    });
+
+    if (needsPayment) {
+      setImmediate(async () => {
+        try {
+          const sessionStripe = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            customer_email: email, 
+            line_items: [{
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: "Premium Plan Subscription",
+                  description: "Unlock unlimited projects (Signup Upgrade)",
+                },
+                unit_amount: 2000, 
+                recurring: { interval: "month" },
+              },
+              quantity: 1,
+            }],
+            mode: "subscription",
+            success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
+            metadata: {
+              organizationId: finalOrganizationId.toString(),
+              userId: userId.toString(),
+              targetPlan: "PREMIUM"
+            },
+            subscription_data: {
+              metadata: {
+                organizationId: finalOrganizationId.toString(),
+                userId: userId.toString(),
+                targetPlan: "PREMIUM"
+              }
+            },
+          });
+          
+          await User.findByIdAndUpdate(userId, { 
+            pendingPaymentUrl: sessionStripe.url,
+            pendingPaymentExpiry: new Date(Date.now() + 30 * 60 * 1000)
+          });
+          
+          console.log(`[SIGNUP] Stripe session created for: ${email}`);
+        } catch (stripeError) {
+          console.error(`[SIGNUP] Stripe failed for ${email}:`, stripeError.message);
+        }
+      });
+    }
 
   } catch (err) {
     if (session.inTransaction()) {
