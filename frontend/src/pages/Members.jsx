@@ -291,7 +291,6 @@ const Members = () => {
     const projectRole = project?.currentUserRole || 'Member';
     const isAdminView = selectedProjectId === 'all';
     
-    // ✅ FIX: Nếu là System Admin -> Luôn có quyền Admin trong Project
     // Ưu tiên System Admin, sau đó đến role lấy từ API (myProjectRole)
     // Nếu myProjectRole là null -> coi như Member
     const effectiveProjectRole = isSystemAdmin ? 'Admin' : (myProjectRole || 'Member');
