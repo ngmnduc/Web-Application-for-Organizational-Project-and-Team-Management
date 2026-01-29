@@ -6,10 +6,9 @@ import ProjectMember from "../models/projectMember.model.js";
 export function verifyProjectAccess(...requiredProjectRoles) {
   return async (req, res, next) => {
     try {
-      // Step 1: Extract projectId from various sources
+      //Extract projectId from various sources
       let projectId = req.params.id || req.params.projectId;
 
-      // If dealing with task routes, we need to get projectId from the task
       if (!projectId && req.params.taskId) {
         const Task = (await import("../models/task.model.js")).default;
         const task = await Task.findById(req.params.taskId).select('projectId');
@@ -50,7 +49,7 @@ export function verifyProjectAccess(...requiredProjectRoles) {
         });
       }
 
-      // Step 2: Get userId from token (set by verifyToken middleware)
+      //Get userId from token (set by verifyToken middleware)
       const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ 
@@ -60,7 +59,7 @@ export function verifyProjectAccess(...requiredProjectRoles) {
         });
       }
 
-      // Step 2.5: GHOST USER CHECK - Verify user still exists and is active
+      //GHOST USER CHECK - Verify user still exists and is active
       const User = (await import("../models/user.model.js")).default;
       const user = await User.findById(userId).select('deletedAt status');
       
@@ -80,14 +79,14 @@ export function verifyProjectAccess(...requiredProjectRoles) {
         });
       }
 
-      // Step 3: Query ProjectMember table
+      //Query ProjectMember table
       const projectMember = await ProjectMember.findOne({ 
         projectId, 
         userId,
         status: "ACTIVE" // Only check active members
       });
 
-      // Step 4: Check if user is a member of the project
+      //Check if user is a member of the project
       if (!projectMember) {
         return res.status(403).json({ 
           success: false, 
@@ -96,11 +95,11 @@ export function verifyProjectAccess(...requiredProjectRoles) {
         });
       }
 
-      // Step 5: Attach project role to request
+      //Attach project role to request
       req.projectRole = projectMember.roleInProject;
       req.projectId = projectId;
 
-      // Step 6: Verify role permissions
+      //Verify role permissions
       if (requiredProjectRoles.length > 0 && !requiredProjectRoles.includes(req.projectRole)) {
         return res.status(403).json({ 
           success: false, 

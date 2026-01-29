@@ -23,7 +23,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         {/*  */}
         </ThemeProvider>
         </NotificationProvider>
-        {/* ==================================== */}
       </AuthProvider>  
       </BrowserRouter>
     </React.StrictMode>

@@ -23,7 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useNotifications } from '../context/NotificationContext';
 
-// === MENU ITEMS ===
+// MENU ITEMS 
 const menuItems = [
     { name: 'Dashboard', icon: Squares2X2Icon, href: '/home' },
     { name: 'Kanban', icon: FolderIcon, href: '/tasks', hideForAdmin: true },
@@ -85,7 +85,7 @@ const SideBar = ({ basePath=""}) => {
     const location = useLocation();
     const { user: contextUser } = useAuth(); 
     
-    // 🔴 FIX: Lazy Initialization - Đọc trực tiếp từ localStorage khi khởi tạo state
+    // Lazy Initialization - Đọc trực tiếp từ localStorage khi khởi tạo state
     // Giúp UI hiển thị đúng ngay lập tức mà không cần chờ useEffect chạy
     const [user, setUser] = useState(() => {
         const stored = localStorage.getItem('user');
@@ -95,7 +95,7 @@ const SideBar = ({ basePath=""}) => {
     const [isHovered, setIsHovered] = useState(false);
     const { unreadCount } = useNotifications();
 
-    // 🔴 FIX: Vẫn giữ useEffect để cập nhật nếu localStorage thay đổi sau đó (VD: khi chuyển trang)
+    // Vẫn giữ useEffect để cập nhật nếu localStorage thay đổi sau đó 
     useEffect(() => {
         const loadUser = () => {
             const stored = localStorage.getItem('user');
@@ -112,7 +112,7 @@ const SideBar = ({ basePath=""}) => {
     const isAdmin = user?.role === 'Admin';
     const homeLink = isAdmin ? '/admin/home' : '/home';
 
-    // --- LOGIC CHỌN LOGO  ---
+    // LOGIC CHỌN LOGO  
     const currentFullLogo = isAdmin ? logoAdminFull : logoUserFull;
     const displaySrc = isHovered ? currentFullLogo : (isAdmin ? logoAdmin : logoUser);
 
@@ -179,7 +179,7 @@ const ProjectSwitcher = ({ isExpanded }) => {
     const { selectedProjectId, selectedProjectName, switchProject } = useProject();
     const { user: contextUser } = useAuth();
     
-    // 🔴 FIX: Áp dụng Lazy Initialization tương tự cho ProjectSwitcher
+    // Áp dụng Lazy Initialization tương tự cho ProjectSwitcher
     const [user, setUser] = useState(() => {
         const stored = localStorage.getItem('user');
         return stored ? JSON.parse(stored) : contextUser;

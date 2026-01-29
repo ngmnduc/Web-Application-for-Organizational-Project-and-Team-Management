@@ -19,7 +19,7 @@ const getHeaders = () => ({
     'Authorization': `Bearer ${localStorage.getItem('token')}`
 });
 
-// --- Helper: Circular Progress Component ---
+// Helper: Circular Progress Component 
 const CircularProgress = ({ percentage, size = 120, strokeWidth = 10, color = "#facc15" }) => {
     const radius = (size - strokeWidth) / 2;
     const circumference = radius * 2 * Math.PI;
@@ -48,7 +48,7 @@ const CircularProgress = ({ percentage, size = 120, strokeWidth = 10, color = "#
     );
 };
 
-// --- SUB-COMPONENT: TAB DASHBOARD ---
+// SUB-COMPONENT: TAB DASHBOARD
 const ProjectDashboardTab = ({ projectId }) => {
     const [stats, setStats] = useState(null);
     const [activities, setActivities] = useState([]);
@@ -123,7 +123,7 @@ const ProjectDashboardTab = ({ projectId }) => {
                     </div>
                 </div>
 
-                {/* --- Xếp dọc --- */}
+                {/* Xếp dọc  */}
                 <div className="grid grid-cols-1 gap-6">
                     {/* Task Distribution */}
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -185,7 +185,7 @@ const ProjectDashboardTab = ({ projectId }) => {
     );
 };
 
-// --- SUB-COMPONENT: TAB MEMBERS ---
+// SUB-COMPONENT: TAB MEMBERS 
 const ProjectMembersTab = ({ projectId }) => {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -247,7 +247,7 @@ const ProjectMembersTab = ({ projectId }) => {
     );
 };
 
-// --- MAIN DRAWER COMPONENT (MODAL STYLE) ---
+// MAIN DRAWER COMPONENT (MODAL STYLE) 
 const ProjectDetailDrawer = ({ isOpen, onClose, project }) => {
     const [activeTab, setActiveTab] = useState('dashboard'); 
     const { user } = useAuth(); // Lấy user hiện tại
@@ -287,9 +287,7 @@ const ProjectDetailDrawer = ({ isOpen, onClose, project }) => {
 
                     {/* ACTIONS: CHAT & CLOSE */}
                     <div className="flex items-center gap-2">
-                        {/* Nút Chat cho Admin (hoặc hiển thị cho tất cả nếu muốn) 
-                            Logic ở đây: Nếu là Admin -> Hiện nút này vì Admin ko có Navbar Chat
-                        */}
+                        {/* Nút Chat cho Admin */}
                         {user?.role === 'Admin' && (
                             <button 
                                 onClick={() => setIsChatOpen(!isChatOpen)}

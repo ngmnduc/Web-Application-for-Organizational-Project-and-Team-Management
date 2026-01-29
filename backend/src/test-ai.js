@@ -8,7 +8,7 @@ dotenv.config();
 const runTest = async () => {
   console.log("BẮT ĐẦU TEST AI SERVICE (JSON MODE)...\n");
 
-  // --- TEST CASE 1: SUBTASKS (Giữ nguyên để test 1 thể) ---
+  // TEST CASE 1: SUBTASKS (Giữ nguyên để test 1 thể) ---
   const taskTitle = "Tổ chức tiệc tất niên công ty";
   console.log(`1.Đang test Generate Subtasks cho: "${taskTitle}"...`);
   
@@ -22,7 +22,7 @@ const runTest = async () => {
   
   console.log("\n--------------------------------------------------\n");
 
-  // --- TEST CASE 2: SUMMARIZE DAY (Cấu trúc JSON mới) ---
+  // TEST CASE 2: SUMMARIZE DAY (Cấu trúc JSON mới) ---
   console.log("2.Đang test Summarize Day (English JSON Output)...");
   
   // Giả lập dữ liệu Task (Có Label để AI phân tích kỹ hơn)
@@ -54,7 +54,7 @@ const runTest = async () => {
     const summary = await AIService.summarizeDay(mockTasks, mockMeetings);
     
     console.log("Kết quả Summary (JSON Object):");
-    console.log(JSON.stringify(summary, null, 2)); // In format đẹp để dễ nhìn cấu trúc
+    console.log(JSON.stringify(summary, null, 2));
 
     // Kiểm tra nhanh cấu trúc
     if (summary.greeting && Array.isArray(summary.task_highlights)) {
@@ -70,5 +70,4 @@ const runTest = async () => {
   console.log("\n--------------------------------------------------");
 };
 
-// Chạy hàm test
 runTest();

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-    UserIcon, KeyIcon, SunIcon, GlobeAltIcon, 
-    PhotoIcon, CameraIcon, TrashIcon, ArrowPathIcon, 
+    CameraIcon, 
     XMarkIcon, CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-    ShieldCheckIcon, LockClosedIcon, FingerPrintIcon, MoonIcon,
+    ShieldCheckIcon,
     CreditCardIcon, CalendarDaysIcon, BanknotesIcon 
 } from '@heroicons/react/24/outline'; 
 import { useAuth } from '../services/AuthContext';
@@ -25,7 +24,7 @@ const getHeaders = () => {
     };
 };
 
-// --- COMPONENT: ALERT WARNING ---
+//  COMPONENT: ALERT WARNING 
 const AlertWarning = ({ organization }) => {
     if (!organization) return null;
     const { subscriptionStatus, plan, subscriptionExpiredAt } = organization;
@@ -48,7 +47,7 @@ const AlertWarning = ({ organization }) => {
     return null;
 };
 
-// --- COMPONENT: NOTIFICATION BANNER ---
+//  COMPONENT: NOTIFICATION BANNER 
 const NotificationBanner = ({ message, type, onClose }) => {
     if (!message) return null;
     const isSuccess = type === 'success';
@@ -67,7 +66,7 @@ const NotificationBanner = ({ message, type, onClose }) => {
     );
 };
 
-// --- COMPONENT: CONFIRM MODAL ---
+//  COMPONENT: CONFIRM MODAL 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = "Confirm", confirmColor = "bg-red-600" }) => {
     if (!isOpen) return null;
     return (
@@ -89,7 +88,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, confirmText 
     );
 };
 
-// --- COMPONENT: IMAGE CROPPER ---
+//  COMPONENT: IMAGE CROPPER 
 const ImageCropperModal = ({ imageSrc, onCancel, onSave }) => {
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -314,7 +313,7 @@ const ProfileInfo = () => {
     );
 };
 
-// --- COMPONENT: BILLING SECTION ---
+//  COMPONENT: BILLING SECTION 
 const BillingSection = ({ organization, onRefresh }) => {
     const [loading, setLoading] = useState(false);
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null });
@@ -365,9 +364,26 @@ const BillingSection = ({ organization, onRefresh }) => {
                         {isPremium && <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"><CalendarDaysIcon className="w-4 h-4" /><span>Expiry: <span className="font-semibold">{expiredAt}</span></span></div>}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                        {!isPremium && <button onClick={() => window.location.href = '/pricing'} className="px-6 py-2 text-white font-semibold rounded-lg bg-[var(--color-brand)] flex items-center justify-center gap-2"><CreditCardIcon className="w-4 h-4"/> Upgrade</button>}
-                        {isPremium && status === 'ACTIVE' && <button onClick={() => setModalConfig({ isOpen: true, type: 'cancel' })} className="px-4 py-2.5 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20">Cancel Renewal</button>}
-                        {isPremium && status === 'PAST_DUE' && <button onClick={handleUpdateCard} className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700">Update Card</button>}
+                        {!isPremium && (
+                            <button onClick={() => window.location.href = '/pricing'} className="px-6 py-2 text-white font-semibold rounded-lg bg-[var(--color-brand)] flex items-center justify-center gap-2">
+                                <CreditCardIcon className="w-4 h-4"/> Upgrade to Premium
+                            </button>
+                        )}
+                        {isPremium && status === 'ACTIVE' && (
+                            <button onClick={() => setModalConfig({ isOpen: true, type: 'cancel' })} className="px-4 py-2.5 bg-white border border-gray-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition">
+                                Cancel Renewal
+                            </button>
+                        )}
+                        {isPremium && status === 'CANCELLED' && (
+                            <button onClick={() => setModalConfig({ isOpen: true, type: 'resume' })} className="px-5 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition">
+                                Resume Subscription
+                            </button>
+                        )}
+                        {isPremium && status === 'PAST_DUE' && (
+                            <button onClick={handleUpdateCard} className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition">
+                                Update Card
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -375,7 +391,7 @@ const BillingSection = ({ organization, onRefresh }) => {
     );
 };
 
-// --- COMPONENT: ACCOUNT SETTINGS ---
+//  COMPONENT: ACCOUNT SETTINGS 
 const AccountSettings = ({ organization, onRefresh }) => {
     const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
     const [notification, setNotification] = useState({ message: '', type: '' });
@@ -428,7 +444,7 @@ const AccountSettings = ({ organization, onRefresh }) => {
     );
 };
 
-// --- COMPONENT: PREFERENCES ---
+//  COMPONENT: PREFERENCES 
 const Preferences = () => {
     const { user, setUser } = useAuth();
     const { theme, toggleTheme } = useTheme(); 

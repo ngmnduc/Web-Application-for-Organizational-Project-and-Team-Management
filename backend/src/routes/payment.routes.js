@@ -20,8 +20,11 @@ router.post("/session", verifyToken, createCheckoutSession);
  * @route   POST /payment/webhook
  * @desc    Stripe webhook listener
  */
-router.post("/webhook", handleWebhook);
-
+router.post(
+  "/webhook", 
+  express.raw({ type: 'application/json' }), 
+  handleWebhook
+);
 /**
  * @route   POST /payment/cancel
  * @desc    Cancel subscription (Schedule for end of period)

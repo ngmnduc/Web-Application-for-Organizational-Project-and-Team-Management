@@ -116,7 +116,7 @@ const AssignToProjectModal = ({ isOpen, onClose, onAssignSuccess, user }) => {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     
-                    {/* Hiển thị thông tin người đang được Assign (Không cho sửa) */}
+                    {/* Hiển thị thông tin người đang được Assign  */}
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
                         <div>
                             <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assigning Member</span>

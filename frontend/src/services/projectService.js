@@ -78,10 +78,9 @@ export const getProjectMembers = async (projectId) => {
   }
 };
 export const getProjectLabels = async (projectId) => {
-  // Logic gọi API lấy labels, ví dụ:
   // const response = await axios.get(`/projects/${projectId}/labels`);
   // return response.data;
-  return []; // Mock tạm nếu chưa có API
+  return []; // Mock tạm vì chưa có API
 };
 export default {
   getProjects,

@@ -12,7 +12,7 @@ export const getMembers = async (req, res) => {
     // Lấy organizationId từ user đã đăng nhập (do middleware auth gán vào)
     const currentOrganizationId = req.user?.currentOrganizationId;
 
-    // Gọi Service lấy danh sách (đã fix populate và format data ở bước trước)
+    // Gọi Service lấy danh sách 
     const members = await projectService.getProjectMembers(id, currentOrganizationId);
 
     res.status(200).json({
@@ -63,10 +63,6 @@ export const removeMember = async (req, res) => {
     const currentOrganizationId = req.user?.currentOrganizationId;
     const requestorId = req.user._id; // ID của người thực hiện hành động xóa
 
-    // --- LOGIC QUAN TRỌNG ĐỂ KHỚP FRONTEND ---
-    // Frontend đang gửi 'memberId' là ID của bản ghi ProjectMember (membershipId).
-    // Nhưng Service removeMember lại cần 'userId'.
-    // Ta phải tìm userId từ membershipId trước.
     let userIdToDelete = memberId;
     
     if (mongoose.isValidObjectId(memberId)) {
@@ -122,7 +118,6 @@ export const joinRequest = async (req, res) => {
     }
 
     // Tạo request mới với status PENDING
-    // (Vì Service chưa có hàm này nên ta gọi trực tiếp Model ở đây cho nhanh)
     await ProjectMember.create({
         projectId,
         userId,
@@ -157,7 +152,7 @@ export const approveMember = async (req, res) => {
     if (action === "approve") {
         member.status = "ACTIVE";
         
-        // 👇 THÊM: Gửi thông báo khi duyệt thành viên
+        // THÊM: Gửi thông báo khi duyệt thành viên
         try {
             const project = await Project.findById(projectId).select('name');
             const activeMembers = await ProjectMember.find({ projectId: projectId, status: 'ACTIVE' });

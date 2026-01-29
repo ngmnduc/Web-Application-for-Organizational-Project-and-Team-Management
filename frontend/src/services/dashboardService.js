@@ -1,12 +1,22 @@
-import axiosInstance from './api';
+import axiosInstance from '../services/api';
 
-// Helper để build query string gọn gàng
 const buildQuery = (projectId, month, year) => {
   const params = new URLSearchParams();
-  if (projectId && projectId !== 'all') params.append('projectId', projectId);
-  if (month) params.append('month', month);
-  if (year) params.append('year', year);
-  return params.toString() ? `?${params.toString()}` : '';
+  
+  if (projectId && projectId !== 'all') {
+    params.append('projectId', projectId);
+  }
+  if (month) {
+    params.append('month', month);
+  }
+  if (year) {
+    params.append('year', year);
+  }
+  
+  // Thêm timestamp để ép trình duyệt tải dữ liệu mới
+  params.append('_t', new Date().getTime());
+  
+  return `?${params.toString()}`;
 };
 
 const getAdminStats = async (projectId = null, month = null, year = null) => {

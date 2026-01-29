@@ -1,26 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     ChevronLeftIcon, ChevronRightIcon, ClockIcon, MapPinIcon, PlusIcon, XMarkIcon,
-    VideoCameraIcon, CalendarIcon, Bars3BottomLeftIcon, BriefcaseIcon,
+    CalendarIcon, Bars3BottomLeftIcon, BriefcaseIcon,
     ShieldCheckIcon, UserGroupIcon, TrashIcon, PencilIcon, 
-    CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon
+    CheckCircleIcon, ExclamationCircleIcon,
 } from '@heroicons/react/24/outline'; 
 import { useOutletContext } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext'; 
-import { useAuth } from '../services/AuthContext'; // ✅ THÊM DÒNG NÀY
+import { useAuth } from '../services/AuthContext'; 
 import { LoaderOverlay } from '../components/LoaderOverlay';
 import TaskSummary from '../components/TaskSummary'; 
 import { CalendarDayCell } from '../components/CalendarDayCell';
 import axiosInstance from '../services/api';
 import { API_BASE_URL } from '../utils/constants';
 
-// --- HELPER FUNCTIONS ---
+//  HELPER 
 const getHeaders = () => ({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('accessToken')}`
 });
 
-// --- UTILS ---
+// UTILS 
 const normalizeDate = (dateInput) => {
     if (!dateInput) return '';
     const d = new Date(dateInput);
@@ -34,7 +34,7 @@ const normalizeDate = (dateInput) => {
 const formatTimeUS = (dateInput) => new Date(dateInput).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 const formatDateUS = (dateInput) => new Date(dateInput).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-// --- NOTIFICATION BANNER ---
+// NOTIFICATION BANNER 
 const NotificationBanner = ({ message, type, onClose }) => {
     if (!message) return null;
     const isSuccess = type === 'success';
@@ -55,7 +55,7 @@ const NotificationBanner = ({ message, type, onClose }) => {
     );
 };
 
-// --- CONFIRM MODAL ---
+// CONFIRM MODAL
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
     if (!isOpen) return null;
     return (
@@ -81,7 +81,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
     );
 };
 
-// --- IP MANAGEMENT MODAL ---
+// IP MANAGEMENT MODAL 
 const IPManagementModal = ({ isOpen, onClose, showNotification }) => {
     const [ips, setIps] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -171,7 +171,7 @@ const IPManagementModal = ({ isOpen, onClose, showNotification }) => {
 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" onClick={onClose}>
-            {/* --- Confirm Delete Modal inside IP Modal --- */}
+            {/* Confirm Delete Modal inside IP Modal */}
             <ConfirmModal 
                 isOpen={!!deleteId} 
                 onClose={() => setDeleteId(null)} 
@@ -325,7 +325,7 @@ const ReportDetailModal = ({ isOpen, onClose, title, data, type }) => {
     );
 };
 
-// --- ATTENDANCE REPORT MODAL ---
+//  ATTENDANCE REPORT MODAL 
 const AttendanceReportModal = ({ isOpen, onClose }) => {
     const { selectedProjectId, selectedProjectName } = useProject();
     
@@ -514,7 +514,7 @@ const AttendanceReportModal = ({ isOpen, onClose }) => {
     );
 };
 
-// --- MEETING DETAIL MODAL ---
+// MEETING DETAIL MODAL
 const MeetingDetailModal = ({ isOpen, onClose, meeting, projects, onDeleteSuccess, canDelete, showNotification }) => {
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
@@ -560,7 +560,7 @@ const MeetingDetailModal = ({ isOpen, onClose, meeting, projects, onDeleteSucces
     );
 };
 
-// --- CREATE MEETING MODAL ---
+// CREATE MEETING MODAL
 const CreateMeetingModal = ({ isOpen, onClose, projects, onSuccess, showNotification }) => {
     const { selectedProjectId } = useProject();
     const [formData, setFormData] = useState({ title: '', projectId: '', startTime: '', endTime: '', location: '', description: '' });
@@ -627,7 +627,7 @@ const CreateMeetingModal = ({ isOpen, onClose, projects, onSuccess, showNotifica
     );
 };
 
-// --- CALENDAR PANEL (COMPONENT ĐÃ ĐƯỢC THÊM LẠI) ---
+// CALENDAR PANEL 
 const CalendarPanel = ({ currentMonth, setCurrentMonth, selectedDate, onSelectDate, events, attendance }) => {
     const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     const getDaysInMonth = (date) => {
@@ -685,7 +685,7 @@ const CalendarPanel = ({ currentMonth, setCurrentMonth, selectedDate, onSelectDa
     );
 };
 
-// --- RIGHT PANEL ---
+//  RIGHT PANEL 
 const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, onOpenCreateModal, onEventClick, canCreateMeeting, userRole, onOpenIPModal, onOpenReportModal, showNotification }) => {
     const [checkInStatus, setCheckInStatus] = useState(null); 
 
@@ -779,7 +779,7 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
     );
 };
 
-// --- MAIN PAGE ---
+// MAIN PAGE 
 const Calendar = () => {
     const { user } = useAuth(); 
     const { dynamicTasksSummary } = useOutletContext();

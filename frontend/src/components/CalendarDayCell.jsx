@@ -26,13 +26,12 @@ export const CalendarDayCell = ({ date, isSelected, isCheckedIn, hasEvent }) => 
                 className={dayClasses}
                 style={isSelected ? { backgroundColor: 'var(--color-brand)' } : {}}
             >
-                {/* Số ngày (đẩy lên z-index cao để không bị che) */}
+                {/* Số ngày  */}
                 <div className="z-10 relative">
                     {date}
                 </div>
                 
                 {/* --- THANH GẠCH NGANG BÁO SỰ KIỆN --- */}
-                {/* Luôn hiện nếu hasEvent = true */}
                 {hasEvent && (
                     <div 
                         className={`absolute bottom-1 h-[3px] w-4 rounded-full z-20 ${

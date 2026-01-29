@@ -19,7 +19,7 @@ export const listUsers = async (req, res) => {
       organizations: currentOrgId // Mongoose tự tìm xem currentOrgId có nằm trong mảng organizations không
     };
 
-    // 3. Hỗ trợ lọc theo Role (Frontend gửi ?role=Manager sẽ chỉ lấy Manager)
+    // 3. Hỗ trợ lọc theo Role 
     if (req.query.role) {
       query.role = req.query.role;
     }
@@ -109,7 +109,7 @@ export const getUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid user ID format" });
     }
 
-    // [QUAN TRỌNG] Tìm user theo ID NHƯNG phải thuộc cùng Org
+    //Tìm user theo ID NHƯNG phải thuộc cùng Org
     const user = await User.findOne({
       _id: id,
       organizations: currentOrgId, // Chặn việc soi thông tin user công ty khác
