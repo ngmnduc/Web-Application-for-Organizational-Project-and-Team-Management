@@ -101,3 +101,76 @@ export const getManagerStats = async (req, res) => {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
+
+/**
+ * @desc    Export Admin Dashboard Report to CSV
+ * @route   GET/api/dashboard/export/admin
+ * @access  Private (Admin) 
+*/
+export const exportAdminReport = async (req, res) => {
+  try {
+    const currentOrgId = req.user.currentOrganizationId;
+    const currentUserId = req.user._id;
+    const { month, year } = req.query;
+
+    if (month && (Number(month) < 1 || Number(month) > 12)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Month must be between 1 and 12" 
+      });
+    }
+
+    const csvData = await dashboardService.exportAdminReport(
+      currentUserId,
+      currentOrgId,
+      month ? Number(month) : null,
+      year ? Number(year) : null
+    );
+
+    const filename = `Admin_Report_${month || 'All'}_${year || 'All'}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    
+    res.status(200).send(csvData);
+
+  } catch (err) {
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ success: false, message: "Organization context missing" });
+    }
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+  }
+};
+
+/**
+ * @desc    Export Manager Dashboard Report
+ * @route   GET /api/dashboard/export/manager
+ * @access  Private (Manager)
+ */
+export const exportManagerReport = async (req, res) => {
+  try {
+    const currentOrgId = req.user.currentOrganizationId;
+    const userId = req.user._id;
+    const { month, year } = req.query;
+    if (month && (Number(month) < 1 || Number(month) > 12)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Month must be between 1 and 12" 
+      });
+    }
+    const csvData = await dashboardService.exportManagerReport(
+      userId,
+      currentOrgId,
+      month ? Number(month) : null,
+      year ? Number(year) : null
+    );
+    const filename = `Manager_Report_${month || 'All'}_${year || 'All'}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.status(200).send(csvData);
+  } catch (err) {
+    if (err.message === 'ORGANIZATION_REQUIRED') {
+      return res.status(400).json({ success: false, message: "Organization context missing" });
+    }
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+  }
+};
