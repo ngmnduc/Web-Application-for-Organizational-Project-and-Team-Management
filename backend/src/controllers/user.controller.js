@@ -244,3 +244,50 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
+
+/**
+ * @desc    Update user preferences (Theme, Notifications)
+ * @route   PATCH /users/preferences
+ * @access  Private
+ */
+export const updatePreferences = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { theme, notifications } = req.body;
+
+    const updateData = {};
+
+    // 1. Xử lý Theme
+    if (theme) {
+        if (!['Light', 'Dark'].includes(theme)) {
+            return res.status(400).json({ success: false, message: "Invalid theme" });
+        }
+        updateData["preferences.theme"] = theme;
+    }
+    
+    // 2. Xử lý Notifications (Hỗ trợ update lẻ từng cái)
+    if (notifications) {
+        const fields = ['enabled', 'taskAssigned', 'mentioned', 'memberJoined', 'meetingCreated'];
+        fields.forEach(field => {
+            if (typeof notifications[field] === 'boolean') {
+                updateData[`preferences.notifications.${field}`] = notifications[field];
+            }
+        });
+    }
+
+    const user = await User.findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true }
+    ).select("-password");
+
+    res.json({
+        success: true,
+        message: "Saved", // Auto-save message ngắn gọn
+        data: user.preferences
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: "ServerError", message: err.message });
+  }
+};

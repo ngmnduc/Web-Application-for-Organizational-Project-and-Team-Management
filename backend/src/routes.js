@@ -14,7 +14,7 @@ import {
   getProjectActivities,
   getPendingRequests,
 } from "./controllers/project.controller.js";
-import { listUsers, searchUsers, getUser, updateUserStatus, deleteUser } from "./controllers/user.controller.js";
+import { listUsers, searchUsers, getUser, updateUserStatus, deleteUser, updatePreferences } from "./controllers/user.controller.js";
 import { getLabels, createLabel, updateLabel, deleteLabel } from "./controllers/label.controller.js";
 import { getMembers, addMember, removeMember, joinRequest, approveMember } from "./controllers/membership.controller.js";
 import { checkProjectActive } from "./middlewares/archive.middleware.js";
@@ -88,6 +88,7 @@ router.delete("/projects/:id/labels/:labelId", verifyToken, requireOrgAccess, ch
 // Users - Require organization context for search
 router.get("/users", verifyToken, requireOrgAccess, listUsers);
 router.get("/users/search", verifyToken, requireOrgAccess, searchUsers);
+router.patch("/users/preferences", verifyToken, updatePreferences);
 router.get("/users/:id", verifyToken, checkRole(ROLES.ADMIN), getUser);
 router.patch("/users/:id/status", verifyToken, checkRole(ROLES.ADMIN), updateUserStatus);
 router.delete("/users/:id", verifyToken, checkRole(ROLES.ADMIN), deleteUser);

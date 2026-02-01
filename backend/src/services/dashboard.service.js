@@ -416,6 +416,84 @@ console.log("DEBUG DEADLINES:", upcomingDeadlines); // Log ra terminal của nod
   _emptyStats() {
     return { success: true, kpi: { totalTasks: 0, doneTasks: 0 }, attendance: { present: 0, late: 0, absent: 0, total: 0 }, charts: { priorityDistribution: [], taskActivity: [] } };
   }
+
+  async exportAdminReport(currentUserId, currentOrganizationId, month = null, year = null) {
+    const stats = await this.getAdminStats(currentUserId, currentOrganizationId, 'all', month, year);
+    const { totalProjects, totalMembers, completedProjects, avgProgress } = stats.kpi;
+    const projectStatus = stats.charts.projectStatus; 
+    const activeProjects = projectStatus.find(p => p.name === "Active")?.value || 0;
+    const archivedProjects = projectStatus.find(p => p.name === "Archived")?.value || 0;
+    const headers = "Category,Metric,Value,Unit\n";
+    const rows = [
+      `Overview,Total Projects,${totalProjects},Projects`,
+      `Overview,Team Size (Non-Admin),${totalMembers},Members`,
+      `Overview,Overall Progress,${avgProgress},%`,
+      `Project Status,Active Projects,${activeProjects},Projects`,
+      `Project Status,Completed Projects,${completedProjects},Projects`,
+      `Project Status,Archived Projects,${archivedProjects},Projects`
+    ];
+    const timeInfo = `Report Time,Month/Year,${month || 'All'}/${year || 'All'},-`;
+    return headers + timeInfo + "\n" + rows.join("\n");
+  }
+
+  async exportManagerReport(userId, currentOrganizationId, month = null, year = null) {
+    const stats = await this.getManagerStats(userId, currentOrganizationId, 'all', month, year);
+    if (!stats || !stats.kpi || !stats.kpi.taskSummary) {
+      return "No data available for this manager.";
+    }
+    const managedProjects = await ProjectMember.find({
+      userId: userId, 
+      organizationId: currentOrganizationId,
+      status: "ACTIVE", 
+      roleInProject: { $in: ["Manager", "Admin"] } 
+    }).select("projectId");
+    const projectIds = managedProjects.map(m => m.projectId);
+    const workloadStats = await Task.aggregate([
+      { 
+        $match: { 
+          projectId: { $in: projectIds }, 
+          deletedAt: null 
+        } 
+      },
+      { 
+        $group: { 
+          _id: "$assigneeId",
+          taskCount: { $sum: 1 } 
+        } 
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" }, 
+      {
+        $project: {
+          name: "$userInfo.name",
+          email: "$userInfo.email",
+          taskCount: 1
+        }
+      },
+      { $sort: { taskCount: -1 } } 
+    ]);
+    const { totalTasks, todoTasks, doingTasks, doneTasks, overdueTasks } = stats.kpi.taskSummary;
+    let csvContent = "Category,Metric,Value,Unit\n";
+    csvContent += `Task Distribution,Total Tasks,${totalTasks},Tasks\n`;
+    csvContent += `Task Distribution,To Do,${todoTasks},Tasks\n`;
+    csvContent += `Task Distribution,In Progress,${doingTasks},Tasks\n`;
+    csvContent += `Task Distribution,Done,${doneTasks},Tasks\n`;
+    csvContent += `Task Distribution,Overdue,${overdueTasks},Tasks\n`;
+    csvContent += "\n";
+    csvContent += "Member Workload,Name,Email,Assigned Tasks\n";
+    workloadStats.forEach(member => {
+      csvContent += `Member Workload,${member.name},${member.email},${member.taskCount}\n`;
+    });
+    csvContent += `\nReport Time,Month/Year,${month || 'All'}/${year || 'All'},-\n`;
+    return csvContent;
+  }
 }
 
 export default new DashboardService();

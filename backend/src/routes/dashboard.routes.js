@@ -26,4 +26,19 @@ router.get("/dashboard/manager-stats", verifyToken, dashboardController.getManag
  */
 router.get("/dashboard/member-stats", verifyToken, dashboardController.getMemberStats);
 
+/**
+ * @route   GET /api/dashboard/export/admin
+ * @desc    Export Admin Dashboard Report (Excel/CSV)
+ * @access  Private (Admin)
+ */
+router.get("/dashboard/export/admin", verifyToken, checkRole("Admin"), dashboardController.exportAdminReport);
+
+
+/**
+ * @route   GET /api/dashboard/export/manager
+ * @desc    Export Manager Report (Task Dist & Workload)
+ * @access  Private (Manager only)
+ */
+router.get("/dashboard/export/manager", verifyToken, checkRole("Manager"), dashboardController.exportManagerReport);
+
 export default router;
