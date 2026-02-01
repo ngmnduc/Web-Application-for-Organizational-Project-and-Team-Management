@@ -309,35 +309,54 @@ export async function login(req, res, next) {
     const authResult = await authService.loginUser(email, password); 
     const publicUserId = authResult.user.id || authResult.user._id; 
 
-    const user = await User.findById(publicUserId).select('+currentOrganizationId +organizations');
+    const user = await User.findById(publicUserId)
+      .select('+currentOrganizationId +organizations')
+      .populate({
+        path: 'currentOrganizationId',
+        select: 'name ownerId status plan createdAt'
+      });
 
     if (!user) {
-         return res.status(401).json({ success: false, message: "User not found after login verification." });
-    }
-    if (!user.currentOrganizationId) {
-        if (user.organizations && user.organizations.length > 0) {
-            user.currentOrganizationId = user.organizations[0];
-            await User.findByIdAndUpdate(user._id, { currentOrganizationId: user.organizations[0] });
-        } else {
-             return res.status(403).json({
-                success: false,
-                error: "ForbiddenError",
-                message: "User has no Organization linked. Please contact support.",
-            });
-        }
+      return res.status(401).json({ 
+        success: false, 
+        message: "User not found after login verification." 
+      });
     }
 
-   const tokenPayload = {
+    if (!user.currentOrganizationId) {
+      if (user.organizations && user.organizations.length > 0) {
+        const updatedUser = await User.findByIdAndUpdate(
+          user._id, 
+          { currentOrganizationId: user.organizations[0] },
+          { new: true }
+        )
+        .select('+currentOrganizationId +organizations')
+        .populate({
+          path: 'currentOrganizationId',
+          select: 'name ownerId status plan createdAt'
+        });
+        
+        user.currentOrganizationId = updatedUser.currentOrganizationId;
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: "ForbiddenError",
+          message: "User has no Organization linked. Please contact support.",
+        });
+      }
+    }
+
+    const organization = user.currentOrganizationId;
+    const organizationId = organization._id || organization;
+
+    const tokenPayload = {
       sub: user._id.toString(),     
       email: user.email,
       role: user.role,
-      organizationId: user.currentOrganizationId.toString()
+      organizationId: organizationId.toString()
     };
     
     const newToken = signToken(tokenPayload);
-
-    const organization = await Organization.findById(user.currentOrganizationId)
-        .select('name ownerId status plan createdAt');
 
     return res.status(200).json({
       success: true,
@@ -346,11 +365,18 @@ export async function login(req, res, next) {
         token: newToken,
         tokenType: "Bearer",
         user: {
-            ...authResult.user, 
-            currentOrganizationId: user.currentOrganizationId,
-            organizations: user.organizations
+          ...authResult.user, 
+          currentOrganizationId: organizationId,
+          organizations: user.organizations
         },
-        organization: organization
+        organization: {
+          _id: organization._id,
+          name: organization.name,
+          ownerId: organization.ownerId,
+          status: organization.status,
+          plan: organization.plan,
+          createdAt: organization.createdAt
+        }
       },
     });
   } catch (err) {
