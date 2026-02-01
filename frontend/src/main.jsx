@@ -7,6 +7,7 @@ import "./index.css";
 import { AuthProvider } from "./services/AuthContext.jsx";
 import { ProjectProvider } from "./context/ProjectContext.jsx"; 
 import { NotificationProvider } from "./context/NotificationContext.jsx";
+import { ThemeProvider } from './context/ThemeContext';
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
@@ -14,9 +15,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
+        <ThemeProvider>
+        {/*  */}
         <ProjectProvider>
             <App />
         </ProjectProvider>
+        {/*  */}
+        </ThemeProvider>
         </NotificationProvider>
       </AuthProvider>  
       </BrowserRouter>

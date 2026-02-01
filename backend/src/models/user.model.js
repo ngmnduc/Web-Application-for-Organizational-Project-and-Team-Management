@@ -31,6 +31,16 @@ const userSchema = new mongoose.Schema(
       default: "ACTIVE",
       index: true,
     },
+    // --- THÊM PHẦN PREFERENCES ---
+    preferences: {
+      theme: { type: String, enum: ['Light', 'Dark'], default: 'Light' },
+      notifications: {
+        taskAssigned: { type: Boolean, default: true },
+        mentioned: { type: Boolean, default: true },
+        memberJoined: { type: Boolean, default: true }, 
+        meetingCreated: { type: Boolean, default: true }
+      }
+    },
     // Organization fields
     currentOrganizationId: {
       type: mongoose.Schema.Types.ObjectId,

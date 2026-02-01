@@ -3,6 +3,219 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 transition-colors duration-200;
+  }
+
+  /* GLOBAL DARK MODE  */
+  
+  /* Khi thẻ HTML có class 'dark', ép Body thành màu đen */
+  .dark body {
+    background-color: #09090b !important; 
+    color: #e4e4e7 !important;           
+  }
+
+  /* Ép tất cả các thẻ div đang dùng bg-white chuyển thành màu tối */
+  .dark .bg-white {
+    background-color: #18181b !important; 
+    border-color: #27272a !important;     
+    color: #e4e4e7 !important;
+  }
+
+  /* Ép nền xám nhạt thành đen */
+  .dark .bg-gray-50, 
+  .dark .bg-gray-100 {
+    background-color: #000000 !important;
+    border-color: #27272a !important;
+  }
+
+  /* 2. FIX CHỮ MỜ & ICON CHÌM */
+  
+  /* Tìm tất cả các loại chữ màu xám/đen và ép chúng sáng lên trong Dark Mode */
+  .dark .text-gray-400,
+  .dark .text-gray-500,
+  .dark .text-gray-600,
+  .dark .text-gray-700,
+  .dark .text-gray-800,
+  .dark .text-gray-900,
+  .dark .text-black {
+    color: #a1a1aa !important; 
+  }
+
+  /* Các tiêu đề đậm thì cho trắng tinh */
+  .dark .font-bold,
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5 {
+    color: #ffffff !important;
+  }
+
+  /* 3. ANT DESIGN  */
+  
+  /* Card của Antd */
+  .dark .ant-card,
+  .dark .ant-card-bordered {
+    background-color: #18181b !important;
+    border-color: #27272a !important;
+    color: #e4e4e7 !important;
+  }
+  
+  /* Tiêu đề card Antd */
+  .dark .ant-card-head {
+    border-bottom-color: #27272a !important;
+    color: #ffffff !important;
+  }
+  .dark .ant-card-head-title {
+    color: #ffffff !important;
+  }
+
+  /* List & Statistic của Antd */
+  .dark .ant-list,
+  .dark .ant-list-item,
+  .dark .ant-statistic-title,
+  .dark .ant-statistic-content {
+    color: #e4e4e7 !important;
+  }
+  .dark .ant-statistic-content-value {
+    color: #ffffff !important;
+  }
+
+  /* 4. LỖI CALENDAR (LƯỚI TRẮNG & NGÀY THÁNG MỜ) */
+  
+  /* Đổi màu đường kẻ lưới lịch */
+  .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #27272a !important; 
+  }
+  .dark .divide-x > :not([hidden]) ~ :not([hidden]) {
+    border-color: #27272a !important;
+  }
+  
+  /* Đổi màu viền lịch */
+  .dark .border-gray-200,
+  .dark .border-gray-100 {
+    border-color: #27272a !important;
+  }
+
+  /* Xử lý phần ngày tháng điểm danh (Attendance) */
+  .dark .text-gray-400.pl-1.font-medium {
+      color: #a1a1aa !important; /* Làm sáng dấu + more */
+  }
+
+  /* 5. FORM INPUTS & SCROLLBAR */
+  
+  /* Input/Select tối màu */
+  .dark input, 
+  .dark select, 
+  .dark textarea {
+    background-color: #27272a !important;
+    border-color: #3f3f46 !important;
+    color: #ffffff !important;
+  }
+  .dark input::placeholder {
+    color: #71717a !important;
+  }
+
+  /* Scrollbar tối màu */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: #09090b; 
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #3f3f46; 
+    border-radius: 4px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #52525b; 
+  }
+ /* FIX AVATAR (Làm sáng lên)
+
+/* Avatar tạo tự động ở trang Members & Navbar */
+.dark div[style*="color-mix"] {
+  background-color: #3f3f46 !important; 
+  /* Chữ màu trắng hoặc Brand color sáng để dễ đọc */
+  color: #ffffff !important; 
+  /* Viền nhẹ để tách biệt */
+  border: 1px solid #52525b !important; 
+}
+
+/* Avatar Gradient (Project Detail Members) */
+.dark .from-gray-100 {
+  --tw-gradient-from: #52525b !important; 
+}
+.dark .to-gray-300 {
+  --tw-gradient-to: #27272a !important;  
+}
+/* Border màu tối */
+.dark .border-white {
+  border-color: #27272a !important;
+}
+
+
+/* FIX PROJECT DETAIL DRAWER */
+
+/* Fix nền của chính cái Modal (Drawer) */
+.dark .bg-white.rounded-3xl.shadow-2xl {
+    background-color: #09090b !important; 
+    border: 1px solid #27272a !important;
+}
+
+/* Fix Tab Buttons (Dashboard / Members) */
+.dark button.text-gray-400:hover {
+    color: #e4e4e7 !important;
+    background-color: rgba(255,255,255,0.05);
+}
+
+/* Fix Card Thành viên (Member Cards) trong tab Members */
+/* Target cụ thể vào thẻ div có class bg-white bên trong drawer */
+.dark .bg-white.border.border-gray-200.rounded-2xl {
+    background-color: #18181b !important; 
+    border-color: #27272a !important;
+    box-shadow: none !important;
+}
+.dark .bg-white.border.border-gray-200.rounded-2xl:hover {
+    border-color: var(--color-brand) !important; 
+    background-color: #27272a !important; 
+}
+
+/* Fix các box thống kê nhỏ (Total Tasks, Completed...) */
+.dark .bg-orange-50, .dark .bg-green-50, .dark .bg-red-50 {
+    background-color: #18181b !important; /* Nền tối */
+    border-color: #27272a !important;
+}
+/* Chữ tiêu đề nhỏ trong các box thống kê */
+.dark .text-orange-600, .dark .text-green-600, .dark .text-red-600 {
+    filter: brightness(1.5); /* Làm sáng màu chữ lên để đọc được trên nền tối */
+}
+
+
+/* FIX OVERALL PROGRESS */
+
+/* Chữ phần trăm */
+.dark .ant-progress-text {
+  color: #ffffff !important;
+}
+
+/* Nếu dùng CircularProgress tự code (SVG) ở ProjectDetailDrawer */
+.dark text.text-2xl.font-bold.text-gray-800 {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+}
+
+/* FIX MÀU CHỮ CHUNG TRONG CARD */
+/* Đảm bảo tên project, tên member chuyển sang trắng */
+.dark .text-gray-900, 
+.dark .text-gray-800 {
+    color: #f4f4f5 !important; 
+}
+.dark .text-gray-500,
+.dark .text-gray-600 {
+    color: #a1a1aa !important; 
+}
+}
+
+
 /* bo tròn góc và tăng khoảng cách bên trong khung modal */
 .swal2-popup {
     border-radius: 24px !important;
