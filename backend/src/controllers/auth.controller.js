@@ -323,20 +323,22 @@ export async function login(req, res, next) {
       });
     }
 
-    if (!user.currentOrganizationId) {
+    let organization = user.currentOrganizationId;
+    let organizationId = organization._id || organization;
+
+    if (!organization) {
       if (user.organizations && user.organizations.length > 0) {
-        const updatedUser = await User.findByIdAndUpdate(
-          user._id, 
-          { currentOrganizationId: user.organizations[0] },
-          { new: true }
-        )
-        .select('+currentOrganizationId +organizations')
-        .populate({
-          path: 'currentOrganizationId',
-          select: 'name ownerId status plan createdAt'
-        });
+        organizationId = user.organizations[0];
         
-        user.currentOrganizationId = updatedUser.currentOrganizationId;
+        User.findByIdAndUpdate(user._id, { 
+          currentOrganizationId: organizationId 
+        }).catch(err => {
+          console.error(`[LOGIN] Failed to update currentOrganizationId:`, err.message);
+        });
+
+        organization = await Organization.findById(organizationId)
+          .select('name ownerId status plan createdAt')
+          .lean();
       } else {
         return res.status(403).json({
           success: false,
@@ -344,10 +346,9 @@ export async function login(req, res, next) {
           message: "User has no Organization linked. Please contact support.",
         });
       }
-    }
-
-    const organization = user.currentOrganizationId;
-    const organizationId = organization._id || organization;
+    } else {
+      organizationId = organization._id;
+    };
 
     const tokenPayload = {
       sub: user._id.toString(),     
