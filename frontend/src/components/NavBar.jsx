@@ -13,6 +13,7 @@ import ChatBox from './ChatBox';
 import { useAuth } from '../services/AuthContext'; 
 import axiosInstance from '../services/api'; 
 import io from 'socket.io-client'; 
+import { useProject } from '../context/ProjectContext';
 
 const SOCKET_URL = 'http://localhost:4000'; 
 
@@ -30,8 +31,13 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
     const location = useLocation();
 
     const [isOpenChat, setIsOpenChat] = useState(false); 
-    const [currentProject, setCurrentProject] = useState(null); 
+    const { selectedProjectId, selectedProjectName } = useProject();
     const [chatNotificationCount, setChatNotificationCount] = useState(0); 
+
+    // Biến phụ để check xem có project nào được chọn chưa
+    const currentProject = (selectedProjectId && selectedProjectId !== 'all') 
+        ? { _id: selectedProjectId, name: selectedProjectName } 
+        : null;
     
     // Refs cho Chat
     const socketRef = useRef(null);
@@ -70,23 +76,6 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
         if (isOpenChat) setChatNotificationCount(0);
     }, [isOpenChat]);
 
-    // Lấy Project mặc định 
-    useEffect(() => {
-        if (!showNavbarChat) return;
-
-        const fetchProject = async () => {
-            try {
-                const res = await axiosInstance.get('/projects');
-                if (res.data.success && res.data.data.length > 0) {
-                    // Mặc định lấy project đầu tiên
-                    setCurrentProject(res.data.data[0]);
-                }
-            } catch (err) {
-                console.error("Error fetching projects for chat:", err);
-            }
-        };
-        fetchProject();
-    }, [showNavbarChat]);
 
     // Socket Connection
     useEffect(() => {
@@ -130,7 +119,7 @@ const HeaderIcons = ({ unreadCount, onLogout }) => {
             socket.off('connect', handleConnect);
             socket.off('receive_message', handleReceiveMessage);
         };
-    }, [currentProject, user]);
+    }, [currentProject, user?._id]);
 
     // 3. Hàm xử lý khi bấm nút Upgrade
     const handleUpgrade = async () => {
