@@ -169,46 +169,52 @@ export async function signup(req, res, next) {
 
     await session.commitTransaction();
 
+    // 3. Logic Payment (Chạy sau khi commit transaction)
     let paymentUrl = null;
     if (!projectToJoin && plan === "PREMIUM") {
-      try {
-        const sessionStripe = await stripe.checkout.sessions.create({
-          payment_method_types: ["card"],
-          customer_email: email, 
-          line_items: [{
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: "Premium Plan Subscription",
-                description: "Unlock unlimited projects (Signup Upgrade)",
-              },
-              unit_amount: 2000, 
-              recurring: { interval: "month" },
-            },
-            quantity: 1,
-          }],
-          mode: "subscription",
-          success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
-          metadata: {
-            organizationId: finalOrganizationId.toString(),
-            userId: userId.toString(),
-            targetPlan: "PREMIUM"
-          },
-          subscription_data: {
-            metadata: {
-              organizationId: finalOrganizationId.toString(),
-              userId: userId.toString(),
-              targetPlan: "PREMIUM"
-            }
-          },
-        });
-        paymentUrl = sessionStripe.url;
-      } catch (stripeError) {
-        console.error("Stripe Session Creation Failed:", stripeError);
-      }
+        try {
+            const sessionStripe = await stripe.checkout.sessions.create({
+                payment_method_types: ["card"],
+                customer_email: email, 
+                
+                line_items: [
+                    {
+                        price_data: {
+                            currency: "usd",
+                            product_data: {
+                                name: "Premium Plan Subscription",
+                                description: "Unlock unlimited projects (Signup Upgrade)",
+                            },
+                            unit_amount: 2000, 
+                            recurring: { interval: "month" },
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: "subscription",
+                success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
+                metadata: {
+                    organizationId: finalOrganizationId.toString(),
+                    userId: userId.toString(), 
+                    targetPlan: "PREMIUM"
+                },
+                // Thêm metadata vào subscription để webhook invoice.payment_succeeded tìm được org
+                subscription_data: {
+                    metadata: {
+                        organizationId: finalOrganizationId.toString(),
+                        userId: userId.toString(), 
+                        targetPlan: "PREMIUM"
+                    }
+                },
+            });
+            paymentUrl = sessionStripe.url;
+        } catch (stripeError) {
+            console.error("Stripe Session Creation Failed:", stripeError);
+        }
     }
 
+    // 4. Response
     const tokenPayload = { 
       sub: userId.toString(), 
       email: userDoc.email, 
@@ -217,27 +223,25 @@ export async function signup(req, res, next) {
     };
     const newToken = signToken(tokenPayload);
 
-    sendWelcomeEmail(userDoc.email, userDoc.name).catch(emailErr => {
-      console.error("Failed to send welcome email:", emailErr);
-    });
+    try { await sendWelcomeEmail(user.email, user.name); } catch (emailErr) { console.error("Failed to send welcome email:", emailErr); }
 
     return res.status(201).json({
       success: true,
       message: projectToJoin ? "Joined project successfully" : "User created successfully",
-      paymentUrl,
+      paymentUrl, // Trả về link thanh toán
       data: {
         token: newToken,
         tokenType: "Bearer",
         user: { 
-          id: userId, 
-          name: userDoc.name, 
-          email: userDoc.email, 
-          role: userRole, 
-          currentOrganizationId: finalOrganizationId, 
-          organizations: [finalOrganizationId], 
-          createdAt: userDoc.createdAt 
+            id: userId, 
+            name: userDoc.name, 
+            email: userDoc.email, 
+            role: userRole, 
+            currentOrganizationId: finalOrganizationId, 
+            organizations: [finalOrganizationId], 
+            createdAt: userDoc.createdAt 
         },
-        organization: finalOrgData,
+        organization: finalOrgData, 
         ...(projectToJoin && { 
           project: { 
             id: projectToJoin._id, 
@@ -294,35 +298,55 @@ export async function login(req, res, next) {
     const authResult = await authService.loginUser(email, password); 
     const publicUserId = authResult.user.id || authResult.user._id; 
 
-    const user = await User.findById(publicUserId).select('+currentOrganizationId +organizations');
+    const user = await User.findById(publicUserId)
+      .select('+currentOrganizationId +organizations')
+      .populate({
+        path: 'currentOrganizationId',
+        select: 'name ownerId status plan createdAt'
+      });
 
     if (!user) {
-         return res.status(401).json({ success: false, message: "User not found after login verification." });
-    }
-    if (!user.currentOrganizationId) {
-        if (user.organizations && user.organizations.length > 0) {
-            user.currentOrganizationId = user.organizations[0];
-            await User.findByIdAndUpdate(user._id, { currentOrganizationId: user.organizations[0] });
-        } else {
-             return res.status(403).json({
-                success: false,
-                error: "ForbiddenError",
-                message: "User has no Organization linked. Please contact support.",
-            });
-        }
+      return res.status(401).json({ 
+        success: false, 
+        message: "User not found after login verification." 
+      });
     }
 
-   const tokenPayload = {
+    let organization = user.currentOrganizationId;
+    let organizationId = organization._id || organization;
+
+    if (!organization) {
+      if (user.organizations && user.organizations.length > 0) {
+        organizationId = user.organizations[0];
+        
+        User.findByIdAndUpdate(user._id, { 
+          currentOrganizationId: organizationId 
+        }).catch(err => {
+          console.error(`[LOGIN] Failed to update currentOrganizationId:`, err.message);
+        });
+
+        organization = await Organization.findById(organizationId)
+          .select('name ownerId status plan createdAt')
+          .lean();
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: "ForbiddenError",
+          message: "User has no Organization linked. Please contact support.",
+        });
+      }
+    } else {
+      organizationId = organization._id;
+    };
+
+    const tokenPayload = {
       sub: user._id.toString(),     
       email: user.email,
       role: user.role,
-      organizationId: user.currentOrganizationId.toString()
+      organizationId: organizationId.toString()
     };
     
     const newToken = signToken(tokenPayload);
-
-    const organization = await Organization.findById(user.currentOrganizationId)
-        .select('name ownerId status plan createdAt');
 
     return res.status(200).json({
       success: true,
@@ -331,11 +355,18 @@ export async function login(req, res, next) {
         token: newToken,
         tokenType: "Bearer",
         user: {
-            ...authResult.user, 
-            currentOrganizationId: user.currentOrganizationId,
-            organizations: user.organizations
+          ...authResult.user, 
+          currentOrganizationId: organizationId,
+          organizations: user.organizations
         },
-        organization: organization
+        organization: {
+          _id: organization._id,
+          name: organization.name,
+          ownerId: organization.ownerId,
+          status: organization.status,
+          plan: organization.plan,
+          createdAt: organization.createdAt
+        }
       },
     });
   } catch (err) {

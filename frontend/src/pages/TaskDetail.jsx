@@ -74,20 +74,28 @@ const TaskDetail = () => {
   const { user } = useAuth();
   const { selectedProjectId, currentProjectRole } = useProject(); 
 
-  const subtaskInputRef = useRef(null);
-  const isGeneratingRef = useRef(false);
-  const lastGenerateTime = useRef(0);
-  const COOLDOWN_MS = 5000;
+    // Data có thể được truyền qua navigate state (từ màn hình danh sách)
+  const taskFromState = location.state?.task || null;
+  const [task, setTask] = useState(taskFromState);
 
   //  Tính toán quyền giống MyTasks
   const systemRole = user?.role || 'Member';
   const isSystemAdmin = systemRole === 'Admin';
   const projectRole = currentProjectRole || 'Member';
   const effectiveRole = isSystemAdmin ? 'Admin' : projectRole;
-  
+
   //  Check quyền quản lý
   const canManage = ['Admin', 'Manager'].includes(effectiveRole);
+  const currentUserId = user?._id || user?.id;
+  const taskAssigneeId = task?.assigneeId?._id || task?.assigneeId;
+  const isAssignee = currentUserId && taskAssigneeId && String(currentUserId) === String(taskAssigneeId); 
+  const canEdit = canManage || isAssignee;
 
+  const subtaskInputRef = useRef(null);
+  const isGeneratingRef = useRef(false);
+  const lastGenerateTime = useRef(0);
+  const COOLDOWN_MS = 5000;
+  
   // Log khi component mount
   useEffect(() => {
     console.log('🔍 [TaskDetail] Permission:', {
@@ -100,9 +108,8 @@ const TaskDetail = () => {
     });
   }, [systemRole, projectRole, effectiveRole, canManage, selectedProjectId, taskId]);
 
-  // Data có thể được truyền qua navigate state (từ màn hình danh sách)
-  const taskFromState = location.state?.task || null;
-  const [task, setTask] = useState(taskFromState);
+
+
   const [commentsList, setCommentsList] = useState([]);
   const [isLoading, setIsLoading] = useState(!taskFromState);
   const [error, setError] = useState(null);
@@ -457,19 +464,23 @@ const TaskDetail = () => {
           Back to tasks
         </button>
 
+        {canEdit && (
+        <div className="flex gap-2">
+    
         {canManage && (
-          <div className="flex gap-2">
-            <button 
-              onClick={openEditModal}
-              className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
-               Edit Task
-            </button>
-            <button
-              onClick={handleFocusSubtaskInput}
-              className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium  transition-colors">
-              + Sub-task
-            </button>
-          </div>
+          <button
+            onClick={openEditModal}
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
+            Edit Task
+          </button>
+        )}
+
+          <button
+            onClick={handleFocusSubtaskInput}
+            className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium transition-colors hover:opacity-90">
+            + Sub-task
+          </button>
+        </div>
         )}
       </div>
 
@@ -574,7 +585,7 @@ const TaskDetail = () => {
             </div>
 
             {/* input tạo subtask mới */}
-            {canManage && (
+            {canEdit && (
                   <div className="flex items-center gap-2 mb-4">
                   <input
                     ref={subtaskInputRef}
@@ -604,10 +615,10 @@ const TaskDetail = () => {
                       <span className={`font-medium text-sm ${st.isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{st.title}</span>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <button onClick={() => handleToggleSubtask(st.id || st._id)} disabled={!canManage} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-colors ${!canManage ? 'cursor-default' : 'hover:opacity-80'} ${st.isCompleted ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      <button onClick={() => handleToggleSubtask(st.id || st._id)} disabled={!canEdit} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-colors ${!canEdit ? 'cursor-default' : 'hover:opacity-80'} ${st.isCompleted ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {st.isCompleted ? <><CheckCircleIcon className="w-4 h-4" />Done</> : <><XCircleIcon className="w-4 h-4" />Todo</>}
                       </button>
-                      {canManage && (
+                      {canEdit && (
                         <button className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all" onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(st.id || st._id); }} title="Delete">
                           <XMarkIcon className="w-4 h-4" />
                         </button>
@@ -755,12 +766,14 @@ const TaskDetail = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
             <div className="flex justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Attachments</h2>
+              {canEdit &&(
                  <button 
                     onClick={handleOpenAttachmentInput} 
                     className="flex items-center gap-1.5 text-xs font-semibold text-white bg-brand hover:opacity-90  px-3 py-1.5 rounded-lg transition-all shadow-sm"
                  >
                     + Add File
-                 </button>            
+                 </button>  
+              )}          
             </div>
             
             {/* INPUT ĐỂ THÊM ATTACHMENT MỚI */}
