@@ -298,10 +298,14 @@ const Members = () => {
     const isProjectAdmin = effectiveProjectRole === 'Admin';
     const isProjectManager = effectiveProjectRole === 'Manager';
     
-    // Logic check quyền đã chính xác
+    // Logic check quyền quản lý (Add, Remove)
     const canManageInAdminView = isSystemAdmin && isAdminView;
     const canManageInProjectView = !isAdminView && (isProjectAdmin || isProjectManager);
     const canManage = canManageInAdminView || canManageInProjectView;
+
+    // Chỉ Admin (System hoặc Project) mới được đổi Role
+    // Manager KHÔNG được đổi Role
+    const canEditRole = isSystemAdmin || (!isAdminView && isProjectAdmin);
     
     // Quyền invite - System Admin luôn có quyền
     const canInvite = !isAdminView && (isSystemAdmin || isProjectAdmin || isProjectManager);
@@ -315,127 +319,126 @@ const Members = () => {
     // Fetch Projects for Filte
 
     // Fetch Members
-const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-        // Lấy User ID chuẩn từ LocalStorage để so sánh
-        const userStr = localStorage.getItem('user');
-        const userObj = userStr ? JSON.parse(userStr) : {};
-        const myId = user?.id || user?._id;
-        const mySystemRole = user?.role;
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            // Lấy User ID chuẩn từ LocalStorage để so sánh
+            const userStr = localStorage.getItem('user');
+            const myId = user?.id || user?._id;
+            const mySystemRole = user?.role;
 
-        const targetProjectId = selectedProjectId !== 'all' ? selectedProjectId : null;
-        // CASE A: Xem chi tiết 1 Project
-        if (targetProjectId) {
-            const res = await fetch(`${API_BASE_URL}/projects/${targetProjectId}/members`, { headers: getHeaders() });
-            if (!res.ok) throw new Error('Access denied');
-            const data = await res.json();
-            
-            const mapped = (data.data || []).map(m => ({
-                id: m.user.id || m.user._id,
-                name: m.user.name,
-                email: m.user.email,
-                role: m.role, // Role dự án (Admin/Manager/Member)
-                systemRole: m.user.role, 
-                avatarUrl: m.user.avatar,
-                createdAt: m.joinedAt,
-                projects: [],
-                membershipId: m._id 
-            }));
+            const targetProjectId = selectedProjectId !== 'all' ? selectedProjectId : null;
+            // CASE A: Xem chi tiết 1 Project
+            if (targetProjectId) {
+                const res = await fetch(`${API_BASE_URL}/projects/${targetProjectId}/members`, { headers: getHeaders() });
+                if (!res.ok) throw new Error('Access denied');
+                const data = await res.json();
+                
+                const mapped = (data.data || []).map(m => ({
+                    id: m.user.id || m.user._id,
+                    name: m.user.name,
+                    email: m.user.email,
+                    role: m.role, // Role dự án (Admin/Manager/Member)
+                    systemRole: m.user.role, 
+                    avatarUrl: m.user.avatar,
+                    createdAt: m.joinedAt,
+                    projects: [],
+                    membershipId: m._id 
+                }));
 
-            // Ưu tiên System Role nếu là Admin
-            const meInProject = mapped.find(m => String(m.id) === String(myId));
-            let myRoleInProject = meInProject ? meInProject.role : null;
-            
-            // Nếu System Admin -> Override thành Admin
-            if (mySystemRole === 'Admin') {
-                myRoleInProject = 'Admin';
-            }
-            
-            setMyProjectRole(myRoleInProject);
-
-            // Lọc bỏ Admin hệ thống ra khỏi danh sách hiển thị 
-            const visibleMembers = mapped.filter(m => m.systemRole !== 'Admin');
-            setMembers(visibleMembers);
-        }
-        // CASE B: Xem tất cả (Admin Mode)
-        else if (mySystemRole === 'Admin') {
-            const usersRes = await fetch(`${API_BASE_URL}/users`, { headers: getHeaders() });
-            if (!usersRes.ok) throw new Error('Failed');
-            const usersData = await usersRes.json();
-
-            const mapped = (usersData.data || []).map(u => {
-                // Ép hiển thị: Nếu không phải Admin thì coi là Member hết
-                let displaySystemRole = u.role;
-                if (u.role !== 'Admin') displaySystemRole = 'Member';
-
-                return {
-                    id: u._id || u.id,
-                    name: u.name,
-                    email: u.email,
-                    role: displaySystemRole, // Ép hiển thị Member
-                    realRole: u.role,        // Lưu role gốc nếu cần dùng
-                    createdAt: u.createdAt,
-                    projectCount: u.projectCount || 0,
-                    membershipId: null 
-                };
-            });
-            
-            setMyProjectRole(null); // Không ở trong project nào
-            setMembers(mapped);
-        }
-    } catch (error) { 
-        console.error(error); 
-    } finally { setIsLoading(false); }
-}, [selectedProjectId, user]);
-
-useEffect(() => { fetchData(); }, [fetchData]);
-
-const handleChangeRole = async (userId, newRole) => { 
-    try {
-        let url;
-        let method = 'PUT';
-        
-        // Phân biệt đang sửa role Hệ thống hay role Dự án
-        if (selectedProjectId !== 'all') {
-            // Đang ở Project View -> Gọi API sửa role dự án
-            const pId = selectedProjectId;
-            url = `${API_BASE_URL}/projects/${pId}/members/${userId}`;
-        } else {
-            // Đang ở Admin View -> Gọi API sửa role hệ thống
-            url = `${API_BASE_URL}/auth/${userId}/role`;
-        }
-
-        const res = await fetch(url, {
-            method: method,
-            headers: getHeaders(),
-            body: JSON.stringify({ role: newRole })
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-            showNotification(`Updated role to ${newRole}`, "success");
-            // Update UI
-            setMembers(prevMembers => prevMembers.map(member => {
-                if (member.id === userId) {
-                    return { 
-                        ...member, 
-                        role: newRole, 
-                        // Nếu đang ở Admin view thì update cả systemRole
-                        ...(selectedProjectId === 'all' ? { systemRole: newRole } : {})
-                    };
+                // Ưu tiên System Role nếu là Admin
+                const meInProject = mapped.find(m => String(m.id) === String(myId));
+                let myRoleInProject = meInProject ? meInProject.role : null;
+                
+                // Nếu System Admin -> Override thành Admin
+                if (mySystemRole === 'Admin') {
+                    myRoleInProject = 'Admin';
                 }
-                return member;
-            }));
-        } else {
-            showNotification(data.message || "Failed to update role", "error");
+                
+                setMyProjectRole(myRoleInProject);
+
+                // Lọc bỏ Admin hệ thống ra khỏi danh sách hiển thị 
+                const visibleMembers = mapped.filter(m => m.systemRole !== 'Admin');
+                setMembers(visibleMembers);
+            }
+            // CASE B: Xem tất cả (Admin Mode)
+            else if (mySystemRole === 'Admin') {
+                const usersRes = await fetch(`${API_BASE_URL}/users`, { headers: getHeaders() });
+                if (!usersRes.ok) throw new Error('Failed');
+                const usersData = await usersRes.json();
+
+                const mapped = (usersData.data || []).map(u => {
+                    // Ép hiển thị: Nếu không phải Admin thì coi là Member hết
+                    let displaySystemRole = u.role;
+                    if (u.role !== 'Admin') displaySystemRole = 'Member';
+
+                    return {
+                        id: u._id || u.id,
+                        name: u.name,
+                        email: u.email,
+                        role: displaySystemRole, // Ép hiển thị Member
+                        realRole: u.role,        // Lưu role gốc nếu cần dùng
+                        createdAt: u.createdAt,
+                        projectCount: u.projectCount || 0,
+                        membershipId: null 
+                    };
+                });
+                
+                setMyProjectRole(null); // Không ở trong project nào
+                setMembers(mapped);
+            }
+        } catch (error) { 
+            console.error(error); 
+        } finally { setIsLoading(false); }
+    }, [selectedProjectId, user]);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    const handleChangeRole = async (userId, newRole) => { 
+        try {
+            let url;
+            let method = 'PUT';
+            
+            // Phân biệt đang sửa role Hệ thống hay role Dự án
+            if (selectedProjectId !== 'all') {
+                // Đang ở Project View -> Gọi API sửa role dự án
+                const pId = selectedProjectId;
+                url = `${API_BASE_URL}/projects/${pId}/members/${userId}`;
+            } else {
+                // Đang ở Admin View -> Gọi API sửa role hệ thống
+                url = `${API_BASE_URL}/auth/${userId}/role`;
+            }
+
+            const res = await fetch(url, {
+                method: method,
+                headers: getHeaders(),
+                body: JSON.stringify({ role: newRole })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                showNotification(`Updated role to ${newRole}`, "success");
+                // Update UI
+                setMembers(prevMembers => prevMembers.map(member => {
+                    if (member.id === userId) {
+                        return { 
+                            ...member, 
+                            role: newRole, 
+                            // Nếu đang ở Admin view thì update cả systemRole
+                            ...(selectedProjectId === 'all' ? { systemRole: newRole } : {})
+                        };
+                    }
+                    return member;
+                }));
+            } else {
+                showNotification(data.message || "Failed to update role", "error");
+            }
+        } catch (error) {
+            console.error("Change role error:", error);
+            showNotification("Error updating role", "error");
         }
-    } catch (error) {
-        console.error("Change role error:", error);
-        showNotification("Error updating role", "error");
-    }
-};
+    };
 
     // REMOVE MEMBER (Tìm đúng ID để xóa)
     const handleRemoveClick = (member) => {
@@ -589,7 +592,10 @@ const handleChangeRole = async (userId, newRole) => {
                                     {filteredMembers.map((member) => (
                                         <tr key={member.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4"><div className="flex items-center gap-3"><Avatar name={member.name} avatarUrl={member.avatarUrl} /><div><div className="text-sm font-bold text-gray-900">{member.name}</div><div className="text-sm text-gray-500">{member.email}</div></div></div></td>
-                                            <td className="px-6 py-4"><RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={canManage} currentUserId={currentUserId} /></td>
+                                            
+                                            {/* SỬ DỤNG canEditRole THAY VÌ canManage */}
+                                            <td className="px-6 py-4"><RoleSelect currentRole={member.role} userId={member.id} onChange={handleChangeRole} canEdit={canEditRole} currentUserId={currentUserId} /></td>
+                                            
                                             {isAdminView && <td className="px-6 py-4"><span className="px-2 py-1 text-xs bg-gray-100 rounded-full">{member.projectCount || 0} Projects</span></td>}
                                             {canManage && (
                                                 <td className="px-6 py-4 text-right">
