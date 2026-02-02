@@ -27,6 +27,12 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
         return currentUserId === msgSenderId;
     };
 
+    // Reset tin nhắn khi đổi project để tránh hiện tin cũ
+    useEffect(() => {
+        setMessages([]);
+        setIsLoading(true);
+    }, [projectId]);
+
     // --- Setup Socket & Fetch Data ---
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -42,7 +48,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
 
         socketRef.current.on('receive_message', (message) => {
             setMessages((prev) => [...prev, message]);
-            scrollToBottom();
+            scrollToBottomManual();
         });
 
         const fetchMessages = async () => {
@@ -58,7 +64,7 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
                 console.error("Failed to load messages", err);
             } finally {
                 setIsLoading(false);
-                scrollToBottom();
+                scrollToBottomManual();
             }
         };
 
@@ -69,12 +75,17 @@ const ChatBox = ({ projectId, projectName, onClose, currentUser }) => {
         };
     }, [projectId]);
 
-    const scrollToBottom = () => {
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages]);
+
+    const scrollToBottomManual = () => {
         setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }, 100);
     };
-
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (!newMessage.trim()) return;
