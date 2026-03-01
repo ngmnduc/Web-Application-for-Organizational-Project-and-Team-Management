@@ -64,9 +64,7 @@ export default function HomePage() {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
 
-            <p className="mt-6 text-sm text-gray-500">
-              No credit card required • Free 14-day trial
-            </p>
+            
           </div>
         </div>
       </div>
@@ -111,15 +109,15 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto bg-gradient-to-r from-orange-500/10 to-orange-600/5 border border-orange-500/20 rounded-3xl p-12">
           <div className="grid md:grid-cols-3 gap-12 text-center">
             <div>
-              <div className="text-4xl text-[#f35640] mb-2">10k+</div>
+              <div className="text-4xl text-[#f35640] mb-2">100+</div>
               <div className="text-gray-400">Active Teams</div>
             </div>
             <div>
-              <div className="text-4xl text-[#f35640] mb-2">500k+</div>
+              <div className="text-4xl text-[#f35640] mb-2">500+</div>
               <div className="text-gray-400">Projects Managed</div>
             </div>
             <div>
-              <div className="text-4xl text-[#f35640] mb-2">99.9%</div>
+              <div className="text-4xl text-[#f35640] mb-2">99%</div>
               <div className="text-gray-400">Uptime</div>
             </div>
           </div>

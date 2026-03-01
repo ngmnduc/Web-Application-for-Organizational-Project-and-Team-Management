@@ -292,7 +292,6 @@ export default function PricingPage() {
 
           {/* Footer */}
           <div className="text-center pb-8">
-            <p className="text-gray-400 mb-4">All plans include 14-day money-back guarantee</p>
             <div className="flex items-center justify-center gap-8 text-sm text-gray-500">
               <span>✓ Secure payments</span>
               <span>✓ Cancel anytime</span>

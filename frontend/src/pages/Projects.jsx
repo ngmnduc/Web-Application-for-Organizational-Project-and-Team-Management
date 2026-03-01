@@ -9,11 +9,15 @@ import {
     ExclamationCircleIcon,  
     XMarkIcon
 } from '@heroicons/react/24/outline';
+import {Spin} from "antd"
 import { LoaderOverlay } from '../components/LoaderOverlay';
 import { ErrorState } from '../components/ErrorState';
 import { EmptyState } from '../components/EmptyState';
 import NewProjectModal from '../components/NewProjectModal'; 
 import ProjectDetailDrawer from '../components/ProjectDetailDrawer';
+import { 
+   LoadingOutlined 
+} from "@ant-design/icons";
 
 import { API_BASE_URL } from '../utils/constants';
 
@@ -158,7 +162,10 @@ const Projects = () => {
 
     // Hàm render nội dung chính
     const renderContent = () => {
-        if (isLoading) return <div className="h-64 flex items-center justify-center"><LoaderOverlay /></div>;
+        if (isLoading) {
+          const antIcon = <LoadingOutlined style={{ fontSize: 48, color: '#3b064d' }} spin />;
+          return <div className="flex h-screen items-center justify-center"><Spin indicator={antIcon} /></div>;
+      }
         
         if (isError) return <ErrorState message="Failed to load projects." onRetry={fetchProjects} />;
         

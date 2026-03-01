@@ -10,6 +10,10 @@ import {
 import Swal from 'sweetalert2';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { 
+   LoadingOutlined 
+} from "@ant-design/icons";
+import {  Spin } from "antd";
 
 import TaskSummary from '../components/TaskSummary';
 import { getProjects, getProjectLabels } from '../services/projectService';
@@ -137,7 +141,7 @@ const MyTasks = () => {
         isLoadingProject,
         currentProjectRole  // Sử dụng helper từ context
     } = useProject();
-    
+
     // PERMISSION LOGIC 
     // Lấy System Role
     const systemRole = user?.role || 'Member';
@@ -510,16 +514,11 @@ const MyTasks = () => {
       }
     };
 
-    // Loading state khi đang fetch project details
-    if (isLoadingProject) {
-        return (
-            <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-gray-500">Loading project...</div>
-                </div>
-            </div>
-        );
-    }
+    if (isLoading) {
+      // Tạo icon loading màu cam
+      const antIcon = <LoadingOutlined style={{ fontSize: 48, color: '#f35640' }} spin />;
+      return <div className="flex h-screen items-center justify-center"><Spin indicator={antIcon} /></div>;
+  }
 
     return (
         <div className="flex-1 p-8 bg-gray-50 min-h-screen font-sans">
