@@ -5,6 +5,10 @@ import {
     ExclamationTriangleIcon, UserPlusIcon, FunnelIcon, 
     QrCodeIcon, ClipboardDocumentIcon, ArrowPathIcon 
 } from '@heroicons/react/24/outline';
+import { 
+   LoadingOutlined 
+} from "@ant-design/icons";
+import {  Spin } from "antd";
 import { useParams } from 'react-router-dom'; 
 import { useAuth } from '../services/AuthContext';
 import { LoaderOverlay } from '../components/LoaderOverlay';
@@ -526,6 +530,16 @@ const Members = () => {
         (member.name && member.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (member.email && member.email.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+
+    if (isLoading) {
+            const Adminspin = <LoadingOutlined style={{ fontSize: 48, color: '#3b064d' }} spin />;
+            const Memberspin = <LoadingOutlined style={{ fontSize: 48, color: '#f35640' }} spin />;
+              if(isSystemAdmin){
+              return <div className="flex h-screen items-center justify-center"><Spin indicator={Adminspin} /></div>;
+              }else{
+              return <div className="flex h-screen items-center justify-center"><Spin indicator={Memberspin} /></div>;
+              }
+          }
 
     return (
         <div className="flex-1 p-6 md:p-8 bg-gray-50 min-h-screen relative">

@@ -4,7 +4,11 @@ import {
     CalendarIcon, Bars3BottomLeftIcon, BriefcaseIcon,
     ShieldCheckIcon, UserGroupIcon, TrashIcon, PencilIcon, 
     CheckCircleIcon, ExclamationCircleIcon,
-} from '@heroicons/react/24/outline'; 
+} from '@heroicons/react/24/outline';
+import { 
+   LoadingOutlined 
+} from "@ant-design/icons";
+import {  Spin } from "antd"; 
 import { useOutletContext } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext'; 
 import { useAuth } from '../services/AuthContext'; 
@@ -707,8 +711,8 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
 
     return (
         <div className="flex flex-col gap-6 h-full">
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                <div className="flex justify-between items-center mb-4">
+            <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all border border-gray-100">
+                <div className="flex justify-between items-center mb-4 ">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><ClockIcon className="w-6 h-6 text-[var(--color-brand)]"/> Attendance</h2>
                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{formatDateUS(selectedDate)}</span>
                 </div>
@@ -750,7 +754,7 @@ const RightPanel = ({ selectedDate, dayEvents, myAttendance, onCheckInSuccess, o
             </div>
 
             {/* SCHEDULE LIST */}
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex-grow flex flex-col">
+            <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all border border-gray-100 flex-grow flex flex-col">
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
                     <h2 className="text-lg font-bold text-gray-800">Events</h2>
                     {canCreateMeeting && <button onClick={onOpenCreateModal} className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"><PlusIcon className="w-5 h-5" /></button>}
@@ -849,7 +853,15 @@ const Calendar = () => {
         return String(meeting.createdBy?._id || meeting.createdBy) === String(user?._id || user?.id);
     };
 
-    if (isLoading) return <div className="flex-1 p-8 flex items-center justify-center"><LoaderOverlay /></div>;
+    if (isLoading) {
+        const Adminspin = <LoadingOutlined style={{ fontSize: 48, color: '#3b064d' }} spin />;
+        const Memberspin = <LoadingOutlined style={{ fontSize: 48, color: '#f35640' }} spin />;
+          if(isSystemAdmin){
+          return <div className="flex h-screen items-center justify-center"><Spin indicator={Adminspin} /></div>;
+          }else{
+          return <div className="flex h-screen items-center justify-center"><Spin indicator={Memberspin} /></div>;
+          }
+      }
 
     return (
         <div className="flex-1 p-6 md:p-8 bg-gray-50 min-h-screen font-sans flex flex-col relative">
@@ -857,7 +869,7 @@ const Calendar = () => {
             
             <div className="mb-6"><TaskSummary summaryData={dynamicTasksSummary} /></div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-grow items-stretch">
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col h-full shadow-sm hover:shadow-md transition-all">
                     <CalendarPanel 
                         currentMonth={currentMonth} 
                         setCurrentMonth={setCurrentMonth} 
@@ -867,7 +879,7 @@ const Calendar = () => {
                         attendance={myAttendance}
                     />
                 </div>
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col h-full ">
                     <RightPanel 
                         selectedDate={selectedDate} 
                         dayEvents={selectedDayEvents} 

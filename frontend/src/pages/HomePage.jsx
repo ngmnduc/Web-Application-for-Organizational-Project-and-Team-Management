@@ -14,8 +14,9 @@ import { ChevronDownIcon, SparklesIcon,XMarkIcon,
   ClockIcon as ClockSolid, 
   ArrowPathIcon as ProgressSolid, 
   CheckCircleIcon as DoneSolid,
-  ExclamationTriangleIcon as WarningSolid, } from '@heroicons/react/24/outline';
-import { Card, Row, Col, Statistic, Progress, List, Tag, Spin } from "antd";
+  ExclamationTriangleIcon as WarningSolid,
+  ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { Card, Row, Col, Statistic, Progress, List, Tag, Spin, message } from "antd";
 import { 
   ProjectOutlined, TeamOutlined, CheckCircleOutlined as AntCheckCircleOutlined,  LoadingOutlined 
 } from "@ant-design/icons";
@@ -226,6 +227,7 @@ const HomePage = () => {
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1); // 1-12
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [isExporting, setIsExporting] = useState(false);
 
   // Lấy User từ LocalStorage để phân quyền
   useEffect(() => {
@@ -310,6 +312,46 @@ const HomePage = () => {
     };
     fetchData();
   }, [selectedProjectId,user]);
+
+  const handleExportAttendance = async () => {
+    // Backend yêu cầu project ID cụ thể. Nếu đang ở view 'all', ta lấy ID project đầu tiên có trong list.
+    const projectIdForReport = selectedProjectId !== 'all' && selectedProjectId 
+        ? selectedProjectId 
+        : projects[0]?._id;
+
+    if (!projectIdForReport) {
+        message.warning("Please select a project or create one first.");
+        return;
+    }
+
+    try {
+      setIsExporting(true);
+      // Gọi API với responseType là blob vì backend trả về file stream
+      const response = await axiosInstance.get(`/projects/${projectIdForReport}/report/attendance`, {
+        params: { month: selectedMonth, year: selectedYear },
+        responseType: 'blob'
+      });
+
+      // Xử lý tải file trực tiếp
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Attendance_Report_${selectedMonth}_${selectedYear}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      message.success("Attendance report downloaded successfully!");
+    } catch (err) {
+      console.error("Export Error:", err);
+      message.error("Failed to export attendance report.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // CONFIG HELPER CHO CHART & COLOR 
   const getStatusConfig = (status) => {
@@ -548,9 +590,13 @@ const HomePage = () => {
     : dynamicTasksSummary;  
 
   if (dashboardLoading) {
-      // Tạo icon loading màu cam
-      const antIcon = <LoadingOutlined style={{ fontSize: 48, color: '#f35640' }} spin />;
-      return <div className="flex h-screen items-center justify-center"><Spin indicator={antIcon} /></div>;
+    const Adminspin = <LoadingOutlined style={{ fontSize: 48, color: '#3b064d' }} spin />;
+    const Memberspin = <LoadingOutlined style={{ fontSize: 48, color: '#f35640' }} spin />;
+      if(isAdminView){
+      return <div className="flex h-screen items-center justify-center"><Spin indicator={Adminspin} /></div>;
+      }else{
+      return <div className="flex h-screen items-center justify-center"><Spin indicator={Memberspin} /></div>;
+      }
   }
 
   return (
@@ -591,12 +637,12 @@ const HomePage = () => {
           {/* Charts & List */}
           <Row gutter={[16, 16]} className='mb-6'>
             <Col xs={24} lg={14}>
-              <Card title="Project Distribution" bordered={false} className="shadow-sm rounded-xl">
+              <Card title="Project Distribution" bordered={false} className="shadow-sm hover:shadow-md transition-all rounded-xl">
                 <ReactECharts option={getAdminPieOption()} style={{ height: 250 }} />
               </Card>
             </Col>
             <Col xs={24} lg={10}>
-              <Card title="Upcoming Deadlines " bordered={false} className="shadow-sm rounded-xl h-full">
+              <Card title="Upcoming Deadlines " bordered={false} className="shadow-sm hover:shadow-md transition-all rounded-xl h-full">
                 <List
                   itemLayout="horizontal"
                   dataSource={adminStats.lists.upcomingDeadlines}
@@ -636,9 +682,14 @@ const HomePage = () => {
                 </select>
                 <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--color-brand)] text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity">
-                  Export report
-                </button>
+                <button 
+                onClick={handleExportAttendance}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--color-brand)] text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {isExporting ? <Spin size="small" className="text-white" /> : <ArrowDownTrayIcon className="w-4 h-4" />}
+                Export CSV
+              </button>
               </div>
               </div>
 
@@ -646,12 +697,12 @@ const HomePage = () => {
 
           <Row gutter={[16, 16]} className='mb-6'>
             <Col xs={24} lg={16}>
-              <Card title="Task Priority Distribution" bordered={false} className="shadow-sm rounded-xl">
+              <Card title="Task Priority Distribution" bordered={false} className="shadow-sm hover:shadow-md transition-all rounded-xl">
                 <ReactECharts option={getAdminBarOption()} style={{ height: 250 }} />
               </Card>
             </Col>
             <Col xs={24} lg={8}>
-              <Card title="Overall Progress" bordered={false} className="shadow-sm rounded-xl h-full flex flex-col items-center justify-center">
+              <Card title="Overall Progress" bordered={false} className="shadow-sm hover:shadow-md transition-all rounded-xl h-full flex flex-col items-center justify-center">
                 <div className="text-center w-full flex flex-col items-center py-4">
                     <Progress 
                         type="dashboard" 
@@ -668,7 +719,7 @@ const HomePage = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Status */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col"> 
+            <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col"> 
               <h2 className="text-lg font-semibold mb-4">Project Status</h2>
               {loading ? (
                 <div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>
@@ -699,7 +750,7 @@ const HomePage = () => {
             </div>
 
             {/* Recent Activity List */}
-              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+              <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
                 </div>
@@ -758,8 +809,13 @@ const HomePage = () => {
                 </select>
                 <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--color-brand)] text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity">
-                  Export report
+                <button 
+                  onClick={handleExportAttendance}
+                  disabled={isExporting}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--color-brand)] text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {isExporting ? <Spin size="small" className="text-white" /> : <ArrowDownTrayIcon className="w-4 h-4" />}
+                  Export CSV
                 </button>
               </div>
               </div>
@@ -787,12 +843,12 @@ const HomePage = () => {
 
           <Row gutter={[16, 16]} className='mb-6'>
             <Col xs={24} lg={16}>
-              <Card title="Task Priority Distribution" bordered={false} className="shadow-sm rounded-xl">
+              <Card title="Task Priority Distribution" bordered={false} className="shadow-sm hover:shadow-md transition-all rounded-xl">
                 <ReactECharts option={getManagerBarOption()} style={{ height: 250 }} />
               </Card>
             </Col>
             <Col xs={24} lg={8}>
-              <Card title="Overall Progress" bordered={false} className="shadow-sm rounded-xl h-full flex flex-col items-center justify-center">
+              <Card title="Overall Progress" bordered={false} className="shadow-sm hover:shadow-md transition-all rounded-xl h-full flex flex-col items-center justify-center">
                 <div className="text-center w-full flex flex-col items-center py-4">
                     <Progress 
                         type="dashboard" 
@@ -809,7 +865,7 @@ const HomePage = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Status */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col">
+            <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col">
               <h2 className="text-lg font-semibold mb-4">Project Status</h2>
               {loading ? (
                 <div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>
@@ -840,7 +896,7 @@ const HomePage = () => {
             </div>
 
             {/* Recent Activity List */}
-              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+              <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
                 </div>
@@ -905,9 +961,14 @@ const HomePage = () => {
                 </select>
                 <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--color-brand)] text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity">
-                  Export report
-                </button>
+                <button 
+                onClick={handleExportAttendance}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--color-brand)] text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {isExporting ? <Spin size="small" className="text-white" /> : <ArrowDownTrayIcon className="w-4 h-4" />}
+                Export CSV
+              </button>
               </div>
           </div>
 
@@ -915,7 +976,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
             {/*  PROGRESS STATUS (USER DATA) */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col">
+            <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col">
               <h2 className="text-lg font-semibold mb-4">Progress Status</h2>
               {/* Sử dụng !memberStats để check loading thay vì biến 'loading' chung */}
               {!memberStats ? (<div className="flex-1 flex items-center justify-center text-gray-400">Loading chart...</div>) : (
@@ -942,7 +1003,7 @@ const HomePage = () => {
             </div>
 
             {/*  TASK PRIORITY (USER DATA) */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col">
+            <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col">
               <h2 className="text-lg font-semibold mb-4">Task Priority Distribution</h2>             
                 <ReactECharts option={getMemberBarOption()} style={{ height: 250 }} />          
             </div>
@@ -950,7 +1011,7 @@ const HomePage = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Weekly Activity Chart */}
-            <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full">
+            <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col h-full">
                 <div className="flex items-center gap-2 mb-4">
                     <h2 className="text-lg font-semibold text-gray-800">Weekly Activity</h2>
                 </div>
@@ -962,7 +1023,7 @@ const HomePage = () => {
             </div>
 
           {/* Recent Activity List */}
-              <div className="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
+              <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 flex flex-col h-full" style={{ minHeight: '400px' }}>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
                 </div>
