@@ -1,4 +1,3 @@
-// src/app.js
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
@@ -59,7 +58,7 @@ app.use("/api", dashboardRoutes);
 app.use("/api", messageRoutes);
 app.use("/api", attendanceRoutes);
 
-// Hàm log routes (Debug purpose)
+
 function printRoutes(stack, parentPath = '') {
   stack.forEach((middleware) => {
     if (middleware.route) {

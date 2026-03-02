@@ -1,7 +1,7 @@
 import express from "express";
 import { 
   createCheckoutSession, 
-  handleWebhook, 
+  handleWebhook,   
   cancelSubscription,
   resumeSubscription, 
   createPortalSession 
@@ -16,15 +16,6 @@ const router = express.Router();
  */
 router.post("/session", verifyToken, createCheckoutSession);
 
-/**
- * @route   POST /payment/webhook
- * @desc    Stripe webhook listener
- */
-router.post(
-  "/webhook", 
-  express.raw({ type: 'application/json' }), 
-  handleWebhook
-);
 /**
  * @route   POST /payment/cancel
  * @desc    Cancel subscription (Schedule for end of period)
