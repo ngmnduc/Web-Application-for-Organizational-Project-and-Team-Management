@@ -123,7 +123,7 @@ router.put('/projects/:id/members/:userId', verifyToken, requireOrgAccess, requi
  * @route   GET /projects/:id/report/attendance
  * @desc    Export attendance report to CSV
  */
-router.get("/projects/:id/report/attendance", verifyToken, requireOrgAccess, checkRole("Admin", "Manager"), exportAttendanceReport
+router.get("/projects/:id/report/attendance", verifyToken, requireOrgAccess, requireProjectManager, exportAttendanceReport
 );
 
 export default router;
