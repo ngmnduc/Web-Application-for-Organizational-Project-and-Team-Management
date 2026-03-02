@@ -187,3 +187,21 @@ export const approveMember = async (req, res) => {
     res.status(500).json({ success: false, error: "ServerError", message: err.message });
   }
 };
+// rejected
+export const checkMyJoinStatus = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    // Tìm bản ghi xin vào dự án mới nhất của user này
+    const memberRecord = await ProjectMember.findOne({ userId: userId }).sort({ createdAt: -1 });
+
+    if (!memberRecord) {
+      return res.json({ success: true, data: { status: 'NONE' } });
+    }
+
+    // Trả về chính xác trạng thái: 'PENDING', 'ACTIVE', hoặc 'REJECTED'
+    res.json({ success: true, data: { status: memberRecord.status } });
+  } catch (err) {
+    console.error("Check status error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
