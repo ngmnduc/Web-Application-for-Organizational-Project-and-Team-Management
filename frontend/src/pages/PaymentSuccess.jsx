@@ -26,26 +26,18 @@ const PaymentSuccess = () => {
 
 const handleSyncData = async () => {
         try {
-            console.log(`Syncing profile data... Attempt: ${retryCount + 1}`);
-            const data = await refreshProfile(); 
+            console.log("Syncing profile data...");
+            const data = await refreshProfile(); // Gọi hàm service
             
-            if (data && data.user && data.organization) {
+            if (data && data.user) {
+                console.log("Profile synced:", data);
+                setUser(data.user); // Cập nhật Context
                 
                 // Lưu gói cước mới vào LocalStorage để NavBar đọc được
                 if (data.organization) {
                     localStorage.setItem('organization', JSON.stringify(data.organization));
-                    
-                    setStatus('success'); // Dừng lặp, hiện màn hình chúc mừng
-                } else {
-                    // Nếu Backend vẫn báo là FREE -> Webhook đang bị delay trên mạng
-                    if (retryCount < 5) { // Thử tối đa 5 lần (tương đương 15 giây chờ)
-                        console.log("Waiting for Stripe Webhook... Retrying in 3 seconds.");
-                        setTimeout(() => handleSyncData(retryCount + 1), 3000);
-                    } else {
-                        // Nếu chờ quá lâu mà Stripe vẫn chưa gọi về
-                        throw new Error("Payment verification is taking longer than expected. Your payment is safe, but the status is updating slowly. Please check the Dashboard later.");
-                    }
                 }
+
                 setStatus('success');
             } else {
                 throw new Error("Failed to retrieve user data");
