@@ -24,7 +24,7 @@ const PaymentSuccess = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-const handleSyncData = async () => {
+    const handleSyncData = async () => {
         try {
             console.log("Syncing profile data...");
             const data = await refreshProfile(); // Gọi hàm service
@@ -32,12 +32,6 @@ const handleSyncData = async () => {
             if (data && data.user) {
                 console.log("Profile synced:", data);
                 setUser(data.user); // Cập nhật Context
-                
-                // Lưu gói cước mới vào LocalStorage để NavBar đọc được
-                if (data.organization) {
-                    localStorage.setItem('organization', JSON.stringify(data.organization));
-                }
-
                 setStatus('success');
             } else {
                 throw new Error("Failed to retrieve user data");
@@ -49,13 +43,16 @@ const handleSyncData = async () => {
         }
     };
 
-    // Chạy cơ chế kiểm tra ngay khi vừa load trang
     useEffect(() => {
-        handleSyncData(0); 
+        // Chờ 1.5s để đảm bảo Webhook phía Backend đã chạy xong DB update
+        const timer = setTimeout(() => {
+            handleSyncData();
+        }, 1500);
+        return () => clearTimeout(timer);
     }, []);
 
     const handleExplore = () => {
-        window.location.href = '/home'; 
+        navigate('/home'); 
     };
 
     return (
