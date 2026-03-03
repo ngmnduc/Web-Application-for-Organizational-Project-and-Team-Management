@@ -16,7 +16,7 @@ import {
 } from "./controllers/project.controller.js";
 import { listUsers, searchUsers, getUser, updateUserStatus, deleteUser, updatePreferences } from "./controllers/user.controller.js";
 import { getLabels, createLabel, updateLabel, deleteLabel } from "./controllers/label.controller.js";
-import { getMembers, addMember, removeMember, joinRequest, approveMember } from "./controllers/membership.controller.js";
+import { getMembers, addMember, removeMember, joinRequest, approveMember, checkMyJoinStatus } from "./controllers/membership.controller.js";
 import { checkProjectActive } from "./middlewares/archive.middleware.js";
 import taskRoutes from "./routes/task.routes.js";
 import meetingRoutes from "./routes/meeting.routes.js";
@@ -65,6 +65,7 @@ router.use("/", organizationRoutes);
 router.post("/projects", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), createProject);
 router.get("/projects", verifyToken, requireOrgAccess, listProjects);
 router.get("/projects/pending-requests", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN,ROLES.MANAGER), getPendingRequests);
+router.get("/projects/my-status", verifyToken, requireOrgAccess, checkMyJoinStatus);
 router.get("/projects/:id", verifyToken, requireOrgAccess, getProject);
 router.put("/projects/:id", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), checkProjectActive, updateProject);
 router.delete("/projects/:id", verifyToken, requireOrgAccess, checkRole(ROLES.ADMIN, ROLES.MANAGER), deleteProject);

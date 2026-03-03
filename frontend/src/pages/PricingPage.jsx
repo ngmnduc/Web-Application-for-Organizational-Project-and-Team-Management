@@ -19,7 +19,7 @@ export default function PricingPage() {
   
   // State Payment & Processing
   const [paymentError, setPaymentError] = useState(''); 
-  const [isProcessing, setIsProcessing] = useState(false); // Loading state chung
+ const [processingPlan, setProcessingPlan] = useState(null); // Lưu 'Free' hoặc 'Premium'
 
   //  XỬ LÝ CHỌN GÓI FREE 
   const handleFreePlan = async (e) => {
@@ -35,7 +35,7 @@ export default function PricingPage() {
       }
 
       // CASE 2: Đã đăng nhập -> Tạo Org Free ngay lập tức
-      setIsProcessing(true);
+      setProcessingPlan('Free');
       try {
         const response = await fetch(`${API_BASE_URL}/organizations`, {
             method: 'POST',
@@ -66,7 +66,7 @@ export default function PricingPage() {
         console.error(err);
         setPaymentError("Connection error");
       } finally {
-        setIsProcessing(false);
+        setProcessingPlan(null);
       }
   };
 
@@ -85,7 +85,7 @@ export default function PricingPage() {
     }
 
     // CASE 2: Đã đăng nhập -> Gọi API lấy link thanh toán
-    setIsProcessing(true);
+    setProcessingPlan('Premium');
     try {
       const response = await fetch(`${API_BASE_URL}/payment/session`, { 
         method: 'POST',
@@ -109,7 +109,7 @@ export default function PricingPage() {
     } catch (error) {
       setPaymentError('Connection error. Please try again.');
     } finally {
-      setIsProcessing(false);
+      setProcessingPlan(null);
     }
   };
 
@@ -227,11 +227,14 @@ export default function PricingPage() {
                 ))}
               </div>
               <button 
-                onClick={handleFreePlan} // Chỉ Button mới trigger API
-                disabled={isProcessing}
-                className="block w-full py-3 px-6 bg-zinc-800 text-white text-center rounded-lg hover:bg-zinc-700 transition-all duration-300 border border-zinc-700 font-bold disabled:opacity-50"
+                onClick={handleFreePlan}
+                disabled={processingPlan !== null}
+                className={`w-full py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2
+                  ${selectedPlan === 'Free' ? 'bg-white text-black hover:bg-gray-200' : 'bg-zinc-800 text-white hover:bg-zinc-700'}
+                  ${processingPlan !== null ? 'opacity-50 cursor-not-allowed' : ''}
+                `}  
               >
-                {isProcessing && selectedPlan === 'Free' ? <Loader2 className="w-5 h-5 animate-spin mx-auto"/> : "Continue with Free"}
+                {processingPlan === 'Free' ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Get Started Free'}
               </button>
             </div>
 
@@ -252,11 +255,13 @@ export default function PricingPage() {
                 ))}
               </div>
               <button 
-                onClick={handleAdminUpgrade} // Chỉ Button mới trigger API
-                disabled={isProcessing}
-                className="w-full py-3 px-6 bg-orange-500 text-black rounded-lg hover:bg-orange-600 transition-all duration-300 shadow-lg shadow-orange-500/50 font-bold disabled:opacity-50"
+                onClick={handleAdminUpgrade}
+                disabled={processingPlan !== null}
+                className={`w-full py-3 rounded-lg font-bold transition-all bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 flex items-center justify-center gap-2
+                  ${processingPlan !== null ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
               >
-                {isProcessing && selectedPlan === 'Admin' ? <Loader2 className="w-5 h-5 animate-spin mx-auto"/> : "Get Admin Access"}
+                {processingPlan === 'Premium' ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Upgrade to Premium'}
               </button>
               
               {paymentError && <div className="mt-3 flex items-center gap-2 text-red-500 text-sm justify-center animate-pulse"><AlertCircle className="w-4 h-4" /><span>{paymentError}</span></div>}
