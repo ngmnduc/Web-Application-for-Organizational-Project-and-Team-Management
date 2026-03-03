@@ -46,6 +46,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+
 app.use("/api", router);
 app.use("/api", taskRoutes);
 app.use("/api", commentRoutes);
@@ -57,27 +59,6 @@ app.use("/api", organizationRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/api", messageRoutes);
 app.use("/api", attendanceRoutes);
-
-
-function printRoutes(stack, parentPath = '') {
-  stack.forEach((middleware) => {
-    if (middleware.route) {
-      const methods = Object.keys(middleware.route.methods).join(', ').toUpperCase();
-      console.log(`Route: ${methods} ${parentPath}${middleware.route.path}`);
-    } else if (middleware.name === 'router') {
-      const routerPath = middleware.regexp.source
-        .replace('\\/?', '')
-        .replace('(?=\\/|$)', '')
-        .replace(/\\\//g, '/');
-      
-      printRoutes(middleware.handle.stack, parentPath + routerPath);
-    }
-  });
-}
-
-console.log('\n Registered Routes:');
-printRoutes(app._router.stack, '');
-console.log('');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
